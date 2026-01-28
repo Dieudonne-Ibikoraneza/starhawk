@@ -144,6 +144,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [loadingMapImage, setLoadingMapImage] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [hasUserClickedLoad, setHasUserClickedLoad] = useState(false);
 
   // Polling function to check for drone analysis data
   const startPollingForDroneData = (assessmentId: string) => {
@@ -239,23 +240,51 @@ export default function RiskAssessmentSystem(): JSX.Element {
     }
   }, [viewMode, assessment]);
 
-  // Auto-load map image if data is available
+  // Auto-load map image if data is available (only on initial load, not after user interaction)
   useEffect(() => {
-    if (assessment?.droneAnalysisData?.map_image) {
+    console.log('🔄 Auto-load effect triggered', {
+      hasAssessment: !!assessment,
+      hasDroneAnalysisData: !!assessment?.droneAnalysisData,
+      hasMapImage: !!assessment?.droneAnalysisData?.map_image,
+      hasUserClickedLoad,
+      mapImageData: assessment?.droneAnalysisData?.map_image
+    });
+    
+    if (assessment?.droneAnalysisData?.map_image && !hasUserClickedLoad) {
       const mapImage = assessment.droneAnalysisData.map_image;
-      // Auto-load if we have embedded data or URL
+      console.log('🔄 Checking map image for auto-load:', {
+        hasData: !!mapImage.data,
+        hasUrl: !!mapImage.url,
+        format: mapImage.format,
+        dataType: typeof mapImage.data,
+        dataLength: mapImage.data?.length
+      });
+      
+      // Only auto-load if we have embedded data and user hasn't manually loaded yet
       if (mapImage.data || mapImage.url) {
         if (mapImage.data) {
-          setMapImageUrl(`data:image/${mapImage.format || 'png'};base64,${mapImage.data}`);
+          const imageUrl = `data:image/${mapImage.format || 'png'};base64,${mapImage.data}`;
+          console.log('🔄 Auto-loading map image from embedded data, URL length:', imageUrl.length);
+          setMapImageUrl(imageUrl);
         } else if (mapImage.url) {
+          console.log('🔄 Auto-loading map image from URL:', mapImage.url);
           setMapImageUrl(mapImage.url);
         }
+      } else {
+        console.log('⚠️ Map image exists but no data or URL available');
       }
-    } else {
-      // Clear image URL when assessment changes
+    } else if (!assessment?.droneAnalysisData?.map_image) {
+      // Clear image URL when assessment changes and no map_image exists
+      console.log('🧹 Clearing map image URL (no map_image data)');
       setMapImageUrl(null);
+      setHasUserClickedLoad(false);
     }
-  }, [assessment?.droneAnalysisData?.map_image]);
+  }, [assessment?.droneAnalysisData?.map_image, hasUserClickedLoad]);
+
+  // Debug: Log mapImageUrl changes
+  useEffect(() => {
+    console.log('🖼️ mapImageUrl state changed:', mapImageUrl ? `${mapImageUrl.substring(0, 50)}...` : 'null');
+  }, [mapImageUrl]);
 
   // Cleanup: revoke blob URLs when component unmounts or image changes
   useEffect(() => {
@@ -1103,7 +1132,13 @@ export default function RiskAssessmentSystem(): JSX.Element {
 
   // Fetch map image from API or use embedded data
   const fetchMapImage = async () => {
+    console.log('🔍 fetchMapImage called');
+    console.log('🔍 assessment:', assessment);
+    console.log('🔍 assessment.droneAnalysisData:', assessment?.droneAnalysisData);
+    console.log('🔍 assessment.droneAnalysisData?.map_image:', assessment?.droneAnalysisData?.map_image);
+    
     if (!assessment?._id || !assessment.droneAnalysisData?.map_image) {
+      console.error('❌ Missing assessment or map_image data');
       toast({
         title: "No Image Data",
         description: "Map image data is not available",
@@ -1112,13 +1147,24 @@ export default function RiskAssessmentSystem(): JSX.Element {
       return;
     }
 
+    setHasUserClickedLoad(true); // Mark that user has clicked the button
     setLoadingMapImage(true);
     try {
       const mapImage = assessment.droneAnalysisData.map_image;
+      console.log('🔍 Fetching map image, available data:', {
+        hasData: !!mapImage.data,
+        hasUrl: !!mapImage.url,
+        format: mapImage.format,
+        dataType: typeof mapImage.data,
+        dataLength: mapImage.data?.length,
+        allKeys: Object.keys(mapImage)
+      });
       
-      // First, check if we have base64 data embedded
+      // First, check if we have base64 data embedded (highest priority)
       if (mapImage.data) {
-        setMapImageUrl(`data:image/${mapImage.format || 'png'};base64,${mapImage.data}`);
+        const imageUrl = `data:image/${mapImage.format || 'png'};base64,${mapImage.data}`;
+        console.log('✅ Setting map image URL from embedded data, length:', imageUrl.length);
+        setMapImageUrl(imageUrl);
         toast({
           title: "Success",
           description: "Map image displayed from embedded data",
@@ -1129,6 +1175,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
       
       // Check if we have a URL
       if (mapImage.url) {
+        console.log('✅ Setting map image URL from URL:', mapImage.url);
         setMapImageUrl(mapImage.url);
         toast({
           title: "Success",
@@ -1150,20 +1197,30 @@ export default function RiskAssessmentSystem(): JSX.Element {
         headers.Authorization = `Bearer ${token}`;
       }
 
+      console.log('🌐 Attempting to fetch from API endpoint:', imageEndpoint);
       const response = await fetch(imageEndpoint, { headers });
       
       if (response.ok && response.headers.get('content-type')?.startsWith('image/')) {
         // If API returns the image directly, create blob URL
         const blob = await response.blob();
         const imageUrl = URL.createObjectURL(blob);
+        console.log('✅ Setting map image URL from API blob:', imageUrl);
         setMapImageUrl(imageUrl);
         toast({
           title: "Success",
           description: "Map image loaded from server",
         });
       } else if (response.status === 404) {
-        // Endpoint doesn't exist, try to use PDF as fallback
-        if (assessment.droneAnalysisPdfUrl) {
+        // Endpoint doesn't exist, try to use embedded data as fallback
+        if (mapImage.data) {
+          const imageUrl = `data:image/${mapImage.format || 'png'};base64,${mapImage.data}`;
+          console.log('✅ Setting map image URL from embedded data (fallback):', imageUrl.length);
+          setMapImageUrl(imageUrl);
+          toast({
+            title: "Success",
+            description: "Map image displayed from embedded data",
+          });
+        } else if (assessment.droneAnalysisPdfUrl) {
           toast({
             title: "Image in PDF",
             description: "Map image is embedded in the PDF. Please view the PDF to see it.",
@@ -1176,13 +1233,20 @@ export default function RiskAssessmentSystem(): JSX.Element {
         throw new Error(`Failed to fetch image: ${response.status}`);
       }
     } catch (err: any) {
-      console.error('Failed to fetch map image:', err);
+      console.error('❌ Failed to fetch map image:', err);
       
       // Final fallback: Check if image data exists in response
-      const mapImage = assessment.droneAnalysisData.map_image;
+      const mapImage = assessment.droneAnalysisData?.map_image;
       if (mapImage?.data) {
-        setMapImageUrl(`data:image/${mapImage.format || 'png'};base64,${mapImage.data}`);
+        const imageUrl = `data:image/${mapImage.format || 'png'};base64,${mapImage.data}`;
+        console.log('✅ Setting map image URL from embedded data (error fallback):', imageUrl.length);
+        setMapImageUrl(imageUrl);
+        toast({
+          title: "Success",
+          description: "Map image displayed from embedded data",
+        });
       } else {
+        console.error('❌ No image data available in fallback');
         toast({
           title: "Image Not Available",
           description: err.message || "Could not load map image. It may be embedded in the PDF.",
@@ -1191,6 +1255,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
       }
     } finally {
       setLoadingMapImage(false);
+      console.log('🏁 Finished loading map image, mapImageUrl state:', mapImageUrl);
     }
   };
 
@@ -2009,7 +2074,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
                           )}
 
                           {/* Map Image Section */}
-                          {assessment.droneAnalysisData.map_image && (
+                          {assessment.droneAnalysisData?.map_image && (
                             <div className="px-6 py-4 border-t border-gray-200">
                               <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-sm font-semibold text-gray-700">Map Image</h3>
@@ -2032,28 +2097,92 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                   )}
                                 </Button>
                               </div>
-                              {/* Display embedded image if available */}
-                              {(mapImageUrl || assessment.droneAnalysisData.map_image.data || assessment.droneAnalysisData.map_image.url) && (
-                                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                                  <img
-                                    src={mapImageUrl || 
-                                      (assessment.droneAnalysisData.map_image.data 
-                                        ? `data:image/${assessment.droneAnalysisData.map_image.format || 'png'};base64,${assessment.droneAnalysisData.map_image.data}`
-                                        : assessment.droneAnalysisData.map_image.url)}
-                                    alt="Field Map"
-                                    className="w-full max-h-96 object-contain bg-white"
-                                    onError={(e) => {
-                                      console.error('Failed to load map image');
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                      toast({
-                                        title: "Image Load Error",
-                                        description: "Failed to display the map image",
-                                        variant: "destructive",
-                                      });
-                                    }}
-                                  />
-                                </div>
-                              )}
+                              
+                              {/* Image Display Section - Always shown below button */}
+                              <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 min-h-[200px] flex items-center justify-center">
+                                {loadingMapImage ? (
+                                  <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
+                                    <p className="text-sm text-gray-600">Loading map image...</p>
+                                  </div>
+                                ) : (() => {
+                                  // Determine the image source - prioritize mapImageUrl state
+                                  const mapImage = assessment.droneAnalysisData?.map_image;
+                                  
+                                  // Debug: Log the full structure
+                                  console.log('🔍 Full droneAnalysisData:', assessment.droneAnalysisData);
+                                  console.log('🔍 map_image object:', mapImage);
+                                  console.log('🔍 map_image.data exists:', !!mapImage?.data);
+                                  console.log('🔍 map_image.data type:', typeof mapImage?.data);
+                                  console.log('🔍 map_image.data length:', mapImage?.data?.length);
+                                  
+                                  let imageSrc: string | null = null;
+                                  
+                                  // Priority 1: Use state if set (from Load Image button)
+                                  if (mapImageUrl) {
+                                    imageSrc = mapImageUrl;
+                                    console.log('📸 Using mapImageUrl from state');
+                                  } 
+                                  // Priority 2: Use embedded base64 data
+                                  else if (mapImage?.data) {
+                                    const format = mapImage.format || 'png';
+                                    imageSrc = `data:image/${format};base64,${mapImage.data}`;
+                                    console.log('📸 Using embedded base64 data, format:', format, 'data length:', mapImage.data.length);
+                                  } 
+                                  // Priority 3: Use URL
+                                  else if (mapImage?.url) {
+                                    imageSrc = mapImage.url;
+                                    console.log('📸 Using map image URL');
+                                  }
+                                  
+                                  console.log('📸 Image source determined:', imageSrc ? 'Available' : 'Not available', {
+                                    hasMapImageUrl: !!mapImageUrl,
+                                    hasData: !!mapImage?.data,
+                                    hasUrl: !!mapImage?.url,
+                                    mapImageKeys: mapImage ? Object.keys(mapImage) : 'null'
+                                  });
+                                  
+                                  if (imageSrc) {
+                                    return (
+                                      <img
+                                        key={imageSrc.substring(0, 100)} // Force re-render when src changes
+                                        src={imageSrc}
+                                        alt="Field Map"
+                                        className="w-full max-h-96 object-contain bg-white"
+                                        onLoad={() => {
+                                          console.log('✅ Map image loaded successfully from:', imageSrc?.substring(0, 50));
+                                        }}
+                                        onError={(e) => {
+                                          console.error('❌ Failed to load map image:', imageSrc?.substring(0, 50));
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = 'none';
+                                          toast({
+                                            title: "Image Load Error",
+                                            description: "Failed to display the map image. Please try clicking 'Load Image' again.",
+                                            variant: "destructive",
+                                          });
+                                        }}
+                                      />
+                                    );
+                                  } else {
+                                    return (
+                                      <div className="flex flex-col items-center justify-center py-12 px-4">
+                                        <Map className="h-12 w-12 text-gray-300 mb-3" />
+                                        <p className="text-sm text-gray-600 text-center mb-2">Map image not loaded</p>
+                                        <p className="text-xs text-gray-500 text-center">Click "Load Image" button above to display the map</p>
+                                        <div className="text-xs text-gray-400 text-center mt-2 space-y-1">
+                                          <p>Debug: mapImageUrl={mapImageUrl ? 'set' : 'null'}</p>
+                                          <p>hasData={mapImage?.data ? 'yes' : 'no'}</p>
+                                          <p>hasUrl={mapImage?.url ? 'yes' : 'no'}</p>
+                                          <p>mapImage keys: {mapImage ? Object.keys(mapImage).join(', ') : 'null'}</p>
+                                          <p>data type: {typeof mapImage?.data}</p>
+                                          <p>data length: {mapImage?.data?.length || 'N/A'}</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                })()}
+                              </div>
                             </div>
                           )}
 

@@ -463,7 +463,7 @@ class AssessmentsApiService {
     
     const response = await fetch(url, {
       method: 'DELETE',
-      headers,
+    headers,
     });
     
     if (response.status === 401) {
