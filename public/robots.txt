@@ -1,0 +1,16 @@
+# robots.txt for STARHAWK Agricultural Insurance Platform
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://starhawk.com/sitemap.xml
+
+# Disallow admin and API endpoints
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+
+# Allow important pages
+Allow: /
+Allow: /services
+Allow: /team

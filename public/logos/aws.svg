@@ -1,0 +1,5 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="5" width="30" height="30" rx="4" fill="#FF9900"/>
+  <text x="8" y="25" fill="white" font-family="Arial, sans-serif" font-size="10" font-weight="bold">AWS</text>
+  <text x="45" y="25" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Amazon Web Services</text>
+</svg>
