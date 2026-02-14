@@ -173,7 +173,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
   const hexToRgb = (hex: string): [number, number, number] => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
-      ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+      ? [
+          parseInt(result[1], 16),
+          parseInt(result[2], 16),
+          parseInt(result[3], 16),
+        ]
       : [0, 177, 89];
   };
 
@@ -181,7 +185,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
   const drawPieChartToDataUrl = (
     levels: { level: string; percentage?: number }[],
     colors: readonly string[] | string[],
-    sizePx: number = 120
+    sizePx: number = 120,
   ): string => {
     const canvas = document.createElement("canvas");
     const dpr = 2;
@@ -1153,8 +1157,12 @@ export default function RiskAssessmentSystem(): JSX.Element {
       const lineHeight = 6;
       const colGap = 8;
 
-      const analysisType = assessment.droneAnalysisData.report?.detected_analysis_type;
-      const rightBannerText = analysisType === "plant_stress" ? "PLANT STRESS ANALYSIS" : "FLOWERING ESTIMATOR";
+      const analysisType =
+        assessment.droneAnalysisData.report?.detected_analysis_type;
+      const rightBannerText =
+        analysisType === "plant_stress"
+          ? "PLANT STRESS ANALYSIS"
+          : "FLOWERING ESTIMATOR";
 
       // Header - Dual Banner (full width, matching reference PDFs)
       doc.setFillColor(220, 252, 231); // Light green
@@ -1165,7 +1173,9 @@ export default function RiskAssessmentSystem(): JSX.Element {
       doc.setTextColor(22, 101, 52);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("PLANT HEALTH MONITORING", pageWidth / 4, 12, { align: "center" });
+      doc.text("PLANT HEALTH MONITORING", pageWidth / 4, 12, {
+        align: "center",
+      });
 
       doc.setTextColor(255, 255, 255);
       doc.text(rightBannerText, (pageWidth / 4) * 3, 12, { align: "center" });
@@ -1187,12 +1197,20 @@ export default function RiskAssessmentSystem(): JSX.Element {
         );
         yPosition += lineHeight;
 
-        doc.text(`Growing stage: ${field.growing_stage || "N/A"}`, margin, yPosition);
+        doc.text(
+          `Growing stage: ${field.growing_stage || "N/A"}`,
+          margin,
+          yPosition,
+        );
         const analysisName =
           assessment.droneAnalysisData.report?.analysis_name ||
           assessment.droneAnalysisData.report?.type ||
           "N/A";
-        doc.text(`Analysis name: ${analysisName}`, pageWidth / 2 + margin, yPosition);
+        doc.text(
+          `Analysis name: ${analysisName}`,
+          pageWidth / 2 + margin,
+          yPosition,
+        );
         yPosition += lineHeight;
 
         const surveyDate = assessment.droneAnalysisData.report?.survey_date;
@@ -1213,7 +1231,10 @@ export default function RiskAssessmentSystem(): JSX.Element {
       );
 
       if (weedAnalysisLevels.length > 0) {
-        const tableTitle = analysisType === "plant_stress" ? "STRESS LEVEL TABLE" : "FLOWERING LEVEL TABLE";
+        const tableTitle =
+          analysisType === "plant_stress"
+            ? "STRESS LEVEL TABLE"
+            : "FLOWERING LEVEL TABLE";
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(22, 101, 52);
@@ -1224,7 +1245,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
         const rightColStart = pageWidth / 2 + colGap / 2;
 
         // Left: Pie chart
-        const pieDataUrl = drawPieChartToDataUrl(stressLevels, LEVEL_COLORS, 100);
+        const pieDataUrl = drawPieChartToDataUrl(
+          stressLevels,
+          LEVEL_COLORS,
+          100,
+        );
         if (pieDataUrl) {
           const pieSize = 55;
           const pieX = margin + (leftColEnd - margin) / 2 - pieSize / 2;
@@ -1240,7 +1265,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        doc.text(analysisType === "plant_stress" ? "Stress level" : "Level", tableX + 2, yPosition);
+        doc.text(
+          analysisType === "plant_stress" ? "Stress level" : "Level",
+          tableX + 2,
+          yPosition,
+        );
         doc.text("%", tableX + tableWidth * 0.5, yPosition);
         doc.text("Hectare", tableX + tableWidth * 0.75, yPosition);
         yPosition += 7;
@@ -1248,15 +1277,32 @@ export default function RiskAssessmentSystem(): JSX.Element {
         doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "normal");
         const tableStartY = yPosition;
-        stressLevels.forEach((level: { level?: string; percentage?: number; area_hectares?: number }, index: number) => {
-          const [r, g, b] = hexToRgb(getLevelColor(index));
-          doc.setFillColor(r, g, b);
-          doc.circle(tableX + 3, yPosition, 1.2, "F");
-          doc.text(level.level || "N/A", tableX + 7, yPosition);
-          doc.text(`${(level.percentage ?? 0).toFixed(2)}%`, tableX + tableWidth * 0.5, yPosition);
-          doc.text((level.area_hectares ?? 0).toFixed(2), tableX + tableWidth * 0.75, yPosition);
-          yPosition += lineHeight;
-        });
+        stressLevels.forEach(
+          (
+            level: {
+              level?: string;
+              percentage?: number;
+              area_hectares?: number;
+            },
+            index: number,
+          ) => {
+            const [r, g, b] = hexToRgb(getLevelColor(index));
+            doc.setFillColor(r, g, b);
+            doc.circle(tableX + 3, yPosition, 1.2, "F");
+            doc.text(level.level || "N/A", tableX + 7, yPosition);
+            doc.text(
+              `${(level.percentage ?? 0).toFixed(2)}%`,
+              tableX + tableWidth * 0.5,
+              yPosition,
+            );
+            doc.text(
+              (level.area_hectares ?? 0).toFixed(2),
+              tableX + tableWidth * 0.75,
+              yPosition,
+            );
+            yPosition += lineHeight;
+          },
+        );
 
         yPosition = Math.max(yPosition, tableStartY + 55) + 8;
       }
@@ -1278,15 +1324,27 @@ export default function RiskAssessmentSystem(): JSX.Element {
         doc.setFillColor(22, 101, 52);
         doc.rect(0, yPosition - 4, 10, 14, "F");
 
-        const totalAreaLabel = analysisType === "plant_stress" ? "Total area PLANT STRESS:" : "Total area FLOWERING:";
+        const totalAreaLabel =
+          analysisType === "plant_stress"
+            ? "Total area PLANT STRESS:"
+            : "Total area FLOWERING:";
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
         doc.text(totalAreaLabel, margin + 12, yPosition + 4);
-        doc.text(`${totalStressArea.toFixed(2)} ha =`, margin + 80, yPosition + 4);
+        doc.text(
+          `${totalStressArea.toFixed(2)} ha =`,
+          margin + 80,
+          yPosition + 4,
+        );
         doc.setFillColor(15, 118, 110);
         doc.rect(margin + 100, yPosition, 30, 8, "F");
-        doc.text(`${totalStressPercent.toFixed(0)}% field`, margin + 115, yPosition + 5, { align: "center" });
+        doc.text(
+          `${totalStressPercent.toFixed(0)}% field`,
+          margin + 115,
+          yPosition + 5,
+          { align: "center" },
+        );
         yPosition += 20;
       }
 
@@ -1320,10 +1378,19 @@ export default function RiskAssessmentSystem(): JSX.Element {
           yPosition += 10;
           const imgWidth = pageWidth - margin * 2;
           const imgHeight = pageHeight - margin - yPosition - 20;
-          const imgFormat = imageDataUrl.startsWith("data:image/jpeg") || imageDataUrl.startsWith("data:image/jpg")
-            ? "JPEG"
-            : "PNG";
-          doc.addImage(imageDataUrl, imgFormat, margin, yPosition, imgWidth, imgHeight);
+          const imgFormat =
+            imageDataUrl.startsWith("data:image/jpeg") ||
+            imageDataUrl.startsWith("data:image/jpg")
+              ? "JPEG"
+              : "PNG";
+          doc.addImage(
+            imageDataUrl,
+            imgFormat,
+            margin,
+            yPosition,
+            imgWidth,
+            imgHeight,
+          );
           yPosition += imgHeight + 15;
         }
       }
@@ -1367,7 +1434,8 @@ export default function RiskAssessmentSystem(): JSX.Element {
         const reportLines: string[] = [];
         if (report.provider) reportLines.push(`Provider: ${report.provider}`);
         if (report.type) reportLines.push(`Type: ${report.type}`);
-        if (report.survey_date && !assessment.droneAnalysisData.field) reportLines.push(`Survey date: ${report.survey_date}`);
+        if (report.survey_date && !assessment.droneAnalysisData.field)
+          reportLines.push(`Survey date: ${report.survey_date}`);
         reportLines.forEach((line) => {
           doc.setFontSize(9);
           doc.text(line, margin, yPosition);
@@ -2416,7 +2484,9 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                     {/* Level Table */}
                                     <div>
                                       <h3 className="text-sm font-bold text-green-700 uppercase tracking-wide mb-4">
-                                        {assessment.droneAnalysisData.report?.detected_analysis_type === "plant_stress"
+                                        {assessment.droneAnalysisData.report
+                                          ?.detected_analysis_type ===
+                                        "plant_stress"
                                           ? "STRESS LEVEL TABLE"
                                           : "FLOWERING LEVEL TABLE"}
                                       </h3>
@@ -2424,7 +2494,10 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                         <thead>
                                           <tr className="bg-teal-700 text-white">
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                                              {assessment.droneAnalysisData.report?.detected_analysis_type === "plant_stress"
+                                              {assessment.droneAnalysisData
+                                                .report
+                                                ?.detected_analysis_type ===
+                                              "plant_stress"
                                                 ? "Stress level"
                                                 : "Level"}
                                             </th>
@@ -2439,42 +2512,42 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                         <tbody>
                                           {levels.map(
                                             (level: any, index: number) => (
-                                                <tr
-                                                  key={index}
-                                                  className="border-b border-gray-200 hover:bg-gray-50"
-                                                >
-                                                  <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                      <div
-                                                        className="w-3 h-3 rounded-full flex-shrink-0"
-                                                        style={{
-                                                          backgroundColor:
-                                                            getLevelColor(index),
-                                                        }}
-                                                      ></div>
-                                                      <span className="text-sm font-medium text-gray-900">
-                                                        {level.level}
-                                                      </span>
-                                                    </div>
-                                                  </td>
-                                                  <td className="px-4 py-3">
-                                                    <span className="text-sm font-semibold text-gray-900">
-                                                      {(
-                                                        level.percentage ?? 0
-                                                      ).toFixed(2)}
-                                                      %
-                                                    </span>
-                                                  </td>
-                                                  <td className="px-4 py-3">
+                                              <tr
+                                                key={index}
+                                                className="border-b border-gray-200 hover:bg-gray-50"
+                                              >
+                                                <td className="px-4 py-3">
+                                                  <div className="flex items-center gap-2">
+                                                    <div
+                                                      className="w-3 h-3 rounded-full flex-shrink-0"
+                                                      style={{
+                                                        backgroundColor:
+                                                          getLevelColor(index),
+                                                      }}
+                                                    ></div>
                                                     <span className="text-sm font-medium text-gray-900">
-                                                      {(
-                                                        level.area_hectares ?? 0
-                                                      ).toFixed(2)}
+                                                      {level.level}
                                                     </span>
-                                                  </td>
-                                                </tr>
-                                              ))
-                                            }
+                                                  </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <span className="text-sm font-semibold text-gray-900">
+                                                    {(
+                                                      level.percentage ?? 0
+                                                    ).toFixed(2)}
+                                                    %
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <span className="text-sm font-medium text-gray-900">
+                                                    {(
+                                                      level.area_hectares ?? 0
+                                                    ).toFixed(2)}
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            ),
+                                          )}
                                         </tbody>
                                       </table>
                                     </div>
@@ -2505,7 +2578,13 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                   <div className="absolute top-0 left-0 w-0 h-0 border-l-[30px] border-l-green-800 border-t-[30px] border-t-green-800 border-r-[30px] border-r-transparent border-b-[30px] border-b-transparent"></div>
                                   <div className="flex items-center gap-3">
                                     <span className="text-white font-semibold">
-                                      Total area {assessment.droneAnalysisData.report?.detected_analysis_type === "plant_stress" ? "PLANT STRESS" : "FLOWERING"}:
+                                      Total area{" "}
+                                      {assessment.droneAnalysisData.report
+                                        ?.detected_analysis_type ===
+                                      "plant_stress"
+                                        ? "PLANT STRESS"
+                                        : "FLOWERING"}
+                                      :
                                     </span>
                                     <span className="text-white text-xl font-bold">
                                       {totalStressArea.toFixed(2)} ha =
