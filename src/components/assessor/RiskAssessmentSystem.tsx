@@ -177,6 +177,41 @@ export default function RiskAssessmentSystem(): JSX.Element {
       : [0, 177, 89];
   };
 
+  // Draw pie chart on canvas and return data URL for PDF embedding
+  const drawPieChartToDataUrl = (
+    levels: { level: string; percentage?: number }[],
+    colors: readonly string[] | string[],
+    sizePx: number = 120
+  ): string => {
+    const canvas = document.createElement("canvas");
+    const dpr = 2;
+    canvas.width = sizePx * dpr;
+    canvas.height = sizePx * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+    ctx.scale(dpr, dpr);
+    const centerX = sizePx / 2;
+    const centerY = sizePx / 2;
+    const radius = sizePx / 2 - 8;
+    const total = levels.reduce((sum, l) => sum + (l.percentage ?? 0), 0) || 1;
+    let startAngle = -Math.PI / 2;
+    levels.forEach((level, i) => {
+      const value = level.percentage ?? 0;
+      const sliceAngle = (value / total) * 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[i] ?? "#888";
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      startAngle += sliceAngle;
+    });
+    return canvas.toDataURL("image/png");
+  };
+
   // Helper function to get full PDF URL
   const getFullPdfUrl = (pdfUrl: string | null): string => {
     if (!pdfUrl) return "";
@@ -1114,120 +1149,116 @@ export default function RiskAssessmentSystem(): JSX.Element {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       let yPosition = 20;
-      const margin = 20;
-      const lineHeight = 7;
-
-      // Header - Dual Banner
-      doc.setFillColor(220, 252, 231); // Light green
-      doc.rect(0, 0, pageWidth / 2, 15, "F");
-      doc.setFillColor(15, 118, 110); // Dark teal
-      doc.rect(pageWidth / 2, 0, pageWidth / 2, 15, "F");
+      const margin = 18;
+      const lineHeight = 6;
+      const colGap = 8;
 
       const analysisType = assessment.droneAnalysisData.report?.detected_analysis_type;
       const rightBannerText = analysisType === "plant_stress" ? "PLANT STRESS ANALYSIS" : "FLOWERING ESTIMATOR";
 
-      doc.setTextColor(22, 101, 52); // Green text
-      doc.setFontSize(14);
+      // Header - Dual Banner (full width, matching reference PDFs)
+      doc.setFillColor(220, 252, 231); // Light green
+      doc.rect(0, 0, pageWidth / 2, 18, "F");
+      doc.setFillColor(15, 118, 110); // Dark teal
+      doc.rect(pageWidth / 2, 0, pageWidth / 2, 18, "F");
+
+      doc.setTextColor(22, 101, 52);
+      doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("PLANT HEALTH MONITORING", pageWidth / 4, 10, {
-        align: "center",
-      });
+      doc.text("PLANT HEALTH MONITORING", pageWidth / 4, 12, { align: "center" });
 
-      doc.setTextColor(255, 255, 255); // White text
-      doc.text(rightBannerText, (pageWidth / 4) * 3, 10, {
-        align: "center",
-      });
+      doc.setTextColor(255, 255, 255);
+      doc.text(rightBannerText, (pageWidth / 4) * 3, 12, { align: "center" });
 
-      yPosition = 25;
+      yPosition = 28;
 
-      // Crop and Field Information
+      // Crop and Field Information (2 columns)
       if (assessment.droneAnalysisData.field) {
         const field = assessment.droneAnalysisData.field;
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
 
-        // Left column
         doc.text(`Crop: ${field.crop || "N/A"}`, margin, yPosition);
-        yPosition += lineHeight;
-        doc.text(
-          `Growing stage: ${field.growing_stage || "N/A"}`,
-          margin,
-          yPosition,
-        );
-
-        // Right column
-        yPosition -= lineHeight * 2;
         doc.text(
           `Field area: ${field.area_hectares ? field.area_hectares.toFixed(2) + " Hectare" : "N/A"}`,
           pageWidth / 2 + margin,
           yPosition,
         );
         yPosition += lineHeight;
+
+        doc.text(`Growing stage: ${field.growing_stage || "N/A"}`, margin, yPosition);
         const analysisName =
           assessment.droneAnalysisData.report?.analysis_name ||
           assessment.droneAnalysisData.report?.type ||
           "N/A";
-        doc.text(
-          `Analysis name: ${analysisName}`,
-          pageWidth / 2 + margin,
-          yPosition,
-        );
+        doc.text(`Analysis name: ${analysisName}`, pageWidth / 2 + margin, yPosition);
+        yPosition += lineHeight;
 
-        // Green line separator
-        yPosition += lineHeight + 3;
-        doc.setDrawColor(34, 197, 94); // Green
-        doc.setLineWidth(0.5);
+        const surveyDate = assessment.droneAnalysisData.report?.survey_date;
+        if (surveyDate) {
+          doc.text(`Survey date: ${surveyDate}`, margin, yPosition);
+          yPosition += lineHeight;
+        }
+
+        yPosition += 6;
+        doc.setDrawColor(34, 197, 94);
+        doc.setLineWidth(0.8);
         doc.line(margin, yPosition, pageWidth - margin, yPosition);
-        yPosition += 5;
+        yPosition += 10;
       }
 
-      // Stress Levels Section
       const weedAnalysisLevels = getWeedAnalysisLevels(
         assessment.droneAnalysisData.weed_analysis,
       );
-      if (weedAnalysisLevels.length > 0) {
-        const stressLevels = weedAnalysisLevels;
 
-        // Table Title
+      if (weedAnalysisLevels.length > 0) {
         const tableTitle = analysisType === "plant_stress" ? "STRESS LEVEL TABLE" : "FLOWERING LEVEL TABLE";
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(22, 101, 52); // Green
+        doc.setTextColor(22, 101, 52);
         doc.text(tableTitle, margin, yPosition);
-        yPosition += lineHeight + 2;
+        yPosition += lineHeight + 4;
+        const stressLevels = weedAnalysisLevels;
+        const leftColEnd = pageWidth / 2 - colGap / 2;
+        const rightColStart = pageWidth / 2 + colGap / 2;
 
-        // Table Header
-        doc.setFillColor(15, 118, 110); // Dark teal
-        doc.rect(margin, yPosition - 5, pageWidth - margin * 2, 8, "F");
+        // Left: Pie chart
+        const pieDataUrl = drawPieChartToDataUrl(stressLevels, LEVEL_COLORS, 100);
+        if (pieDataUrl) {
+          const pieSize = 55;
+          const pieX = margin + (leftColEnd - margin) / 2 - pieSize / 2;
+          doc.addImage(pieDataUrl, "PNG", pieX, yPosition, pieSize, pieSize);
+        }
+
+        // Right: Table
+        const tableX = rightColStart;
+        const tableWidth = pageWidth - margin - rightColStart;
+
+        doc.setFillColor(15, 118, 110);
+        doc.rect(tableX, yPosition - 5, tableWidth, 7, "F");
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        doc.text(analysisType === "plant_stress" ? "Stress level" : "Level", margin + 2, yPosition);
-        doc.text("%", margin + 80, yPosition);
-        doc.text("Hectare", margin + 100, yPosition);
-        yPosition += 8;
+        doc.text(analysisType === "plant_stress" ? "Stress level" : "Level", tableX + 2, yPosition);
+        doc.text("%", tableX + tableWidth * 0.5, yPosition);
+        doc.text("Hectare", tableX + tableWidth * 0.75, yPosition);
+        yPosition += 7;
 
-        // Table Rows
         doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "normal");
-        stressLevels.forEach((level: any, index: number) => {
-          if (yPosition > pageHeight - 30) {
-            doc.addPage();
-            yPosition = 20;
-          }
-
-          // Fixed colors by row: row 0=#00b159, row 1=#f2b11c, row 2=#ef495f
+        const tableStartY = yPosition;
+        stressLevels.forEach((level: { level?: string; percentage?: number; area_hectares?: number }, index: number) => {
           const [r, g, b] = hexToRgb(getLevelColor(index));
           doc.setFillColor(r, g, b);
-          doc.circle(margin + 3, yPosition, 1.5, "F");
-
-          doc.text(level.level || "N/A", margin + 8, yPosition);
-          doc.text(`${(level.percentage ?? 0).toFixed(2)}%`, margin + 80, yPosition);
-          doc.text((level.area_hectares ?? 0).toFixed(2), margin + 100, yPosition);
-
+          doc.circle(tableX + 3, yPosition, 1.2, "F");
+          doc.text(level.level || "N/A", tableX + 7, yPosition);
+          doc.text(`${(level.percentage ?? 0).toFixed(2)}%`, tableX + tableWidth * 0.5, yPosition);
+          doc.text((level.area_hectares ?? 0).toFixed(2), tableX + tableWidth * 0.75, yPosition);
           yPosition += lineHeight;
         });
+
+        yPosition = Math.max(yPosition, tableStartY + 55) + 8;
       }
 
       // Summary Banner
@@ -1241,38 +1272,25 @@ export default function RiskAssessmentSystem(): JSX.Element {
           yPosition = 20;
         }
 
-        yPosition += 5;
-        // Green banner
-        doc.setFillColor(34, 197, 94); // Green
-        doc.rect(0, yPosition - 5, pageWidth, 12, "F");
-
-        // Dark green triangle accent (simplified as a small rectangle)
-        doc.setFillColor(22, 101, 52); // Dark green
-        doc.rect(0, yPosition - 5, 8, 12, "F");
+        yPosition += 4;
+        doc.setFillColor(34, 197, 94);
+        doc.rect(0, yPosition - 4, pageWidth, 14, "F");
+        doc.setFillColor(22, 101, 52);
+        doc.rect(0, yPosition - 4, 10, 14, "F");
 
         const totalAreaLabel = analysisType === "plant_stress" ? "Total area PLANT STRESS:" : "Total area FLOWERING:";
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
-        doc.text(totalAreaLabel, margin + 10, yPosition + 2);
-        doc.text(
-          `${totalStressArea.toFixed(2)} ha =`,
-          margin + 70,
-          yPosition + 2,
-        );
-
-        // Dark teal box for percentage
-        doc.setFillColor(15, 118, 110); // Dark teal
-        doc.rect(margin + 85, yPosition - 1, 25, 6, "F");
-        doc.text(
-          `${totalStressPercent.toFixed(0)}% field`,
-          margin + 97.5,
-          yPosition + 2,
-          { align: "center" },
-        );
+        doc.text(totalAreaLabel, margin + 12, yPosition + 4);
+        doc.text(`${totalStressArea.toFixed(2)} ha =`, margin + 80, yPosition + 4);
+        doc.setFillColor(15, 118, 110);
+        doc.rect(margin + 100, yPosition, 30, 8, "F");
+        doc.text(`${totalStressPercent.toFixed(0)}% field`, margin + 115, yPosition + 5, { align: "center" });
+        yPosition += 20;
       }
 
-      // Map Image - embed if available (matching reference PDF layout)
+      // Map Image - new page for prominent display (matching reference PDFs)
       const mapImage = assessment.droneAnalysisData.map_image;
       if (mapImage) {
         let imageDataUrl: string | null = null;
@@ -1293,27 +1311,24 @@ export default function RiskAssessmentSystem(): JSX.Element {
           }
         }
         if (imageDataUrl) {
-          yPosition += 15;
-          if (yPosition > pageHeight - 90) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          doc.setFontSize(10);
+          doc.addPage();
+          yPosition = 15;
+          doc.setFontSize(12);
           doc.setFont("helvetica", "bold");
-          doc.setTextColor(0, 0, 0);
-          doc.text("Map", margin, yPosition);
-          yPosition += lineHeight;
+          doc.setTextColor(22, 101, 52);
+          doc.text("Field Map", margin, yPosition);
+          yPosition += 10;
           const imgWidth = pageWidth - margin * 2;
-          const imgHeight = 70;
+          const imgHeight = pageHeight - margin - yPosition - 20;
           const imgFormat = imageDataUrl.startsWith("data:image/jpeg") || imageDataUrl.startsWith("data:image/jpg")
             ? "JPEG"
             : "PNG";
           doc.addImage(imageDataUrl, imgFormat, margin, yPosition, imgWidth, imgHeight);
-          yPosition += imgHeight + 10;
+          yPosition += imgHeight + 15;
         }
       }
 
-      // Additional Information
+      // Additional Information (on current page or new if needed)
       if (assessment.droneAnalysisData.additional_info) {
         yPosition += 15;
         if (yPosition > pageHeight - 30) {
@@ -1334,42 +1349,30 @@ export default function RiskAssessmentSystem(): JSX.Element {
         yPosition += splitText.length * lineHeight;
       }
 
-      // Report Information
+      // Report Information (compact, matching reference style)
       if (assessment.droneAnalysisData.report) {
-        yPosition += 5;
-        if (yPosition > pageHeight - 40) {
+        yPosition += 8;
+        if (yPosition > pageHeight - 35) {
           doc.addPage();
           yPosition = 20;
         }
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.text("Report Information:", margin, yPosition);
-        yPosition += lineHeight;
+        doc.setTextColor(22, 101, 52);
+        doc.text("Report Information", margin, yPosition);
+        yPosition += 6;
         doc.setFont("helvetica", "normal");
-        if (assessment.droneAnalysisData.report.provider) {
-          doc.text(
-            `Provider: ${assessment.droneAnalysisData.report.provider}`,
-            margin,
-            yPosition,
-          );
-          yPosition += lineHeight;
-        }
-        if (assessment.droneAnalysisData.report.type) {
-          doc.text(
-            `Type: ${assessment.droneAnalysisData.report.type}`,
-            margin,
-            yPosition,
-          );
-          yPosition += lineHeight;
-        }
-        if (assessment.droneAnalysisData.report.survey_date) {
-          doc.text(
-            `Survey Date: ${assessment.droneAnalysisData.report.survey_date}`,
-            margin,
-            yPosition,
-          );
-          yPosition += lineHeight;
-        }
+        doc.setTextColor(0, 0, 0);
+        const report = assessment.droneAnalysisData.report;
+        const reportLines: string[] = [];
+        if (report.provider) reportLines.push(`Provider: ${report.provider}`);
+        if (report.type) reportLines.push(`Type: ${report.type}`);
+        if (report.survey_date && !assessment.droneAnalysisData.field) reportLines.push(`Survey date: ${report.survey_date}`);
+        reportLines.forEach((line) => {
+          doc.setFontSize(9);
+          doc.text(line, margin, yPosition);
+          yPosition += 5;
+        });
       }
 
       // Generate filename
