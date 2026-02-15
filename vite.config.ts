@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
       // Proxy API requests to backend to avoid CORS issues in development
       "/api": {
         target:
-          "https://starhawk-backend-agriplatform-a39f.onrender.com",
+          "http://localhost:3000",
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api/, "/api"),

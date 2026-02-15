@@ -1,8 +1,6 @@
 // Auth API Service
-// Use proxy in development to avoid CORS issues, full URL in production
-const AUTH_BASE_URL = import.meta.env.DEV 
-  ? '/api/v1/auth'
-  : 'https://starhawk-backend-agriplatform-a39f.onrender.com/api/v1/auth';
+// Use environment variable for easy deployment across different environments
+const AUTH_BASE_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/v1/auth`;
 
 interface LoginResponse {
   token: string;
@@ -21,12 +19,12 @@ class AuthApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
 
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     };
 
@@ -35,7 +33,7 @@ class AuthApiService {
     const timeoutAbort = () => {
       try {
         // AbortController.abort(reason) is supported in modern browsers
-        (controller as any).abort('timeout');
+        (controller as any).abort("timeout");
       } catch (_) {
         controller.abort();
       }
@@ -50,13 +48,15 @@ class AuthApiService {
         // If caller's signal is already aborted, respect it immediately
         // and avoid starting the request at all.
         clearTimeout(timeoutId);
-        throw new Error('Request was cancelled.');
+        throw new Error("Request was cancelled.");
       }
       // If AbortSignal.any is available, use it to combine signals; otherwise mirror external aborts
-      if (typeof (AbortSignal as any).any === 'function') {
+      if (typeof (AbortSignal as any).any === "function") {
         signal = (AbortSignal as any).any([controller.signal, externalSignal]);
       } else {
-        externalSignal.addEventListener('abort', () => timeoutAbort(), { once: true });
+        externalSignal.addEventListener("abort", () => timeoutAbort(), {
+          once: true,
+        });
         signal = controller.signal;
       }
     }
@@ -72,8 +72,8 @@ class AuthApiService {
 
       // Handle non-JSON responses (like HTML error pages)
       let data;
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
         try {
           data = await response.json();
         } catch (jsonError) {
@@ -88,80 +88,121 @@ class AuthApiService {
         if (!response.ok) {
           // Provide user-friendly error messages for common server errors
           if (response.status === 502) {
-            throw new Error('Bad Gateway (502): The server is temporarily unavailable. Please try again in a few moments.');
+            throw new Error(
+              "Bad Gateway (502): The server is temporarily unavailable. Please try again in a few moments.",
+            );
           } else if (response.status === 503) {
-            throw new Error('Service Unavailable (503): The server is currently down for maintenance. Please try again later.');
+            throw new Error(
+              "Service Unavailable (503): The server is currently down for maintenance. Please try again later.",
+            );
           } else if (response.status === 504) {
-            throw new Error('Gateway Timeout (504): The server took too long to respond. Please try again.');
+            throw new Error(
+              "Gateway Timeout (504): The server took too long to respond. Please try again.",
+            );
           } else if (response.status >= 500) {
-            throw new Error(`Server Error (${response.status}): The server encountered an error. Please try again later.`);
+            throw new Error(
+              `Server Error (${response.status}): The server encountered an error. Please try again later.`,
+            );
           } else {
             // For other non-JSON errors, show a truncated message
-            const errorPreview = text.substring(0, 100).replace(/\s+/g, ' ').trim();
-            throw new Error(`Server error (${response.status}): ${errorPreview || 'Unknown error'}`);
+            const errorPreview = text
+              .substring(0, 100)
+              .replace(/\s+/g, " ")
+              .trim();
+            throw new Error(
+              `Server error (${response.status}): ${errorPreview || "Unknown error"}`,
+            );
           }
         }
         // If response is OK but not JSON, this is unexpected
-        throw new Error(`Unexpected response format: ${text.substring(0, 100)}`);
+        throw new Error(
+          `Unexpected response format: ${text.substring(0, 100)}`,
+        );
       }
 
       if (!response.ok) {
         // Provide better error messages for common status codes
         if (response.status === 401) {
           // Extract error message from various possible response formats
-          const errorMessage = data.message || data.error || data.detail || 'Invalid credentials. Please check your phone number and password.';
+          const errorMessage =
+            data.message ||
+            data.error ||
+            data.detail ||
+            "Invalid credentials. Please check your phone number and password.";
           throw new Error(errorMessage);
         } else if (response.status === 400) {
           // Extract validation errors if they exist
-          let errorMessage = data.message || data.error || data.detail || 'Bad request. Please check your input.';
-          
+          let errorMessage =
+            data.message ||
+            data.error ||
+            data.detail ||
+            "Bad request. Please check your input.";
+
           if (data.validationErrors) {
             const validationMessages: string[] = [];
-            
+
             // Handle validationErrors object structure
-            if (typeof data.validationErrors === 'object') {
+            if (typeof data.validationErrors === "object") {
               // Check for general errors
-              if (data.validationErrors.general && Array.isArray(data.validationErrors.general)) {
+              if (
+                data.validationErrors.general &&
+                Array.isArray(data.validationErrors.general)
+              ) {
                 validationMessages.push(...data.validationErrors.general);
               }
-              
+
               // Check for field-specific errors
               Object.keys(data.validationErrors).forEach((key) => {
-                if (key !== 'general' && Array.isArray(data.validationErrors[key])) {
+                if (
+                  key !== "general" &&
+                  Array.isArray(data.validationErrors[key])
+                ) {
                   data.validationErrors[key].forEach((msg: string) => {
                     validationMessages.push(`${key}: ${msg}`);
                   });
                 }
               });
             }
-            
+
             // Use validation messages if available, otherwise use the default
             if (validationMessages.length > 0) {
-              errorMessage = validationMessages.join('. ');
+              errorMessage = validationMessages.join(". ");
             }
           }
-          
+
           throw new Error(errorMessage);
         } else if (response.status === 404) {
-          throw new Error(data.message || data.error || 'Endpoint not found.');
+          throw new Error(data.message || data.error || "Endpoint not found.");
         } else if (response.status >= 500) {
-          throw new Error(data.message || data.error || `Server error (${response.status}). Please try again later.`);
+          throw new Error(
+            data.message ||
+              data.error ||
+              `Server error (${response.status}). Please try again later.`,
+          );
         }
-        throw new Error(data.message || data.error || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          data.message ||
+            data.error ||
+            `HTTP error! status: ${response.status}`,
+        );
       }
 
       return data;
     } catch (error: any) {
       // Handle timeout/abort errors
-      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-        throw new Error('Request timeout. The server is taking too long to respond. Please check your connection and try again.');
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        throw new Error(
+          "Request timeout. The server is taking too long to respond. Please check your connection and try again.",
+        );
       }
-      
+
       // Re-throw with better error message if it's already an Error
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error('Network error. Please check your connection and try again.');
+      throw new Error(
+        "Network error. Please check your connection and try again.",
+      );
     } finally {
       // Always clear the timeout to prevent memory leaks
       clearTimeout(timeoutId);
@@ -169,10 +210,13 @@ class AuthApiService {
   }
 
   // Admin Login
-  async adminLogin(phoneNumber: string, password: string): Promise<LoginResponse> {
+  async adminLogin(
+    phoneNumber: string,
+    password: string,
+  ): Promise<LoginResponse> {
     try {
-      const response = await this.request<any>('/login', {
-        method: 'POST',
+      const response = await this.request<any>("/login", {
+        method: "POST",
         body: JSON.stringify({ phoneNumber, password }),
       });
 
@@ -180,19 +224,19 @@ class AuthApiService {
       const data = response.data || response;
 
       if (!data || !data.token) {
-        throw new Error('Invalid response from server');
+        throw new Error("Invalid response from server");
       }
 
-      if (data.role !== 'ADMIN') {
-        throw new Error('Access denied. Only admins can log in here.');
+      if (data.role !== "ADMIN") {
+        throw new Error("Access denied. Only admins can log in here.");
       }
 
       // Save token & user info in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      localStorage.setItem('userId', data.userId || data._id || '');
-      localStorage.setItem('phoneNumber', data.phoneNumber || '');
-      localStorage.setItem('email', data.email || '');
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("userId", data.userId || data._id || "");
+      localStorage.setItem("phoneNumber", data.phoneNumber || "");
+      localStorage.setItem("email", data.email || "");
 
       return data;
     } catch (error: any) {
@@ -200,17 +244,22 @@ class AuthApiService {
       if (error.message) {
         throw error;
       }
-      throw new Error('Login failed. Please check your credentials and try again.');
+      throw new Error(
+        "Login failed. Please check your credentials and try again.",
+      );
     }
   }
 
   // Assessor Login
-  async assessorLogin(phoneNumber: string, password: string): Promise<LoginResponse> {
+  async assessorLogin(
+    phoneNumber: string,
+    password: string,
+  ): Promise<LoginResponse> {
     try {
       const requestBody = { phoneNumber, password };
-      
-      const response = await this.request<any>('/login', {
-        method: 'POST',
+
+      const response = await this.request<any>("/login", {
+        method: "POST",
         body: JSON.stringify(requestBody),
       });
 
@@ -218,19 +267,19 @@ class AuthApiService {
       const data = response.data || response;
 
       if (!data || !data.token) {
-        throw new Error('Invalid response from server');
+        throw new Error("Invalid response from server");
       }
 
-      if (data.role !== 'ASSESSOR') {
-        throw new Error('Access denied. Only assessors can log in here.');
+      if (data.role !== "ASSESSOR") {
+        throw new Error("Access denied. Only assessors can log in here.");
       }
 
       // Save token & user info in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      localStorage.setItem('userId', data.userId || data._id || '');
-      localStorage.setItem('phoneNumber', data.phoneNumber || '');
-      localStorage.setItem('email', data.email || '');
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("userId", data.userId || data._id || "");
+      localStorage.setItem("phoneNumber", data.phoneNumber || "");
+      localStorage.setItem("email", data.email || "");
 
       return data;
     } catch (error: any) {
@@ -238,17 +287,22 @@ class AuthApiService {
       if (error.message) {
         throw error;
       }
-      throw new Error('Login failed. Please check your credentials and try again.');
+      throw new Error(
+        "Login failed. Please check your credentials and try again.",
+      );
     }
   }
 
   // Farmer Login
-  async farmerLogin(phoneNumber: string, password: string): Promise<LoginResponse> {
+  async farmerLogin(
+    phoneNumber: string,
+    password: string,
+  ): Promise<LoginResponse> {
     try {
       const requestBody = { phoneNumber, password };
-      
-      const response = await this.request<any>('/login', {
-        method: 'POST',
+
+      const response = await this.request<any>("/login", {
+        method: "POST",
         body: JSON.stringify(requestBody),
       });
 
@@ -256,19 +310,19 @@ class AuthApiService {
       const data = response.data || response;
 
       if (!data || !data.token) {
-        throw new Error('Invalid response from server');
+        throw new Error("Invalid response from server");
       }
 
-      if (data.role !== 'FARMER') {
-        throw new Error('Access denied. Only farmers can log in here.');
+      if (data.role !== "FARMER") {
+        throw new Error("Access denied. Only farmers can log in here.");
       }
 
       // Save token & user info in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      localStorage.setItem('userId', data.userId || data._id || '');
-      localStorage.setItem('phoneNumber', data.phoneNumber || '');
-      localStorage.setItem('email', data.email || '');
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("userId", data.userId || data._id || "");
+      localStorage.setItem("phoneNumber", data.phoneNumber || "");
+      localStorage.setItem("email", data.email || "");
 
       return data;
     } catch (error: any) {
@@ -276,17 +330,22 @@ class AuthApiService {
       if (error.message) {
         throw error;
       }
-      throw new Error('Login failed. Please check your credentials and try again.');
+      throw new Error(
+        "Login failed. Please check your credentials and try again.",
+      );
     }
   }
 
   // Insurer Login
-  async insurerLogin(phoneNumber: string, password: string): Promise<LoginResponse> {
+  async insurerLogin(
+    phoneNumber: string,
+    password: string,
+  ): Promise<LoginResponse> {
     try {
       const requestBody = { phoneNumber, password };
-      
-      const response = await this.request<any>('/login', {
-        method: 'POST',
+
+      const response = await this.request<any>("/login", {
+        method: "POST",
         body: JSON.stringify(requestBody),
       });
 
@@ -294,19 +353,19 @@ class AuthApiService {
       const data = response.data || response;
 
       if (!data || !data.token) {
-        throw new Error('Invalid response from server');
+        throw new Error("Invalid response from server");
       }
 
-      if (data.role !== 'INSURER') {
-        throw new Error('Access denied. Only insurers can log in here.');
+      if (data.role !== "INSURER") {
+        throw new Error("Access denied. Only insurers can log in here.");
       }
 
       // Save token & user info in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      localStorage.setItem('userId', data.userId || data._id || '');
-      localStorage.setItem('phoneNumber', data.phoneNumber || '');
-      localStorage.setItem('email', data.email || '');
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("userId", data.userId || data._id || "");
+      localStorage.setItem("phoneNumber", data.phoneNumber || "");
+      localStorage.setItem("email", data.email || "");
 
       return data;
     } catch (error: any) {
@@ -314,56 +373,58 @@ class AuthApiService {
       if (error.message) {
         throw error;
       }
-      throw new Error('Login failed. Please check your credentials and try again.');
+      throw new Error(
+        "Login failed. Please check your credentials and try again.",
+      );
     }
   }
 
   // Logout (clear storage)
   logout(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('phoneNumber');
-    localStorage.removeItem('email');
-    localStorage.removeItem('user'); // Also remove user object if it exists
-    console.log('🚪 Logged out successfully');
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("phoneNumber");
+    localStorage.removeItem("email");
+    localStorage.removeItem("user"); // Also remove user object if it exists
+    console.log("🚪 Logged out successfully");
   }
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     return !!token;
   }
 
   // Check if current user is Admin
   isAdmin(): boolean {
-    const role = localStorage.getItem('role');
-    return role === 'ADMIN';
+    const role = localStorage.getItem("role");
+    return role === "ADMIN";
   }
 
   // Get current user token
   getToken(): string | null {
-    return localStorage.getItem('token');
+    return localStorage.getItem("token");
   }
 
   // Get current user role
   getRole(): string | null {
-    return localStorage.getItem('role');
+    return localStorage.getItem("role");
   }
 
   // Get current user ID
   getUserId(): string | null {
-    return localStorage.getItem('userId');
+    return localStorage.getItem("userId");
   }
 
   // Get current user phone number
   getPhoneNumber(): string | null {
-    return localStorage.getItem('phoneNumber');
+    return localStorage.getItem("phoneNumber");
   }
 
   // Get current user email
   getEmail(): string | null {
-    return localStorage.getItem('email');
+    return localStorage.getItem("email");
   }
 }
 
@@ -400,4 +461,3 @@ export const getPhoneNumber = () => authApiService.getPhoneNumber();
 export const getEmail = () => authApiService.getEmail();
 
 export default authApiService;
-
