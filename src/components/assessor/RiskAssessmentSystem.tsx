@@ -847,20 +847,50 @@ export default function RiskAssessmentSystem(): JSX.Element {
         selectedPdfType,
       );
 
-      // Optimistic update (NO refetch)
+      // Stop any ongoing polling for this assessment
+      stopPollingForDroneData();
+
+      // Optimistic update - remove PDF from droneAnalysisPdfs array
       setAssessment((prev: any) => {
         if (!prev) return prev;
 
         const updated = { ...prev };
 
+        // Handle new droneAnalysisPdfs array structure
+        if (
+          updated.droneAnalysisPdfs &&
+          Array.isArray(updated.droneAnalysisPdfs)
+        ) {
+          updated.droneAnalysisPdfs = updated.droneAnalysisPdfs.filter(
+            (pdf: any) => pdf.pdfType !== selectedPdfType,
+          );
+        }
+
+        // Handle legacy structure
         if (selectedPdfType === "plant_health") {
           updated.plantHealthPdfUrl = null;
           updated.plantHealthData = null;
+          // Also clear legacy single PDF if it was plant health
+          if (
+            updated.droneAnalysisData?.report?.detected_analysis_type ===
+            "plant_stress"
+          ) {
+            updated.droneAnalysisPdfUrl = null;
+            updated.droneAnalysisData = null;
+          }
         }
 
         if (selectedPdfType === "flowering") {
           updated.floweringPdfUrl = null;
           updated.floweringData = null;
+          // Also clear legacy single PDF if it was flowering
+          if (
+            updated.droneAnalysisData?.report?.detected_analysis_type !==
+            "plant_stress"
+          ) {
+            updated.droneAnalysisPdfUrl = null;
+            updated.droneAnalysisData = null;
+          }
         }
 
         return updated;
@@ -2277,7 +2307,13 @@ export default function RiskAssessmentSystem(): JSX.Element {
                       return (
                         <button
                           key={pdfType}
-                          onClick={() => setSelectedPdfType(pdfType)}
+                          onClick={() => {
+                            setSelectedPdfType(pdfType);
+                            // Clear selected file when switching tabs to prevent cross-tab file state
+                            setSelectedPDFFile(null);
+                            // Stop polling when switching tabs to prevent processing state persisting
+                            stopPollingForDroneData();
+                          }}
                           className={[
                             "px-5 py-2 rounded-lg text-sm font-medium transition-all focus:outline-none flex items-center gap-1.5",
                             active
@@ -2425,10 +2461,10 @@ export default function RiskAssessmentSystem(): JSX.Element {
                 )}
 
                 {/* ── Processing state: PDF uploaded but data not yet ready ── */}
-                {(assessment.droneAnalysisPdfUrl ||
-                  (assessment.droneAnalysisPdfs?.length ?? 0) > 0) &&
+                {getCurrentPdfData()?.pdfUrl &&
                   !getCurrentPdfData()?.droneAnalysisData &&
-                  !uploadingPDF && (
+                  !uploadingPDF &&
+                  pollingForDroneData && (
                     <div className="p-6">
                       <div className="flex items-center gap-2 mb-3">
                         <Activity
