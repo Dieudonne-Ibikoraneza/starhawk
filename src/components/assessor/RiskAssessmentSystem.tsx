@@ -1132,7 +1132,6 @@ export default function RiskAssessmentSystem(): JSX.Element {
     return "High Risk";
   };
 
-  // Generate PDF replicating the Agremo style from the uploaded reference PDFs
   const generateDroneDataPDF = async () => {
     const currentPdfData = getCurrentPdfData();
     if (!currentPdfData?.droneAnalysisData) {
@@ -1166,103 +1165,109 @@ export default function RiskAssessmentSystem(): JSX.Element {
       const W = doc.internal.pageSize.getWidth(); // 210
       const H = doc.internal.pageSize.getHeight(); // 297
       const M = 14; // margin
+      const cropName = (field.crop ?? "N/A").toString();
+      const headerCropText = `Crop Monitoring - ${cropName}`;
+
+      // Helper: draw page header (provider, Crop Monitoring - crop, survey date — all right-aligned)
+      const drawPageHeader = (startY: number, rowH: number = 20) => {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(0, startY, W, rowH, "F");
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.3);
+        doc.line(0, startY + rowH, W, startY + rowH);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(22, 101, 52);
+        doc.text(report.provider ?? "STARHAWK", W - M, startY + 7, {
+          align: "right",
+        });
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(8);
+        doc.text(headerCropText, W - M, startY + 12, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        if (report.survey_date) {
+          doc.text(`Survey date: ${report.survey_date}`, W - M, startY + 17, {
+            align: "right",
+          });
+        }
+        return startY + rowH;
+      };
 
       // ─── PAGE 1 ────────────────────────────────────────────────────────────
 
-      // ── DUAL TITLE STRIP at top (like Agremo UI) ─────────────────────────
-      // Left: light green — PLANT HEALTH MONITORING
+      // ── HEADER first (Crop Monitoring - crop, provider, survey date) ──────
+      const headerBottom = drawPageHeader(0, 20);
+
+      // ── DUAL TITLE STRIP below header (page 1 only) ────────────────────────
       doc.setFillColor(220, 252, 231);
-      doc.rect(0, 0, W / 2, 14, "F");
+      doc.rect(0, headerBottom, W / 2, 14, "F");
       doc.setTextColor(22, 101, 52);
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text("PLANT HEALTH MONITORING", W / 4, 9, { align: "center" });
-
-      // Right: dark teal — analysis type label
+      doc.text("PLANT HEALTH MONITORING", W / 4, headerBottom + 9, {
+        align: "center",
+      });
       doc.setFillColor(13, 110, 97);
-      doc.rect(W / 2, 0, W / 2, 14, "F");
+      doc.rect(W / 2, headerBottom, W / 2, 14, "F");
       doc.setTextColor(255, 255, 255);
-      doc.text(rightLabel, (W / 4) * 3, 9, { align: "center" });
+      doc.text(rightLabel, (W / 4) * 3, headerBottom + 9, { align: "center" });
 
-      // ── SUB-ROW: light bg — provider info RIGHT-aligned (mirrors UI) ───────
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 14, W, 20, "F");
-      doc.setDrawColor(229, 231, 235);
-      doc.setLineWidth(0.3);
-      doc.line(0, 34, W, 34);
-      // Provider name right-aligned
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(22, 101, 52);
-      doc.text(report.provider ?? "STARHAWK", W - M, 22, { align: "right" });
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 100, 100);
-      doc.text(report.type ?? "Crop Monitoring", W - M, 28, { align: "right" });
-      if (report.survey_date) {
-        doc.text(`Survey date: ${report.survey_date}`, W - M, 33, {
-          align: "right",
-        });
-      }
-      const stripY = 0; // kept for compat reference
+      let y = headerBottom + 14 + 8; // below dual strip
 
-      // ─── FIELD INFO TABLE (2 columns like the original) ──────────────────
-      let y = 38; // below the dual-strip + sub-row
-
-      // 2-column info grid with thin bottom border
-      doc.setFillColor(255, 255, 255);
+      // ─── FIELD INFO BLOCK (margin-x 8, green-600 borders) ─────────────────
+      const infoMarginX = 8; // 8mm horizontal margin (≈ mx-8)
+      const infoLeft = M + infoMarginX;
+      const infoRight = W - M - infoMarginX;
+      const infoW = infoRight - infoLeft;
       const infoH = 22;
-      doc.rect(0, y, W, infoH, "F");
+      const green600 = { r: 22, g: 163, b: 74 };
+      const col1Right = infoLeft + infoW / 2;
+      const col2Left = col1Right;
 
-      // Crop label/value
+      doc.setFillColor(255, 255, 255);
+      doc.rect(infoLeft, y, infoW, infoH, "F");
+      doc.setDrawColor(green600.r, green600.g, green600.b);
+      doc.setLineWidth(0.53); // ~2px
+      doc.line(infoLeft, y + infoH, infoRight, y + infoH); // border-bottom
+      doc.line(col1Right, y, col1Right, y + infoH); // border-right between columns
+
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text("Crop:", M, y + 8);
+      doc.text("Crop:", infoLeft + 4, y + 8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
-      doc.text(field.crop ?? "N/A", M + 14, y + 8);
-
-      // Growing stage
+      doc.text(field.crop ?? "N/A", infoLeft + 18, y + 8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text("Growing stage:", M, y + 17);
+      doc.text("Growing stage:", infoLeft + 4, y + 17);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
-      doc.text(field.growing_stage ?? "N/A", M + 28, y + 17);
-
-      // Field area (right column)
+      doc.text(field.growing_stage ?? "N/A", infoLeft + 32, y + 17);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text("Field area:", W / 2 + M, y + 8);
+      doc.text("Field area:", col2Left + 4, y + 8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
       doc.text(
         field.area_hectares != null
           ? `${Number(field.area_hectares).toFixed(2)} Hectare`
           : "N/A",
-        W / 2 + M + 20,
+        col2Left + 24,
         y + 8,
       );
-
-      // Analysis name (right column)
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text("Analysis name:", W / 2 + M, y + 17);
+      doc.text("Analysis name:", col2Left + 4, y + 17);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
       doc.text(
         report.analysis_name ?? report.type ?? "N/A",
-        W / 2 + M + 28,
+        col2Left + 32,
         y + 17,
       );
 
-      // Green separator line
-      y += infoH;
-      doc.setDrawColor(34, 197, 94);
-      doc.setLineWidth(1.2);
-      doc.line(0, y, W, y);
-      y += 8;
+      y += infoH + 8;
 
       // ─── STRESS LEVEL TABLE (section title) ──────────────────────────────
       doc.setFontSize(11);
@@ -1284,17 +1289,59 @@ export default function RiskAssessmentSystem(): JSX.Element {
 
       if (levels.length > 0) {
         const pieDataUrl = drawPieChartToDataUrl(levels, LEVEL_COLORS, 160);
+        const pieCenterX = pieX + pieSize / 2;
+        const pieCenterY = pieY + pieSize / 2;
+        const pieRadius = pieSize / 2 - 3;
+        const blockH = 6;
+        const blockW = 14;
+        const blockGap = 2;
+        const blockY = pieY + pieSize + 4;
+        const total = levels.reduce((s, l) => s + (l.percentage ?? 0), 0) || 1;
+        let blockX = pieX;
+        const blockCenters: { x: number; y: number; midAngle: number }[] = [];
+
         if (pieDataUrl) {
           doc.addImage(pieDataUrl, "PNG", pieX, pieY, pieSize, pieSize);
         }
+        // Compute slice mid-angles and block positions
+        let startAngle = -Math.PI / 2;
+        levels.forEach((lv: { level?: string; percentage?: number }) => {
+          const sliceAngle = ((lv.percentage ?? 0) / total) * 2 * Math.PI;
+          const midAngle = startAngle + sliceAngle / 2;
+          blockCenters.push({
+            x: blockX + blockW / 2,
+            y: blockY + blockH / 2,
+            midAngle,
+          });
+          blockX += blockW + blockGap;
+          startAngle += sliceAngle;
+        });
 
-        // Percentage labels around pie  (simplified – just beneath)
-        const pieCenter = pieX + pieSize / 2;
-        let labelY = pieY + pieSize + 4;
-        levels.forEach((lv: any, i: number) => {
+        // Connector lines from pie edge to each block (drawn first, behind percentages)
+        doc.setDrawColor(120, 120, 120);
+        doc.setLineWidth(0.25);
+        blockCenters.forEach((bc) => {
+          const edgeX = pieCenterX + pieRadius * Math.cos(bc.midAngle);
+          const edgeY = pieCenterY + pieRadius * Math.sin(bc.midAngle);
+          doc.line(edgeX, edgeY, bc.x, bc.y);
+        });
+
+        // Percentage blocks (rendered on top of lines)
+        blockX = pieX;
+        levels.forEach((lv: { level?: string; percentage?: number }, i: number) => {
           const [r, g, b] = hexToRgb(getLevelColor(i));
           doc.setFillColor(r, g, b);
-          doc.circle(pieCenter - 18 + i * 14, labelY, 2, "F");
+          doc.rect(blockX, blockY, blockW, blockH, "F");
+          doc.setFontSize(6);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text(
+            `${(lv.percentage ?? 0).toFixed(1)}%`,
+            blockX + blockW / 2,
+            blockY + blockH - 1.5,
+            { align: "center" },
+          );
+          blockX += blockW + blockGap;
         });
       }
 
@@ -1345,14 +1392,12 @@ export default function RiskAssessmentSystem(): JSX.Element {
         });
       }
 
-      // ─── SUMMARY BANNER ───────────────────────────────────────────────────
+      // ─── TOTAL AREA BLOCK (two-line layout like browser) ────────────────────
       const wa = d.weed_analysis;
       if (wa) {
         const lvs = getWeedAnalysisLevels(wa);
         const totalHa = getTotalStressArea(wa, lvs);
         const totalPct = getTotalStressPercent(wa, lvs);
-
-        // Use the flowering total if not plant stress
         const displayHa = isPlantStress
           ? totalHa
           : (wa.total_area_hectares ?? totalHa);
@@ -1361,49 +1406,41 @@ export default function RiskAssessmentSystem(): JSX.Element {
           : (wa.total_area_percent ?? totalPct);
 
         const bannerY =
-          Math.max(y, pieAreaEnd > 0 ? pieY + pieSize + 14 : y) + 8;
-        const bannerH = 22;
+          Math.max(y, pieAreaEnd > 0 ? pieY + pieSize + 18 : y) + 8;
+        const line1H = 6;
+        const line2H = 8;
+        const bannerH = 20;
 
-        // Dark triangle / wedge decoration on left
-        doc.setFillColor(22, 101, 52);
-        doc.triangle(
-          0,
-          bannerY,
-          0,
-          bannerY + bannerH,
-          16,
-          bannerY + bannerH,
-          "F",
-        );
-
-        // Green banner
         doc.setFillColor(34, 197, 94);
         doc.rect(0, bannerY, W, bannerH, "F");
         doc.setFillColor(22, 101, 52);
-        doc.triangle(
-          0,
-          bannerY,
-          0,
-          bannerY + bannerH,
-          16,
-          bannerY + bannerH,
-          "F",
-        );
+        doc.triangle(0, bannerY, 10, bannerY, 0, bannerY + 10, "F");
 
+        // Line 1: title
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(11);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.text(`Total area ${totalLabel}:`, M + 18, bannerY + 9);
+        doc.text(`Total area ${totalLabel}:`, W / 2, bannerY + line1H, {
+          align: "center",
+        });
 
-        doc.setFontSize(16);
-        doc.text(`${displayHa.toFixed(2)} ha =`, M + 75, bannerY + 14);
-
-        // Dark teal box for percentage
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        const dimText = `${displayHa.toFixed(2)} ha =`;
+        const boxW = 32;
+        const boxH = 10;
+        const gap = 6;
+        const dimWidth = doc.getTextWidth(dimText) ?? 22;
+        const totalStatsW = dimWidth + gap + boxW;
+        const statsLeft = (W - totalStatsW) / 2;
+        const boxX = statsLeft + dimWidth + gap;
+        const boxY = bannerY + line1H + 2;
+        const statsY = bannerY + line1H + line2H + 1;
+        doc.text(dimText, statsLeft, statsY);
         doc.setFillColor(13, 110, 97);
-        doc.rect(M + 115, bannerY + 3, 38, 16, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
-        doc.text(`${Math.round(displayPct)}% field`, M + 134, bannerY + 14, {
+        doc.rect(boxX, boxY, boxW, boxH, "F");
+        doc.setFontSize(9);
+        doc.text(`${Math.round(displayPct)}% field`, boxX + boxW / 2, statsY, {
           align: "center",
         });
 
@@ -1434,7 +1471,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
         y += infoBoxH + 8;
       }
 
-      // ─── FOOTER ───────────────────────────────────────────────────────────
+      // ─── FOOTER (justify-between: powered by left, walk through right) ─────
       doc.setFontSize(7);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(160, 160, 160);
@@ -1444,8 +1481,8 @@ export default function RiskAssessmentSystem(): JSX.Element {
       doc.text(report.provider ?? "STARHAWK", M + 20, H - 8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(160, 160, 160);
-      doc.text("Walk through your map on app.agremo.com", W / 2, H - 8, {
-        align: "center",
+      doc.text("Walk through field maps on starhawk.rw", W - M, H - 8, {
+        align: "right",
       });
 
       // ─── PAGE 2: MAP IMAGE ────────────────────────────────────────────────
@@ -1472,39 +1509,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
         if (imgDataUrl) {
           doc.addPage();
 
-          // Page 2 header — same dual-strip + provider on right
-          doc.setFillColor(220, 252, 231);
-          doc.rect(0, 0, W / 2, 12, "F");
-          doc.setTextColor(22, 101, 52);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "bold");
-          doc.text("PLANT HEALTH MONITORING", W / 4, 8, { align: "center" });
-          doc.setFillColor(13, 110, 97);
-          doc.rect(W / 2, 0, W / 2, 12, "F");
-          doc.setTextColor(255, 255, 255);
-          doc.text(rightLabel, (W / 4) * 3, 8, { align: "center" });
-          // Sub-row with provider info on right
-          doc.setFillColor(248, 250, 252);
-          doc.rect(0, 12, W, 14, "F");
-          doc.setDrawColor(229, 231, 235);
-          doc.setLineWidth(0.3);
-          doc.line(0, 26, W, 26);
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(22, 101, 52);
-          doc.text(report.provider ?? "STARHAWK", W - M, 19, {
-            align: "right",
-          });
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          if (report.survey_date)
-            doc.text(`Survey date: ${report.survey_date}`, W - M, 25, {
-              align: "right",
-            });
+          // Page 2 header — same as page 1 (Crop Monitoring - crop, provider, survey date), NO dual title strip
+          const page2HeaderBottom = drawPageHeader(0, 20);
 
           // Map image taking up most of the page
-          const imgY = 30;
+          const imgY = page2HeaderBottom + 6;
           const imgW = W - M * 2;
           const imgH = H - imgY - 30;
           const fmt =
@@ -1535,7 +1544,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
             });
           }
 
-          // Footer on page 2
+          // Footer on page 2 (justify-between)
           doc.setFontSize(7);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(160, 160, 160);
@@ -1545,8 +1554,8 @@ export default function RiskAssessmentSystem(): JSX.Element {
           doc.text(report.provider ?? "STARHAWK", M + 20, H - 5);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(160, 160, 160);
-          doc.text("Walk through your map on app.agremo.com", W / 2, H - 5, {
-            align: "center",
+          doc.text("Walk through field maps on starhawk.rw", W - M, H - 5, {
+            align: "right",
           });
         }
       }
@@ -2552,7 +2561,6 @@ export default function RiskAssessmentSystem(): JSX.Element {
                     </div>
                   )}
 
-                {/* ── MAIN DATA DISPLAY: Agremo PDF clone ── */}
                 {getCurrentPdfData()?.droneAnalysisData &&
                   (() => {
                     const d = getCurrentPdfData()!.droneAnalysisData;
@@ -2580,7 +2588,6 @@ export default function RiskAssessmentSystem(): JSX.Element {
 
                     return (
                       <div className="font-sans mt-2 border-t-2 border-gray-100">
-                        {/* ── DUAL TITLE STRIP (exact Agremo style) ── */}
                         <div className="flex">
                           <div className="flex-1 bg-[#4eb857] px-5 py-3">
                             <p className="text-lg font-bold text-center text-white uppercase">
@@ -2733,7 +2740,6 @@ export default function RiskAssessmentSystem(): JSX.Element {
                           </div>
                         )}
 
-                        {/* ── SUMMARY BANNER (exact Agremo style) ── */}
                         {wa && (
                           <div className="relative bg-green-500 overflow-hidden">
                             {/* Dark wedge decoration top-left */}
@@ -2862,7 +2868,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
                               {report.provider ?? "STARHAWK"}
                             </span>
                           </span>
-                          <span>Walk through your map on app.agremo.com</span>
+                          <span>Walk through field maps on starhawk.rw</span>
                         </div>
                       </div>
                     );
