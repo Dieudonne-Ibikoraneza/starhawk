@@ -603,7 +603,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
 
       toast({
         title: "Success",
-        description: "KML uploaded successfully. EOSDA field created.",
+        description: "KML uploaded successfully and farm updated.",
       });
 
       setSelectedKMLFile(null);

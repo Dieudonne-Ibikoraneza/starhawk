@@ -349,19 +349,11 @@ class FarmsApiService {
         throw new Error(errorMessage);
       }
       
-      // Handle EOSDA-related errors - if it's just an EOSDA error, the KML might still be saved
-      // Check if it's specifically an EOSDA error that we can ignore
+      // Handle EOSDA-related errors explicitly as failures (backend aborts farm update)
       const errorDetail = responseData.detail || responseData.message || responseData.error || '';
       if (errorDetail.includes('EOSDA') && response.status === 400) {
-        // EOSDA is currently disabled, but KML upload might still succeed on backend
-        // Log a warning but don't throw - the boundary should still be saved
-        console.warn('⚠️ EOSDA error encountered, but KML upload may have succeeded:', errorDetail);
-        // Return a success response with a note about EOSDA
-        return {
-          ...responseData,
-          eosdaWarning: true,
-          message: 'KML uploaded successfully (EOSDA integration currently disabled)'
-        };
+        console.error('❌ EOSDA error during KML upload:', errorDetail);
+        throw new Error(errorDetail || 'Failed to process KML due to EOSDA integration error');
       }
       
       // Check for validationErrors object (from the API response structure)
