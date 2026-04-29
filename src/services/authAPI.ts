@@ -1,6 +1,6 @@
-// Auth API Service
-// Use environment variable for easy deployment across different environments
-const AUTH_BASE_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/v1/auth`;
+import { API_BASE_URL } from "@/config/api";
+
+const AUTH_BASE_URL = `${API_BASE_URL}/auth`;
 
 interface LoginResponse {
   token: string;
