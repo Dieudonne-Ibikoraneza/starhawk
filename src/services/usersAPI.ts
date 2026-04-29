@@ -1,6 +1,6 @@
-// Users API Service
-// Use environment variable for easy deployment across different environments
-const USERS_BASE_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/v1/users`;
+import { API_BASE_URL } from "@/config/api";
+
+const USERS_BASE_URL = `${API_BASE_URL}/users`;
 
 interface UpdateUserData {
   firstName?: string;
@@ -67,11 +67,6 @@ class UsersApiService {
           localStorage.removeItem("userId");
           localStorage.removeItem("phoneNumber");
           localStorage.removeItem("email");
-
-          // Redirect to login page
-          if (typeof window !== "undefined") {
-            window.location.href = "/";
-          }
 
           throw new Error("Authentication required. Please log in again.");
         } else if (response.status === 403) {
