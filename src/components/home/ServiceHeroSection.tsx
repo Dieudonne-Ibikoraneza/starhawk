@@ -1,98 +1,113 @@
 import { motion } from "framer-motion";
-import { Mail } from "lucide-react";
+import { Mail, ArrowRight } from "lucide-react";
 import { useState } from "react";
 
 export function ServiceHeroSection() {
   const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle newsletter subscription
-    console.log("Subscribing:", email);
+    setSubmitted(true);
     setEmail("");
+    setTimeout(() => setSubmitted(false), 3000);
   };
 
   return (
     <section className="relative w-full overflow-hidden">
-      {/* Newsletter Section */}
-      <div className="relative w-full min-h-[40vh] md:min-h-[50vh] flex flex-col">
+      <div className="relative w-full min-h-[50vh] flex flex-col">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <img 
-            src="/service.png" 
-            alt="Newsletter background" 
+          <img
+            src="/service.png"
+            alt="Subscribe background"
             className="w-full h-full object-cover"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#14284B]/90 via-[#14284B]/75 to-[#0a1628]/85" />
+          {/* Grid texture */}
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)",
+              backgroundSize: "60px 60px",
+            }}
+          />
         </div>
-        
-        {/* Dark Overlay for text contrast */}
-        <div className="absolute inset-0 bg-black/40"></div>
 
-        {/* Content Container */}
-        <div className="relative z-10 flex-1 flex items-center justify-center py-12 md:py-16">
+        {/* Content */}
+        <div className="relative z-10 flex-1 flex items-center justify-center py-16 md:py-20 px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center px-4 sm:px-6 lg:px-8 max-w-2xl w-full"
+            transition={{ duration: 0.65 }}
+            className="text-center max-w-2xl w-full"
           >
-            {/* Heading */}
+            <span className="inline-block text-white/50 text-xs font-semibold tracking-[0.18em] uppercase mb-4">
+              Stay In The Loop
+            </span>
+
             <motion.h2
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-2xl sm:text-3xl md:text-4xl font-semibold text-white mb-3"
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4 leading-tight"
             >
-              Subscribe to Our Newsletter
+              Get the Latest<br />
+              <span className="text-white/60">AgriInsurance Insights</span>
             </motion.h2>
-            
-            {/* Subtitle */}
+
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-sm sm:text-base text-white/90 mb-6 leading-relaxed"
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="text-white/70 text-sm sm:text-base mb-8 leading-relaxed"
             >
-              Stay updated with the latest agricultural insurance insights, technology updates, and industry news.
+              Technology updates, weather alerts, and industry news — delivered to your inbox.
             </motion.p>
 
-            {/* Email Subscription Form */}
+            {/* Form */}
             <motion.form
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.35 }}
               onSubmit={handleSubmit}
               className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
             >
               <div className="flex-1 relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
+                  placeholder="your@email.com"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/90 backdrop-blur-sm border border-white/20 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
+                  className="w-full pl-11 pr-5 py-3.5 bg-white/95 text-[#14284B] placeholder-slate-400 text-sm font-medium rounded-full border-2 border-transparent focus:border-white focus:outline-none transition-all duration-200 shadow-lg"
                 />
               </div>
               <button
                 type="submit"
-                className="px-6 py-3 text-white font-medium rounded transition-colors duration-200 whitespace-nowrap"
-                style={{ backgroundColor: 'rgba(20, 40, 75, 1)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(15, 30, 56, 1)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(20, 40, 75, 1)'}
+                className="flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-[#14284B] font-bold text-sm rounded-full hover:bg-[#e8eef7] transition-all duration-300 shadow-lg whitespace-nowrap"
               >
-                Subscribe
+                {submitted ? "✓ Subscribed!" : (
+                  <>
+                    Subscribe
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
             </motion.form>
+
+            <p className="mt-4 text-white/40 text-xs">
+              No spam. Unsubscribe anytime.
+            </p>
           </motion.div>
         </div>
       </div>
     </section>
   );
 }
-

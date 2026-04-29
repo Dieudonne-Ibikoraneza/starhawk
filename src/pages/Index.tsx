@@ -9,19 +9,12 @@ import CustomScrollbar from "@/components/ui/CustomScrollbar";
 const Index = () => {
   return (
     <CustomScrollbar>
-      <div className="relative min-h-screen">
+      <div className="relative min-h-screen bg-[#f8f9fc]">
         <HomeNavbar />
+        {/* Hero does NOT need top padding — it has pt-28 built in */}
         <HeroSection />
-        <div 
-          className="relative z-10"
-          style={{
-            backgroundImage: 'url(/bg_img.png)',
-            backgroundAttachment: 'fixed',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
-          }}
-        >
+        {/* Rest of sections sit below the hero overlap cards */}
+        <div className="relative z-10 pt-6">
           <ImpactSection />
           <WhyWeExistSection />
           <ServiceHeroSection />
