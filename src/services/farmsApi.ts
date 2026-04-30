@@ -6,7 +6,7 @@ import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from '@/config/api';
 const FARMS_BASE_URL = `${API_BASE_URL}${API_ENDPOINTS.FARMS.BASE}`;
 
 interface FarmData {
-  name: string;
+  name?: string;
   location?: {
     type: string;
     coordinates: number[]; // [longitude, latitude]
@@ -17,6 +17,8 @@ interface FarmData {
     coordinates: number[][][]; // Polygon coordinates
   };
   cropType?: string;
+  sowingDate?: string;
+  insurerId?: string;
 }
 
 interface UpdateFarmData {
@@ -94,12 +96,7 @@ class FarmsApiService {
         localStorage.removeItem('userId');
         localStorage.removeItem('phoneNumber');
         localStorage.removeItem('email');
-        
-        // Redirect to login page
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
-        
+
         throw new Error('Authentication required. Please log in again.');
       }
 
@@ -162,66 +159,54 @@ class FarmsApiService {
   //   "cropType": "MAIZE" // Optional, uppercase
   // }
   async createFarm(farmData: FarmData) {
-    // Build request body matching exact API specification
+    // If no boundary or name is provided, use the simple register endpoint
+    const isSimpleRegister = !farmData.boundary && !farmData.name;
+    const endpoint = isSimpleRegister ? '/register' : '';
+
     const requestBody: any = {
-      name: farmData.name,
+      cropType: farmData.cropType?.toUpperCase(),
+      sowingDate: farmData.sowingDate,
+      insurerId: farmData.insurerId,
     };
 
-    // Use location object directly if provided, otherwise construct from coordinates
-    if (farmData.location && farmData.location.type && farmData.location.coordinates) {
-      requestBody.location = farmData.location;
-    } else if (farmData.coordinates) {
-      const coordinates = farmData.coordinates;
-      if (!Array.isArray(coordinates) || coordinates.length !== 2) {
-        throw new Error('Invalid coordinates. Expected [longitude, latitude] array.');
+    if (!isSimpleRegister) {
+      requestBody.name = farmData.name;
+      
+      // Use location object directly if provided, otherwise construct from coordinates
+      if (farmData.location && farmData.location.type && farmData.location.coordinates) {
+        requestBody.location = farmData.location;
+      } else if (farmData.coordinates) {
+        const coordinates = farmData.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+          throw new Error('Invalid coordinates. Expected [longitude, latitude] array.');
+        }
+        requestBody.location = {
+          type: 'Point',
+          coordinates: coordinates, // [longitude, latitude] format
+        };
       }
-      requestBody.location = {
-        type: 'Point',
-        coordinates: coordinates, // [longitude, latitude] format
-      };
+
+      // Add boundary if provided
+      if (farmData.boundary) {
+        requestBody.boundary = {
+          type: 'Polygon',
+          coordinates: farmData.boundary.coordinates || farmData.boundary,
+        };
+      }
+
+      // Validations for full registration
+      if (!requestBody.name) throw new Error('Farm name is required');
+      if (!requestBody.location || !requestBody.location.coordinates) throw new Error('Location coordinates are required');
+      if (!requestBody.boundary || !requestBody.boundary.coordinates) throw new Error('Boundary coordinates are required');
     } else {
-      throw new Error('Location is required. Provide either location object or coordinates array.');
+      // Validations for simple registration
+      if (!requestBody.cropType) throw new Error('Crop type is required');
+      if (!requestBody.sowingDate) throw new Error('Sowing date is required');
     }
 
-    // Add boundary if provided
-    if (farmData.boundary) {
-      requestBody.boundary = {
-        type: 'Polygon',
-        coordinates: farmData.boundary.coordinates || farmData.boundary,
-      };
-    }
+    console.log(`📤 Sending farm creation request (POST ${this.baseURL}${endpoint}):`, JSON.stringify(requestBody, null, 2));
 
-    // Add cropType if provided (should be uppercase per API spec)
-    if (farmData.cropType) {
-      requestBody.cropType = farmData.cropType;
-    }
-
-    // Validate request body before sending
-    if (!requestBody.name) {
-      throw new Error('Farm name is required');
-    }
-    if (!requestBody.location || !requestBody.location.coordinates) {
-      throw new Error('Location coordinates are required');
-    }
-    if (!requestBody.boundary || !requestBody.boundary.coordinates) {
-      throw new Error('Boundary coordinates are required');
-    }
-
-    console.log('📤 Sending farm creation request (POST /api/v1/farms):', JSON.stringify(requestBody, null, 2));
-    console.log('📤 Request details:', {
-      url: `${this.baseURL}`,
-      method: 'POST',
-      hasName: !!requestBody.name,
-      hasLocation: !!requestBody.location,
-      locationType: requestBody.location?.type,
-      locationCoordinates: requestBody.location?.coordinates,
-      hasBoundary: !!requestBody.boundary,
-      boundaryType: requestBody.boundary?.type,
-      boundaryCoordinatesCount: requestBody.boundary?.coordinates?.[0]?.length,
-      cropType: requestBody.cropType || 'Not provided'
-    });
-
-    const response = await this.request<any>('', {
+    const response = await this.request<any>(endpoint, {
       method: 'POST',
       body: JSON.stringify(requestBody),
     });
@@ -396,12 +381,13 @@ class FarmsApiService {
   }
 
   // Create Insurance Request
-  async createInsuranceRequest(farmId: string, notes?: string) {
+  async createInsuranceRequest(farmId: string, notes?: string, insurerId?: string) {
     return this.request<any>('/insurance-requests', {
       method: 'POST',
       body: JSON.stringify({
         farmId,
         notes,
+        insurerId,
       }),
     });
   }
