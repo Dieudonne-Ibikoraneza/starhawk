@@ -3,9 +3,7 @@
 import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from "@/config/api";
 
 // Use proxy in development to avoid CORS issues, full URL in production
-const ASSESSMENTS_BASE_URL = import.meta.env.DEV
-  ? `/api/v1${API_ENDPOINTS.ASSESSMENTS.BASE}` // Use proxy: /api/v1/assessments -> proxied to backend
-  : `${API_BASE_URL}${API_ENDPOINTS.ASSESSMENTS.BASE}`; // Production: full URL
+const ASSESSMENTS_BASE_URL = `${API_BASE_URL}${API_ENDPOINTS.ASSESSMENTS.BASE}`;
 
 interface CreateAssessmentRequest {
   farmId: string;
