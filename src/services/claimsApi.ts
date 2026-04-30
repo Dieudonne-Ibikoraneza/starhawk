@@ -77,12 +77,7 @@ class ClaimsApiService {
         localStorage.removeItem('userId');
         localStorage.removeItem('phoneNumber');
         localStorage.removeItem('email');
-        
-        // Redirect to login page
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
-        
+
         throw new Error('Authentication required. Please log in again.');
       }
 
