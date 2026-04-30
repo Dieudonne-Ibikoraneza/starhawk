@@ -5,6 +5,7 @@ import { Eye, EyeOff, ArrowLeft, Phone, Lock, LogIn, AlertCircle, CheckCircle2, 
 import CustomScrollbar from "@/components/ui/CustomScrollbar";
 import { useToast } from "@/hooks/use-toast";
 import { farmerLogin, assessorLogin, insurerLogin, adminLogin } from "@/services/authAPI";
+import { API_BASE_URL } from "@/config/api";
 
 // ─────────────────────────────────────────────────────────────────
 //  DEMO / OFFLINE CREDENTIALS
@@ -101,34 +102,9 @@ export default function RoleSelection() {
 
       const formattedPhone = phoneValidation.formatted;
 
-      // ── 1. Check demo/offline credentials first ──
       const demo = DEMO_CREDENTIALS[formattedPhone];
-      if (demo && demo.password === formData.password) {
-        // Store minimal session info
-        localStorage.setItem("role", demo.role);
-        localStorage.setItem("phoneNumber", formattedPhone);
-        localStorage.setItem("userId", "demo-" + Date.now());
-        localStorage.setItem("token", "demo-token-" + Date.now());
 
-        toast({
-          title: `Welcome, ${demo.name}! 👋`,
-          description: `Redirecting to ${demo.role.toLowerCase()} dashboard…`,
-        });
-
-        // Small delay for UX feedback
-        await new Promise((r) => setTimeout(r, 800));
-        navigate(getDashboardRoute(demo.role));
-        return;
-      }
-
-      // ── 2. Wrong password for a demo account → friendly message ──
-      if (demo && demo.password !== formData.password) {
-        setError(`Incorrect password for this account. (Demo hint: ${demo.password})`);
-        setIsLoading(false);
-        return;
-      }
-
-      // ── 3. Try the live backend ──
+      // ── 1. Try the live backend first ──
       const loginMethods = [
         () => farmerLogin(formattedPhone, formData.password),
         () => assessorLogin(formattedPhone, formData.password),
@@ -150,7 +126,7 @@ export default function RoleSelection() {
 
       if (!loginResponse) {
         try {
-          const res = await fetch("/api/v1/auth/login", {
+          const res = await fetch(`${API_BASE_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phoneNumber: formattedPhone, password: formData.password }),
@@ -164,6 +140,35 @@ export default function RoleSelection() {
             localStorage.setItem("phoneNumber", formattedPhone);
           }
         } catch (_) {}
+      }
+
+      const isConnectivityError = (err: any) => {
+        const message = String(err?.message || "").toLowerCase();
+        return (
+          message.includes("network") ||
+          message.includes("timeout") ||
+          message.includes("failed to fetch") ||
+          message.includes("service unavailable") ||
+          message.includes("bad gateway") ||
+          message.includes("gateway timeout")
+        );
+      };
+
+      // ── 2. Fallback to demo ONLY when backend is unreachable ──
+      if (!loginResponse && demo && demo.password === formData.password && isConnectivityError(lastError)) {
+        localStorage.setItem("role", demo.role);
+        localStorage.setItem("phoneNumber", formattedPhone);
+        localStorage.setItem("userId", "demo-" + Date.now());
+        localStorage.setItem("token", "demo-token-" + Date.now());
+
+        toast({
+          title: `Backend unavailable, using ${demo.name} demo`,
+          description: `You are in offline demo mode as ${demo.role.toLowerCase()}.`,
+        });
+
+        await new Promise((r) => setTimeout(r, 600));
+        navigate(getDashboardRoute(demo.role));
+        return;
       }
 
       if (!loginResponse) {
