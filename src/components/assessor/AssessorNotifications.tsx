@@ -213,7 +213,7 @@ export default function AssessorNotifications() {
           const claimDate = claim.createdAt || claim.submittedAt || new Date().toISOString();
           const farmerId = claim.farmerId?._id || claim.farmerId || claim.farmer?.id || "";
           let farmerName = "Unknown Farmer";
-          let location = "Unknown Location";
+          const location = "Unknown Location";
 
           // Get farmer info
           if (claim.farmer || claim.farmerId) {

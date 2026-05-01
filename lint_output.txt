@@ -1,0 +1,116 @@
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+E:\viko\starhawk\src\components\assessment\RiskAssessmentModule.tsx
+  183:9  error  Unexpected lexical declaration in case block  no-case-declarations
+
+E:\viko\starhawk\src\components\assessor\AssessorNotifications.tsx
+  75:6  warning  React Hook useEffect has a missing dependency: 'loadNotifications'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\assessor\AssessorProfileSettings.tsx
+  131:6  warning  React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\assessor\CropMonitoringSystem.tsx
+  173:6  warning  React Hook useEffect has a missing dependency: 'loadPolicies'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  749:8  warning  React Hook useEffect has a missing dependency: 'loadCropData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\assessor\LossAssessmentSystem.tsx
+  73:6  warning  React Hook useEffect has a missing dependency: 'loadLossAssessments'. Either include it or remove the dependency array   react-hooks/exhaustive-deps
+  79:6  warning  React Hook useEffect has a missing dependency: 'loadAssessmentDetail'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\assessor\RiskAssessmentSystem.tsx
+  543:6  warning  React Hook useEffect has a missing dependency: 'loadFarmers'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\common\LeafletMap.tsx
+  206:6  warning  React Hook useEffect has missing dependencies: 'boundary', 'center', 'geoJsonData', 'kmlUrl', 'onMapClick', 'showControls', 'tileLayer', and 'zoom'. Either include them or remove the dependency array. If 'onMapClick' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\common\RwandaLocationSelector.tsx
+   60:6  warning  React Hook useEffect has a missing dependency: 'loadProvinces'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   70:6  warning  React Hook useEffect has a missing dependency: 'loadDistricts'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   80:6  warning  React Hook useEffect has a missing dependency: 'loadSectors'. Either include it or remove the dependency array    react-hooks/exhaustive-deps
+   90:6  warning  React Hook useEffect has a missing dependency: 'loadVillages'. Either include it or remove the dependency array   react-hooks/exhaustive-deps
+  100:6  warning  React Hook useEffect has a missing dependency: 'loadCells'. Either include it or remove the dependency array      react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\common\WeatherForecast.tsx
+  64:6  warning  React Hook useEffect has a missing dependency: 'loadWeatherData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\dashboards\AdminDashboard.tsx
+   213:6  warning  React Hook useEffect has missing dependencies: 'loadAdminProfile' and 'loadAdminStatistics'. Either include them or remove the dependency array                                                          react-hooks/exhaustive-deps
+   454:6  warning  React Hook useEffect has missing dependencies: 'loadAssessments', 'loadAssessors', 'loadFarmsForAssessment', 'loadInsurers', and 'loadPendingFarms'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+   823:6  warning  React Hook useEffect has a missing dependency: 'loadUsers'. Either include it or remove the dependency array                                                                                             react-hooks/exhaustive-deps
+  5901:6  warning  React Hook useEffect has missing dependencies: 'loadClaims' and 'loadPolicies'. Either include them or remove the dependency array                                                                       react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\dashboards\AssessorDashboard.tsx
+   384:6  warning  React Hook useEffect has missing dependencies: 'loadAssessments' and 'loadFarms'. Either include them or remove the dependency array                                                       react-hooks/exhaustive-deps
+   400:6  warning  React Hook useEffect has missing dependencies: 'loadAlerts', 'loadAssessments', 'loadAssessorProfile', 'loadFarmers', and 'loadFarms'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  1502:6  warning  React Hook useEffect has a missing dependency: 'loadFarms'. Either include it or remove the dependency array                                                                               react-hooks/exhaustive-deps
+  1653:6  warning  React Hook useEffect has missing dependencies: 'loadFarmWeatherData' and 'loadVegetationStats'. Either include them or remove the dependency array                                         react-hooks/exhaustive-deps
+  6420:6  warning  React Hook useEffect has missing dependencies: 'loadAlerts', 'loadCropMonitoringPolicies', 'loadFarmers', and 'loadFarms'. Either include them or remove the dependency array              react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\dashboards\FarmerDashboard.tsx
+  193:6  warning  React Hook useEffect has missing dependencies: 'loadAllReports', 'loadClaims', 'loadFarmAnalytics', 'loadFarmDetails', 'loadFarmerProfile', 'loadFarms', 'loadLossReports', and 'loadPolicies'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\dashboards\GovernmentDashboard.tsx
+  77:6  warning  React Hook useEffect has a missing dependency: 'loadGovernmentProfile'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\dashboards\InsurerDashboard.tsx
+  105:6  warning  React Hook useEffect has missing dependencies: 'loadInsuranceRequests', 'loadInsurerProfile', and 'loadSubmittedAssessments'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  171:6  warning  React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array                                                                          react-hooks/exhaustive-deps
+  242:6  warning  React Hook useEffect has a missing dependency: 'loadAssessors'. Either include it or remove the dependency array                                                                  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\insurer\ClaimReviewPage.tsx
+  51:6  warning  React Hook useEffect has a missing dependency: 'loadClaims'. Either include it or remove the dependency array        react-hooks/exhaustive-deps
+  58:6  warning  React Hook useEffect has a missing dependency: 'loadClaimDetails'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\insurer\ClaimsTable.tsx
+  60:6  warning  React Hook useEffect has a missing dependency: 'loadClaims'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\insurer\CreatePolicyPage.tsx
+  49:6  warning  React Hook useEffect has a missing dependency: 'loadSubmittedAssessments'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\insurer\PolicyManagement.tsx
+  72:6  warning  React Hook useEffect has a missing dependency: 'loadPolicies'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+E:\viko\starhawk\src\components\requests\PolicyRequestForm.tsx
+  138:9  error  Unexpected lexical declaration in case block  no-case-declarations
+
+E:\viko\starhawk\src\components\ui\badge.tsx
+  36:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\button.tsx
+  56:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\command.tsx
+  24:11  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+E:\viko\starhawk\src\components\ui\form.tsx
+  168:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\navigation-menu.tsx
+  119:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\sidebar.tsx
+  760:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\sonner.tsx
+  29:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\components\ui\textarea.tsx
+  5:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+E:\viko\starhawk\src\components\ui\toggle.tsx
+  43:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\contexts\AuthContext.tsx
+  24:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+E:\viko\starhawk\src\pages\RoleSelection.tsx
+  166:21  error  Empty block statement  no-empty
+
+E:\viko\starhawk\src\pages\UserDetailsPage.tsx
+  132:6  warning  React Hook useEffect has a missing dependency: 'loadUser'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 47 problems (5 errors, 42 warnings)
+

@@ -435,7 +435,7 @@ export default function AssessorDashboard() {
       
       // CLIENT-SIDE FILTERING: Ensure we only show farmers assigned to this assessor
       // Get assessments to identify which farmers are assigned to this assessor
-      let assignedFarmerIds = new Set<string>();
+      const assignedFarmerIds = new Set<string>();
       
       try {
         // Load assessments for this assessor to get assigned farmers

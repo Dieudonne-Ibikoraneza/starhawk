@@ -100,7 +100,7 @@ export default function LossAssessmentSystem() {
           const claimDate = claim.createdAt || claim.submittedAt || claim.date || new Date().toISOString();
           const farmerId = claim.farmerId?._id || claim.farmerId || claim.farmer?.id || "";
           let farmerName = "Unknown Farmer";
-          let fieldId = claim.fieldId || claim.farmId || "";
+          const fieldId = claim.fieldId || claim.farmId || "";
           let crop = claim.cropType || claim.crop || "Unknown";
           let area = "0 ha";
           let location = "";

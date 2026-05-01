@@ -930,7 +930,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
         selectedPdfType,
       );
 
-      let responseData = result?.data ?? result?.response ?? result;
+      const responseData = result?.data ?? result?.response ?? result;
 
       let extractedData = null;
       if (responseData?.droneAnalysisData) {
