@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import DashboardLayout from "../layout/DashboardLayout";
 import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
-import { getUserProfile, updateUserProfile } from "@/services/usersAPI";
+import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
 import { getFarms, getAllFarms, createFarm, createInsuranceRequest, getFarmById, getWeatherForecast, getHistoricalWeather, getVegetationStats } from "@/services/farmsApi";
 import RwandaLocationSelector from "@/components/common/RwandaLocationSelector";
 import { API_BASE_URL, getAuthToken } from "@/config/api";
@@ -20,7 +20,7 @@ import assessmentsApiService from "@/services/assessmentsApi";
 import { useToast } from "@/hooks/use-toast";
 import { 
   User, 
-  FileText, 
+  FileText, Bell,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -43,8 +43,19 @@ import {
   X,
   Sun,
   MapPin,
-  Leaf
+  Leaf,
+  Building2,
+  List
 } from "lucide-react";
+import MyFarmsTab from "../farmer/tabs/MyFarmsTab";
+import InsurersTab from "../farmer/tabs/InsurersTab";
+import InsuranceTab from "../farmer/tabs/InsuranceTab";
+import ReportsTab from "../farmer/tabs/ReportsTab";
+import MonitoringTab from "../farmer/tabs/MonitoringTab";
+import FarmDetailsTab from "../farmer/tabs/FarmDetailsTab";
+import PolicyDetailsTab from "../farmer/tabs/PolicyDetailsTab";
+import NotificationsTab from "../farmer/tabs/NotificationsTab";
+import RegisterFarmTab from "../farmer/tabs/RegisterFarmTab";
 import { 
   LineChart, 
   Line,
@@ -87,8 +98,13 @@ export default function FarmerDashboard() {
   const [isCreating, setIsCreating] = useState(false);
   const [newFieldData, setNewFieldData] = useState({
     cropType: "",
-    sowingDate: ""
+    sowingDate: "",
+    insurerId: ""
   });
+  
+  // State for Insurers
+  const [insurers, setInsurers] = useState<any[]>([]);
+  const [insurersLoading, setInsurersLoading] = useState(false);
   
   // State for File Claim Page
   const [policies, setPolicies] = useState<any[]>([]);
@@ -106,16 +122,20 @@ export default function FarmerDashboard() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   // State for Insurance Request
-  const [insuranceRequestDialog, setInsuranceRequestDialog] = useState<{
-    open: boolean;
-    farmId: string | null;
-    farmName: string;
-  }>({ open: false, farmId: null, farmName: "" });
+  const [insuranceRequestDialog, setInsuranceRequestDialog] = useState({
+    open: false,
+    farmId: "",
+    farmName: "",
+    insurerId: ""
+  });
   const [insuranceRequestNotes, setInsuranceRequestNotes] = useState("");
   const [isRequestingInsurance, setIsRequestingInsurance] = useState(false);
 
-  // State for Farm Details View
   const [selectedFarm, setSelectedFarm] = useState<any | null>(null);
+  const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
+  const [selectedInsurerId, setSelectedInsurerId] = useState<string | null>(null);
+  const [selectedInsurerName, setSelectedInsurerName] = useState<string | null>(null);
   const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
 
   // State for Farm Analytics
@@ -163,34 +183,90 @@ export default function FarmerDashboard() {
     village: null,
     cell: null
   });
+
+  const toDisplayText = (value: any, fallback: string = "N/A"): string => {
+    if (value === null || value === undefined || value === "") return fallback;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => toDisplayText(item, "")).filter(Boolean).join(", ") || fallback;
+    }
+    if (typeof value === "object") {
+      if (typeof value.name === "string" && value.name.trim()) return value.name;
+      if (typeof value.label === "string" && value.label.trim()) return value.label;
+      if (typeof value.title === "string" && value.title.trim()) return value.title;
+      if (typeof value._id === "string" && value._id.trim()) return value._id;
+      if (typeof value.id === "string" && value.id.trim()) return value.id;
+      return fallback;
+    }
+    return fallback;
+  };
+
+  const formatLocation = (farmOrLocation: any, coordinates?: any): string => {
+    if (farmOrLocation && farmOrLocation.locationName) return farmOrLocation.locationName;
+    if (farmOrLocation && farmOrLocation.location?.name) return farmOrLocation.location.name;
+    
+    const locCoords = farmOrLocation?.location?.coordinates || farmOrLocation?.coordinates || farmOrLocation?.locationCoordinates;
+    if (Array.isArray(locCoords) && locCoords.length >= 2) {
+      return `${locCoords[1]?.toFixed(4)}, ${locCoords[0]?.toFixed(4)}`;
+    }
+    if (Array.isArray(coordinates) && coordinates.length >= 2) {
+      return `${coordinates[1]?.toFixed(4)}, ${coordinates[0]?.toFixed(4)}`;
+    }
+    return toDisplayText(farmOrLocation, "N/A");
+  };
+
+  const toNumber = (value: any, fallback: number = 0): number => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const formatApiDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
   
   // Load data for dashboard and pages
   useEffect(() => {
+    loadFarms();
+    loadAllReports();
+    loadFarmerProfile();
+    fetchInsurers();
+  }, []);
+
+  const fetchInsurers = async () => {
+    setInsurersLoading(true);
+    try {
+      const response = await getInsurers(0, 100);
+      setInsurers(response.items || []);
+    } catch (err) {
+      console.error('Failed to fetch insurers:', err);
+    } finally {
+      setInsurersLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (farmerId) {
       if (activePage === "dashboard") {
-        loadFarms();
-        loadClaims();
-        loadLossReports();
-        loadFarmerProfile();
+        loadFarms(false);
+        loadAllReports();
       } else if (activePage === "my-fields") {
         loadFarms();
-      } else if (activePage === "create-farm") {
-        loadFarms();
+      } else if (activePage === "reports") {
+        loadAllReports();
       } else if (activePage === "loss-reports") {
         loadAllReports();
       } else if (activePage === "file-claim") {
         loadPolicies();
-      } else if (activePage === "farm-details" && selectedFarm) {
-        const farmId = selectedFarm._id || selectedFarm.id;
-        if (farmId) loadFarmDetails(farmId);
-      } else if (activePage === "farm-analytics" && selectedFarm) {
-        const farmId = selectedFarm._id || selectedFarm.id;
-        if (farmId) loadFarmAnalytics(farmId);
       } else if (activePage === "profile") {
         loadFarmerProfile();
       }
     }
-  }, [activePage, farmerId, selectedFarm]);
+  }, [activePage, farmerId]);
 
   const loadFarmerProfile = async () => {
     if (profileLoading) return;
@@ -281,7 +357,7 @@ export default function FarmerDashboard() {
   const isProfileStep1Valid = profileFormData.fullName && profileFormData.gender && profileFormData.nationalId && profileFormData.phoneNumber;
   const isProfileStep2Valid = selectedLocation.province && selectedLocation.district && selectedLocation.sector && selectedLocation.village && selectedLocation.cell;
   
-  const loadFarms = async () => {
+  const loadFarms = async (showErrorToast: boolean = true) => {
     setFarmsLoading(true);
     setFarmsError(null);
     try {
@@ -395,11 +471,13 @@ export default function FarmerDashboard() {
         if (response?.data?.totalItems > 0) {
           console.error('❌ API reports farms exist but none were returned. This is likely a backend pagination bug.');
           setFarmsError(`API reports ${response.data.totalItems} farms exist but none were returned. Please contact support.`);
-          toast({
-            title: 'Data Loading Issue',
-            description: `The API reports ${response.data.totalItems} farms but none are being returned. This may be a server-side issue.`,
-            variant: 'destructive'
-          });
+          if (showErrorToast) {
+            toast({
+              title: 'Data Loading Issue',
+              description: `The API reports ${response.data.totalItems} farms but none are being returned. This may be a server-side issue.`,
+              variant: 'destructive'
+            });
+          }
         } else {
         console.log('No farms found. This could mean:');
         console.log('1. The farmer has no farms assigned');
@@ -410,11 +488,13 @@ export default function FarmerDashboard() {
     } catch (err: any) {
       console.error('Failed to load farms:', err);
       setFarmsError(err.message || 'Failed to load farms');
-      toast({
-        title: 'Error loading farms',
-        description: err.message || 'Failed to load farms',
-        variant: 'destructive'
-      });
+      if (showErrorToast) {
+        toast({
+          title: 'Error loading farms',
+          description: err.message || 'Failed to load farms',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setFarmsLoading(false);
     }
@@ -572,7 +652,8 @@ export default function FarmerDashboard() {
     try {
       await createInsuranceRequest(
         insuranceRequestDialog.farmId,
-        insuranceRequestNotes || undefined
+        insuranceRequestNotes || undefined,
+        insuranceRequestDialog.insurerId && insuranceRequestDialog.insurerId !== "none" ? insuranceRequestDialog.insurerId : undefined
       );
 
       toast({
@@ -621,9 +702,12 @@ export default function FarmerDashboard() {
   const loadFarmAnalytics = async (farmId: string) => {
     setFarmAnalytics({ ...farmAnalytics, loading: true });
     try {
-      const endDate = new Date().toISOString().split('T')[0];
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const historicalStartDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const now = new Date();
+      // Set to yesterday to avoid timezone issues with AgroMonitoring API 'end can not be after now'
+      const yesterdayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0);
+      const endDate = formatApiDate(yesterdayLocal);
+      const startDate = formatApiDate(new Date(yesterdayLocal.getTime() - 30 * 24 * 60 * 60 * 1000));
+      const historicalStartDate = formatApiDate(new Date(yesterdayLocal.getTime() - 365 * 24 * 60 * 60 * 1000));
 
       const [forecast, historical, stats] = await Promise.all([
         getWeatherForecast(farmId, startDate, endDate).catch(() => null),
@@ -1000,7 +1084,8 @@ export default function FarmerDashboard() {
       // Only send cropType and sowingDate
       const farmData: any = {
         cropType: newFieldData.cropType.trim().toUpperCase(),
-        ...(newFieldData.sowingDate && { sowingDate: newFieldData.sowingDate })
+        ...(newFieldData.sowingDate && { sowingDate: newFieldData.sowingDate }),
+        ...(newFieldData.insurerId && newFieldData.insurerId !== "none" && { insurerId: newFieldData.insurerId })
       };
 
       console.log('📤 Preparing to create farm with data:', JSON.stringify(farmData, null, 2));
@@ -1099,7 +1184,7 @@ export default function FarmerDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-6 space-y-8">
 
       {/* Stats Cards */}
       <div className="grid gap-6 md:grid-cols-4">
@@ -1187,12 +1272,12 @@ export default function FarmerDashboard() {
                         className="hover:bg-gray-50/50 transition-all duration-150 cursor-pointer border-b border-gray-100"
                       >
                         <td className="py-4 px-6 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{farm.name || "Unnamed Farm"}</div>
+                          <div className="text-sm font-medium text-gray-900">{toDisplayText(farm.name, "Unnamed Farm")}</div>
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Leaf className="h-4 w-4 text-teal-500 flex-shrink-0" />
-                            <span>{farm.cropType || farm.crop || "N/A"}</span>
+                            <span>{toDisplayText(farm.cropType || farm.crop, "N/A")}</span>
     </div>
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap">
@@ -1208,7 +1293,7 @@ export default function FarmerDashboard() {
                               ? "bg-blue-500 text-white border-blue-600"
                               : "bg-gray-500 text-white border-gray-600"
                           }`}>
-                            {farm.status || "REGISTERED"}
+                            {toDisplayText(farm.status, "REGISTERED")}
                           </span>
                         </td>
                       </tr>
@@ -1245,11 +1330,11 @@ export default function FarmerDashboard() {
                       className="hover:bg-gray-50/50 transition-all duration-150 border-b border-gray-100"
                     >
                       <td className="py-4 px-6 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{claim.claimNumber || claim._id || claim.id || `CLAIM-${index + 1}`}</div>
+                              <div className="text-sm font-medium text-gray-900">{toDisplayText(claim.claimNumber || claim._id || claim.id, `CLAIM-${index + 1}`)}</div>
                       </td>
                       <td className="py-4 px-6 whitespace-nowrap">
                         <div className="text-sm text-gray-600">
-                          {claim.lossEventType || claim.damageType || claim.lossType || "N/A"}
+                          {toDisplayText(claim.lossEventType || claim.damageType || claim.lossType, "N/A")}
                         </div>
                       </td>
                       <td className="py-4 px-6 whitespace-nowrap">
@@ -1262,7 +1347,7 @@ export default function FarmerDashboard() {
                             ? "bg-red-500 text-white border-red-600"
                             : "bg-gray-500 text-white border-gray-600"
                         }`}>
-                          {claim.status || "PENDING"}
+                          {toDisplayText(claim.status, "PENDING")}
                         </span>
                       </td>
                       <td className="py-4 px-6 whitespace-nowrap">
@@ -1299,11 +1384,7 @@ export default function FarmerDashboard() {
                   {lossReports.slice(0, 5).map((report, index) => {
                     // Extract location from report
                     const location = 
-                      report.location || 
-                      report.farm?.location || 
-                      (report.farm?.location?.coordinates 
-                        ? `${report.farm.location.coordinates[1]?.toFixed(4)}, ${report.farm.location.coordinates[0]?.toFixed(4)}`
-                        : '') ||
+                      formatLocation(report.farm) || 
                       "Location not available";
                     
                     // Get status color
@@ -1462,12 +1543,12 @@ export default function FarmerDashboard() {
                           className="hover:bg-gray-50/50 transition-all duration-150 border-b border-gray-100 cursor-pointer"
                         >
                           <td className="py-4 px-6 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{farm.name || "Unnamed Farm"}</div>
+                            <div className="text-sm font-medium text-gray-900">{toDisplayText(farm.name, "Unnamed Farm")}</div>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Crop className="h-4 w-4 text-teal-500 flex-shrink-0" />
-                              <span>{farm.cropType || farm.crop || "N/A"}</span>
+                              <span>{toDisplayText(farm.cropType || farm.crop, "N/A")}</span>
                             </div>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
@@ -1477,11 +1558,7 @@ export default function FarmerDashboard() {
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
                             <div className="text-sm text-gray-600">
-                            {farm.location?.coordinates && Array.isArray(farm.location.coordinates) && farm.location.coordinates.length >= 2
-                              ? `${farm.location.coordinates[1]?.toFixed(4)}, ${farm.location.coordinates[0]?.toFixed(4)}`
-                              : farm.coordinates && Array.isArray(farm.coordinates) && farm.coordinates.length >= 2
-                              ? `${farm.coordinates[1]?.toFixed(4)}, ${farm.coordinates[0]?.toFixed(4)}`
-                              : farm.location || "N/A"}
+                            {formatLocation(farm.location, farm.coordinates)}
                             </div>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
@@ -1494,7 +1571,7 @@ export default function FarmerDashboard() {
                                 ? "bg-blue-500 text-white border-blue-600"
                                 : "bg-gray-500 text-white border-gray-600"
                             }`}>
-                              {farm.status || "REGISTERED"}
+                              {toDisplayText(farm.status, "REGISTERED")}
                             </span>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
@@ -1506,7 +1583,8 @@ export default function FarmerDashboard() {
                                   onClick={() => setInsuranceRequestDialog({
                                     open: true,
                                     farmId: farmId,
-                                    farmName: farm.name || "Unnamed Farm"
+                                    farmName: toDisplayText(farm.name, "Unnamed Farm"),
+                                    insurerId: ""
                                   })}
                                   className="border-green-600 text-green-600 hover:bg-green-50 h-8 px-3 text-xs font-medium !rounded-none"
                                 >
@@ -1553,6 +1631,25 @@ export default function FarmerDashboard() {
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
+              <Label className="text-gray-700">Preferred Insurer (Optional)</Label>
+              <Select 
+                value={insuranceRequestDialog.insurerId || "none"} 
+                onValueChange={(value) => setInsuranceRequestDialog({ ...insuranceRequestDialog, insurerId: value })}
+              >
+                <SelectTrigger className="mt-2 border-gray-300 !rounded-none">
+                  <SelectValue placeholder={insurersLoading ? "Loading insurers..." : "Select an insurer"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No preference</SelectItem>
+                  {insurers.map((insurer: any) => (
+                    <SelectItem key={insurer._id || insurer.id} value={insurer._id || insurer.id}>
+                      {insurer.insurerProfile?.companyName || `${insurer.firstName} ${insurer.lastName}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label className="text-gray-700">Additional Notes (Optional)</Label>
               <Textarea
                 value={insuranceRequestNotes}
@@ -1566,7 +1663,7 @@ export default function FarmerDashboard() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setInsuranceRequestDialog({ open: false, farmId: null, farmName: "" });
+                  setInsuranceRequestDialog({ open: false, farmId: "", farmName: "", insurerId: "" });
                   setInsuranceRequestNotes("");
                 }}
                 className="border-gray-300 text-gray-700 hover:bg-gray-100 !rounded-none"
@@ -1597,113 +1694,6 @@ export default function FarmerDashboard() {
       </div>
     </div>
   );
-
-  const renderCreateFarm = () => (
-    <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-5">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setActivePage("my-fields")}
-                className="text-gray-600 hover:text-gray-700 mb-2 !rounded-none"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to My Farms
-            </Button>
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Register New Farm</h1>
-              <p className="text-sm text-gray-500 mt-1">
-            Submit the official farm record required by Starhawk&apos;s backend APIs.
-          </p>
-            </div>
-          </div>
-          </div>
-        </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6">
-        <Card className="bg-white border border-gray-200 shadow-sm">
-          <CardHeader>
-          <CardTitle className="text-gray-900">Farm Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateField} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="cropType" className="text-gray-900">Crop Type *</Label>
-              <Input
-                id="cropType"
-                  value={newFieldData.cropType}
-                onChange={(e) => setNewFieldData({ ...newFieldData, cropType: e.target.value })}
-                placeholder="e.g., MAIZE, RICE, BEANS"
-                  required
-                className="bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-              />
-              <p className="text-xs text-gray-500">
-                Enter crop type (will be converted to uppercase).
-              </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sowingDate" className="text-gray-900">Sowing Date</Label>
-                <Input
-                  id="sowingDate"
-                  type="date"
-                  value={newFieldData.sowingDate}
-                  onChange={(e) => setNewFieldData({ ...newFieldData, sowingDate: e.target.value })}
-                  min={(() => {
-                    const today = new Date();
-                    const minDate = new Date(today);
-                    minDate.setDate(today.getDate() + 14);
-                    return minDate.toISOString().split('T')[0];
-                  })()}
-                  className="bg-gray-50 border-gray-300 text-gray-900"
-                />
-                <p className="text-xs text-gray-500">
-                  Select the date when crops will be sown (must be at least 14 days in the future).
-              </p>
-              </div>
-
-            <div className="flex gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setActivePage("my-fields");
-                    setNewFieldData({
-                    cropType: "",
-                    sowingDate: ""
-                  });
-                  }}
-                className="flex-1 bg-gray-50 hover:bg-gray-100 border border-gray-300 text-gray-900 !rounded-none"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isCreating}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {isCreating ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Create Farm
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
-    );
 
   const renderFileClaim = () => (
     <div className="min-h-screen bg-gray-50 pt-6 pb-8">
@@ -1941,854 +1931,6 @@ export default function FarmerDashboard() {
     </div>
   );
 
-  const renderLossReports = () => (
-    <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-5">
-      <div className="flex items-center justify-between">
-        <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Reports</h1>
-              <p className="text-sm text-gray-500 mt-1">View all your claim and risk assessment reports</p>
-        </div>
-        <Button 
-          variant="outline" 
-              size="sm"
-              onClick={loadAllReports}
-              disabled={reportsLoading}
-              className="border-gray-200 hover:bg-gray-50 text-xs h-9 !rounded-none"
-        >
-              <BarChart3 className={`h-4 w-4 mr-2 ${reportsLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 space-y-6">
-        {reportsLoading && (
-          <Card className="bg-white border border-gray-200 shadow-sm">
-          <CardContent className="p-12">
-            <div className="flex items-center justify-center">
-              <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-3"></div>
-                  <p className="text-sm text-gray-600">Loading reports...</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-        {reportsError && !reportsLoading && (
-          <Card className="bg-white border border-gray-200 shadow-sm">
-          <CardContent className="p-6">
-            <div className="text-center text-red-600">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-                <p className="text-sm">{reportsError}</p>
-              <Button 
-                  onClick={loadAllReports} 
-                  className="mt-4 bg-green-600 hover:bg-green-700 text-white text-xs h-8"
-              >
-                Retry
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-        {!reportsLoading && !reportsError && (
-          <>
-            {/* Claim Reports */}
-            <Card className="bg-white border border-gray-200 shadow-sm">
-              <CardHeader className="border-b border-gray-200 bg-gray-50">
-                <CardTitle className="text-base font-semibold text-gray-900">Claim Reports</CardTitle>
-          </CardHeader>
-              <CardContent className="p-0">
-            {claims.length === 0 ? (
-              <div className="text-center py-12">
-                    <FileText className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                    <p className="text-sm font-medium text-gray-900 mb-1">No claim reports found</p>
-                    <p className="text-xs text-gray-500">Your claim reports will appear here</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                    <table className="w-full">
-                  <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Claim ID</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Crop</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Date</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Damage Type</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Amount</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Status</th>
-                    </tr>
-                  </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {claims.map((claim) => (
-                      <tr 
-                            key={claim._id || claim.id} 
-                            className="hover:bg-green-50/30 transition-colors"
-                      >
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{claim.claimNumber || claim._id || claim.id || "N/A"}</div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{claim.cropType || claim.crop || "N/A"}</div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                          {claim.createdAt || claim.submittedAt || claim.date 
-                            ? new Date(claim.createdAt || claim.submittedAt || claim.date).toLocaleDateString()
-                            : "N/A"}
-                              </div>
-                        </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{claim.lossEventType || claim.damageType || "N/A"}</div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                          {claim.amount || claim.claimAmount 
-                            ? `${(claim.amount || claim.claimAmount).toLocaleString()} RWF`
-                            : "N/A"}
-                              </div>
-                        </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <Badge className={`text-xs py-1 px-2.5 ${getStatusColor(claim.status?.toLowerCase() || "pending")}`}>
-                            {getStatusIcon(claim.status?.toLowerCase() || "pending")}
-                            <span className="ml-1 capitalize">{claim.status?.replace('_', ' ') || "Pending"}</span>
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-            {/* Risk Assessment Reports */}
-            <Card className="bg-white border border-gray-200 shadow-sm">
-              <CardHeader className="border-b border-gray-200 bg-gray-50">
-                <CardTitle className="text-base font-semibold text-gray-900">Risk Assessment Reports</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {riskAssessments.length === 0 ? (
-                  <div className="text-center py-12">
-                    <BarChart3 className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                    <p className="text-sm font-medium text-gray-900 mb-1">No risk assessment reports found</p>
-                    <p className="text-xs text-gray-500">Your risk assessment reports will appear here</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Assessment ID</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Type</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Date</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Risk Score</th>
-                          <th className="text-left py-3 px-6 font-medium text-gray-700 text-xs">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {riskAssessments.map((assessment) => (
-                          <tr 
-                            key={assessment._id || assessment.id} 
-                            className="hover:bg-green-50/30 transition-colors"
-                          >
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{assessment._id || assessment.id || "N/A"}</div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{assessment.type || "Risk Assessment"}</div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {assessment.createdAt || assessment.assessmentDate || assessment.date 
-                                  ? new Date(assessment.createdAt || assessment.assessmentDate || assessment.date).toLocaleDateString()
-                                  : "N/A"}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {assessment.riskScore !== undefined ? `${assessment.riskScore}/100` : "N/A"}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-6 whitespace-nowrap">
-                              <Badge className={`text-xs py-1 px-2.5 ${getStatusColor(assessment.status?.toLowerCase() || "pending")}`}>
-                                {getStatusIcon(assessment.status?.toLowerCase() || "pending")}
-                                <span className="ml-1 capitalize">{assessment.status?.replace('_', ' ') || "Pending"}</span>
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderFarmDetails = () => {
-    if (!selectedFarm) {
-      return (
-        <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-          <div className="max-w-7xl mx-auto px-6">
-          <Button
-            variant="ghost"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setSelectedFarm(null);
-              setActivePage("my-fields");
-            }}
-                  className="text-gray-900 hover:bg-gray-50 !rounded-none"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to My Fields
-          </Button>
-          <Card className={dashboardTheme.card}>
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-600">No farm selected</p>
-            </CardContent>
-          </Card>
-          </div>
-        </div>
-      );
-    }
-
-    const farm = selectedFarm;
-    const coordinates = farm.location?.coordinates || farm.coordinates || [];
-
-    return (
-      <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-        {/* Header */}
-        <div className="max-w-7xl mx-auto px-6 mb-6">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-5">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSelectedFarm(null);
-                  setActivePage("my-fields");
-                }}
-                className="text-gray-600 hover:text-gray-700 p-0 h-auto"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Farm Details</h1>
-                <p className="text-sm text-gray-500 mt-1">{farm.name || "Farm Information"}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-6">
-
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-2 text-sm mb-4">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSelectedFarm(null);
-                  setActivePage("my-fields");
-                }}
-                className="text-gray-600 hover:text-gray-700 font-medium"
-              >
-                My Fields
-              </button>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-900 font-medium">Farm Details</span>
-            </div>
-            
-            {/* Back Button */}
-            <div className="mb-4 hidden">
-          <Button
-            variant="ghost"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setSelectedFarm(null);
-              setActivePage("my-fields");
-            }}
-                  className="text-gray-900 hover:bg-gray-50 !rounded-none"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Fields List
-          </Button>
-        </div>
-
-            {/* Title */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{farm.name || "Unnamed Farm"}</h2>
-          <p className="text-gray-600">Farm Details</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className={dashboardTheme.card}>
-            <CardHeader>
-              <CardTitle className="text-gray-900">Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Farm Name:</span>
-                <span className="text-gray-900 font-medium">{farm.name || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Crop Type:</span>
-                <span className="text-gray-900 font-medium">{farm.cropType || farm.crop || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Area:</span>
-                <span className="text-gray-900 font-medium">
-                  {farm.area ? `${farm.area} ha` : farm.size ? `${farm.size} ha` : "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <Badge className={`
-                  ${farm.status === 'INSURED' || farm.status === 'insured'
-                    ? "bg-green-100 text-green-700 border border-green-200"
-                    : farm.status === 'REGISTERED' || farm.status === 'registered'
-                    ? "bg-blue-100 text-blue-700 border border-blue-200"
-                    : "bg-gray-100 text-gray-700 border border-gray-200"
-                  }
-                `}>
-                  {farm.status || "REGISTERED"}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={dashboardTheme.card}>
-            <CardHeader>
-              <CardTitle className="text-gray-900">Location</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {coordinates.length >= 2 && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Latitude:</span>
-                    <span className="text-gray-900 font-medium">{coordinates[1]?.toFixed(6)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Longitude:</span>
-                    <span className="text-gray-900 font-medium">{coordinates[0]?.toFixed(6)}</span>
-                  </div>
-                </>
-              )}
-              {farm.eosdaFieldId && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">EOSDA Farm ID:</span>
-                  <span className="text-gray-900 font-medium">{farm.eosdaFieldId}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className={dashboardTheme.card}>
-          <CardHeader>
-            <CardTitle className="text-gray-900">Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              {farm.status === 'REGISTERED' || farm.status === 'registered' || !farm.status ? (
-                <Button
-                  onClick={() => setInsuranceRequestDialog({
-                    open: true,
-                    farmId: farm._id || farm.id,
-                    farmName: farm.name || "Unnamed Farm"
-                  })}
-                  className="bg-green-600 hover:bg-green-700 text-white !rounded-none"
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Request Insurance
-                </Button>
-              ) : null}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedFarm(farm);
-                  loadFarmAnalytics(farm._id || farm.id);
-                  setActivePage("farm-analytics");
-                }}
-                  className="border-blue-600 text-blue-600 hover:bg-blue-50 !rounded-none"
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                View Analytics
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        </div>
-      </div>
-    );
-  };
-
-  const renderFarmAnalytics = () => {
-    if (!selectedFarm) {
-      return (
-        <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-          <div className="max-w-7xl mx-auto px-6">
-          <Button
-            variant="ghost"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setSelectedFarm(null);
-              setActivePage("my-fields");
-            }}
-                  className="text-gray-900 hover:bg-gray-50 !rounded-none"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to My Fields
-          </Button>
-          <Card className={dashboardTheme.card}>
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-600">No farm selected</p>
-            </CardContent>
-          </Card>
-          </div>
-        </div>
-      );
-    }
-
-    const { weatherForecast, historicalWeather, vegetationStats, loading } = farmAnalytics;
-
-    return (
-      <div className="min-h-screen bg-gray-50 pt-6 pb-8">
-        {/* Header */}
-        <div className="max-w-7xl mx-auto px-6 mb-6">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-5">
-            <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSelectedFarm(null);
-                  setActivePage("my-fields");
-              }}
-                className="text-gray-600 hover:text-gray-700 p-0 h-auto"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-            </Button>
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Farm Analytics</h1>
-                <p className="text-sm text-gray-500 mt-1">{selectedFarm.name || "Weather forecasts, historical data, and vegetation indices"}</p>
-              </div>
-            </div>
-          </div>
-            </div>
-
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-6">
-
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            {/* Breadcrumb Navigation */}
-            
-            {/* Title */}
-            <h2 className="text-2xl font-bold text-gray-900">
-              Farm Analytics: {selectedFarm.name || "Unnamed Farm"}
-            </h2>
-            <p className="text-gray-600 mt-1">Weather forecasts, historical data, and vegetation indices</p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              const farmId = selectedFarm._id || selectedFarm.id;
-              if (farmId) loadFarmAnalytics(farmId);
-            }}
-            disabled={loading}
-            className="border-gray-300 text-gray-700 hover:bg-gray-100 !rounded-none"
-          >
-            <Clock className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-
-        {loading ? (
-          <Card className={dashboardTheme.card}>
-            <CardContent className="p-12 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading analytics data...</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Weather Forecast */}
-            <Card className={dashboardTheme.card}>
-              <CardHeader>
-                <CardTitle className="text-gray-900 flex items-center gap-2">
-                  <CloudRain className="h-5 w-5" />
-                  Weather Forecast
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {weatherForecast ? (
-                  <div className="text-gray-600">
-                    <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border border-gray-200">
-                      {JSON.stringify(weatherForecast, null, 2)}
-                    </pre>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No weather forecast data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Historical Weather */}
-            <Card className={dashboardTheme.card}>
-              <CardHeader>
-                <CardTitle className="text-gray-900 flex items-center gap-2">
-                  <Thermometer className="h-5 w-5" />
-                  Historical Weather
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {historicalWeather ? (() => {
-                  // Extract data array from response - handle different response structures
-                  let dataArray: any[] = [];
-                  
-                  if (Array.isArray(historicalWeather)) {
-                    dataArray = historicalWeather;
-                  } else if (historicalWeather?.data && Array.isArray(historicalWeather.data)) {
-                    dataArray = historicalWeather.data;
-                  } else if (historicalWeather?.data?.data && Array.isArray(historicalWeather.data.data)) {
-                    dataArray = historicalWeather.data.data;
-                  } else if (historicalWeather?.results && Array.isArray(historicalWeather.results)) {
-                    dataArray = historicalWeather.results;
-                  } else if (historicalWeather?.items && Array.isArray(historicalWeather.items)) {
-                    dataArray = historicalWeather.items;
-                  }
-                  
-                  if (dataArray.length === 0) {
-                    return <p className="text-gray-500">No historical weather data available</p>;
-                  }
-
-                  // Calculate summary statistics
-                  const totalRainfall = dataArray.reduce((sum: number, d: any) => sum + (d.rainfall || 0), 0);
-                  const avgRainfall = totalRainfall / dataArray.length;
-                  const maxRainfall = Math.max(...dataArray.map((d: any) => d.rainfall || 0));
-                  const avgTempMin = dataArray.reduce((sum: number, d: any) => sum + (d.temperature_min || 0), 0) / dataArray.length;
-                  const avgTempMax = dataArray.reduce((sum: number, d: any) => sum + (d.temperature_max || 0), 0) / dataArray.length;
-                  const avgHumidity = dataArray.reduce((sum: number, d: any) => sum + (d.humidity_day_avg || 0), 0) / dataArray.length;
-
-                  // Prepare chart data (limit to last 60 days for readability)
-                  const chartData = dataArray.slice(-60).map((d: any) => ({
-                    date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                    rainfall: Math.round(d.rainfall * 10) / 10,
-                    tempMin: d.temperature_min,
-                    tempMax: d.temperature_max,
-                    humidity: Math.round(d.humidity_day_avg * 10) / 10,
-                    tempAvg: Math.round((d.temperature_min + d.temperature_max) / 2 * 10) / 10
-                  }));
-
-                  // Get recent data for table (last 30 days)
-                  const tableData = dataArray.slice(-30).reverse();
-
-                  return (
-                    <div className="space-y-6">
-                      {/* Summary Cards */}
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Droplets className="h-4 w-4 text-blue-600" />
-                            <p className="text-xs text-blue-700 font-medium">Avg Rainfall</p>
-                  </div>
-                          <p className="text-2xl font-bold text-blue-900">{avgRainfall.toFixed(1)}mm</p>
-                          <p className="text-xs text-blue-600 mt-1">Max: {maxRainfall.toFixed(1)}mm</p>
-                        </div>
-                        
-                        <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Thermometer className="h-4 w-4 text-orange-600" />
-                            <p className="text-xs text-orange-700 font-medium">Avg Temp</p>
-                          </div>
-                          <p className="text-2xl font-bold text-orange-900">{avgTempMax.toFixed(1)}°C</p>
-                          <p className="text-xs text-orange-600 mt-1">Range: {avgTempMin.toFixed(1)}-{avgTempMax.toFixed(1)}°C</p>
-                        </div>
-                        
-                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Wind className="h-4 w-4 text-purple-600" />
-                            <p className="text-xs text-purple-700 font-medium">Humidity</p>
-                          </div>
-                          <p className="text-2xl font-bold text-purple-900">{avgHumidity.toFixed(1)}%</p>
-                          <p className="text-xs text-purple-600 mt-1">Daily average</p>
-                        </div>
-                        
-                        <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BarChart3 className="h-4 w-4 text-green-600" />
-                            <p className="text-xs text-green-700 font-medium">Data Points</p>
-                          </div>
-                          <p className="text-2xl font-bold text-green-900">{dataArray.length}</p>
-                          <p className="text-xs text-green-600 mt-1">Days recorded</p>
-                        </div>
-                        
-                        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                            <p className="text-xs text-red-700 font-medium">Critical Days</p>
-                          </div>
-                          <p className="text-2xl font-bold text-red-900">
-                            {dataArray.filter((d: any) => d.temp_critical > 0).length}
-                          </p>
-                          <p className="text-xs text-red-600 mt-1">Temp alerts</p>
-                        </div>
-                      </div>
-
-                      {/* Charts */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Temperature Chart */}
-                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <Thermometer className="h-4 w-4" />
-                            Temperature Trends (Last 60 Days)
-                          </h4>
-                          <ResponsiveContainer width="100%" height={250}>
-                            <ComposedChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                              <XAxis 
-                                dataKey="date" 
-                                tick={{ fontSize: 10 }}
-                                interval="preserveStartEnd"
-                                stroke="#6b7280"
-                              />
-                              <YAxis 
-                                yAxisId="temp"
-                                label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft' }}
-                                tick={{ fontSize: 10 }}
-                                stroke="#6b7280"
-                              />
-                              <Tooltip 
-                                contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-                              />
-                              <Legend />
-                              <Bar 
-                                yAxisId="temp"
-                                dataKey="tempMin" 
-                                fill="#93c5fd" 
-                                name="Min Temp (°C)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                              <Bar 
-                                yAxisId="temp"
-                                dataKey="tempMax" 
-                                fill="#f97316" 
-                                name="Max Temp (°C)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* Rainfall Chart */}
-                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <Droplets className="h-4 w-4" />
-                            Rainfall (Last 60 Days)
-                          </h4>
-                          <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                              <XAxis 
-                                dataKey="date" 
-                                tick={{ fontSize: 10 }}
-                                interval="preserveStartEnd"
-                                stroke="#6b7280"
-                              />
-                              <YAxis 
-                                label={{ value: 'Rainfall (mm)', angle: -90, position: 'insideLeft' }}
-                                tick={{ fontSize: 10 }}
-                                stroke="#6b7280"
-                              />
-                              <Tooltip 
-                                contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-                              />
-                              <Bar 
-                                dataKey="rainfall" 
-                                fill="#3b82f6" 
-                                name="Rainfall (mm)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Humidity Chart */}
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <Wind className="h-4 w-4" />
-                          Humidity Trend (Last 60 Days)
-                        </h4>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis 
-                              dataKey="date" 
-                              tick={{ fontSize: 10 }}
-                              interval="preserveStartEnd"
-                              stroke="#6b7280"
-                            />
-                            <YAxis 
-                              label={{ value: 'Humidity (%)', angle: -90, position: 'insideLeft' }}
-                              tick={{ fontSize: 10 }}
-                              domain={[0, 100]}
-                              stroke="#6b7280"
-                            />
-                            <Tooltip 
-                              contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="humidity" 
-                              stroke="#8b5cf6" 
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              name="Humidity (%)"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Data Table */}
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4" />
-                          Recent Weather Data (Last 30 Days)
-                        </h4>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-gray-300">
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Date</th>
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Rainfall (mm)</th>
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Temp Range (°C)</th>
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Avg Temp (°C)</th>
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Humidity (%)</th>
-                                <th className="text-left py-2 px-3 font-medium text-gray-700">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {tableData.map((day: any, idx: number) => {
-                                const avgTemp = (day.temperature_min + day.temperature_max) / 2;
-                                const date = new Date(day.date);
-                                const isRecent = idx < 7;
-                                
-                                return (
-                                  <tr 
-                                    key={idx} 
-                                    className={`border-b border-gray-200 hover:bg-gray-100 transition-colors ${
-                                      idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                    }`}
-                                  >
-                                    <td className="py-2 px-3 text-gray-900 font-medium">
-                                      {date.toLocaleDateString('en-US', { 
-                                        weekday: 'short', 
-                                        month: 'short', 
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                      {isRecent && (
-                                        <Badge className="ml-2 bg-blue-100 text-blue-700 text-xs">Recent</Badge>
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-3 text-gray-700">
-                                      <div className="flex items-center gap-2">
-                                        <Droplets className="h-3 w-3 text-blue-500" />
-                                        <span className="font-medium">{day.rainfall?.toFixed(1) || '0.0'}</span>
-                                      </div>
-                                    </td>
-                                    <td className="py-2 px-3 text-gray-700">
-                                      <span className="font-medium text-orange-600">{day.temperature_max}°</span>
-                                      <span className="text-gray-400 mx-1">/</span>
-                                      <span className="text-blue-600">{day.temperature_min}°</span>
-                                    </td>
-                                    <td className="py-2 px-3 text-gray-700 font-medium">
-                                      {avgTemp.toFixed(1)}°
-                                    </td>
-                                    <td className="py-2 px-3 text-gray-700">
-                                      <div className="flex items-center gap-1">
-                                        <Wind className="h-3 w-3 text-purple-500" />
-                                        <span>{day.humidity_day_avg?.toFixed(1) || '0.0'}</span>
-                                      </div>
-                                    </td>
-                                    <td className="py-2 px-3">
-                                      {day.temp_critical > 0 ? (
-                                        <Badge className="bg-red-100 text-red-700 text-xs">Critical</Badge>
-                                      ) : day.rainfall > 20 ? (
-                                        <Badge className="bg-blue-100 text-blue-700 text-xs">Heavy Rain</Badge>
-                                      ) : day.rainfall > 5 ? (
-                                        <Badge className="bg-blue-100 text-blue-700 text-xs">Rain</Badge>
-                                      ) : (
-                                        <Badge className="bg-green-100 text-green-700 text-xs">Normal</Badge>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })() : (
-                  <p className="text-gray-500">No historical weather data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Vegetation Statistics */}
-            <Card className={dashboardTheme.card}>
-              <CardHeader>
-                <CardTitle className="text-gray-900 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Vegetation Indices (NDVI)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {vegetationStats ? (
-                  <div className="text-gray-600">
-                    <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border border-gray-200">
-                      {JSON.stringify(vegetationStats, null, 2)}
-                    </pre>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No vegetation statistics available</p>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-        </div>
-      </div>
-    );
-  };
-
   const renderProfileSettings = () => (
     <div className="min-h-screen bg-gray-50 pt-6 pb-8">
       {/* Header */}
@@ -2971,13 +2113,100 @@ export default function FarmerDashboard() {
 
   const renderPage = () => {
     switch (activePage) {
-      case "dashboard": return renderDashboard();
-      case "my-fields": return renderMyFields();
-      case "create-farm": return renderCreateFarm();
+      case "dashboard": 
+        return renderDashboard();
+      case "my-fields": 
+        return (
+          <MyFarmsTab 
+            onRegisterFarm={() => setActivePage("create-farm")} 
+            onViewDetails={(farm) => {
+              setSelectedFarmId(farm._id || farm.id);
+              setActivePage("farm-details");
+            }}
+            onViewAnalytics={(farm) => {
+              setSelectedFarmId(farm._id || farm.id);
+              setActivePage("monitoring");
+            }}
+            onRequestInsurance={(farm) => {
+              setInsuranceRequestDialog({
+                open: true,
+                farmId: farm._id || farm.id,
+                farmName: farm.name || "Unnamed Farm",
+                insurerId: ""
+              });
+            }}
+          />
+        );
+      case "insurers": 
+        return (
+          <InsurersTab 
+            onRegisterFarm={(insurerId, insurerName) => {
+              setSelectedInsurerId(insurerId);
+              setSelectedInsurerName(insurerName);
+              setActivePage("register-farm");
+            }}
+          />
+        );
+      case "insurance": 
+        return (
+          <InsuranceTab 
+            onViewDetails={(id) => {
+              setSelectedPolicyId(id);
+              setActivePage("policy-details");
+            }} 
+          />
+        );
+      case "monitoring": return <MonitoringTab />;
+      case "create-farm": 
+        return (
+          <InsurersTab 
+            selectionMode={true}
+            onRegisterFarm={(insurerId, insurerName) => {
+              setSelectedInsurerId(insurerId);
+              setSelectedInsurerName(insurerName);
+              setActivePage("register-farm");
+            }}
+          />
+        );
+      case "register-farm":
+        return (
+          <RegisterFarmTab 
+            onSuccess={() => setActivePage("my-fields")} 
+            onCancel={() => setActivePage("create-farm")} 
+            insurerId={selectedInsurerId || undefined}
+            insurerName={selectedInsurerName || undefined}
+          />
+        );
+      case "notifications": return <NotificationsTab />;
       case "file-claim": return renderFileClaim();
-      case "loss-reports": return renderLossReports();
-      case "farm-details": return renderFarmDetails();
-      case "farm-analytics": return renderFarmAnalytics();
+      case "reports": return <ReportsTab />;
+      case "farm-details": 
+        return (
+          <FarmDetailsTab 
+            farmId={selectedFarmId!} 
+            onBack={() => setActivePage("my-fields")}
+            onViewPolicy={(id) => {
+              setSelectedPolicyId(id);
+              setActivePage("policy-details");
+            }}
+            onFileClaim={(id) => {
+              setSelectedPolicyId(id);
+              setActivePage("file-claim");
+            }}
+          />
+        );
+      case "policy-details":
+        return (
+          <PolicyDetailsTab 
+            policyId={selectedPolicyId!} 
+            onBack={() => setActivePage("insurance")}
+            onFileClaim={(id) => {
+              setSelectedPolicyId(id);
+              setActivePage("file-claim");
+            }}
+          />
+        );
+      case "loss-reports": return <ReportsTab />;
       case "profile": return renderProfileSettings();
       default: return renderDashboard();
     }
@@ -2986,8 +2215,12 @@ export default function FarmerDashboard() {
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "my-fields", label: "My Farms", icon: Crop },
+    { id: "monitoring", label: "Monitoring", icon: MapPin },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "insurers", label: "Insurers", icon: Building2 },
+    { id: "insurance", label: "Insurance", icon: Shield },
+    { id: "reports", label: "Reports", icon: FileText },
     { id: "file-claim", label: "File Claim", icon: AlertTriangle },
-    { id: "loss-reports", label: "Reports", icon: FileText },
     { id: "profile", label: "Profile", icon: User }
   ];
 
@@ -3015,7 +2248,11 @@ export default function FarmerDashboard() {
         window.location.href = '/role-selection';
       }}
     >
-      {renderPage()}
+      <div className="p-6 md:p-8 lg:p-10 w-full">
+        <div className="max-w-7xl mx-auto">
+          {renderPage()}
+        </div>
+      </div>
     </DashboardLayout>
   );
 }
