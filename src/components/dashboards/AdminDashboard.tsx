@@ -7525,6 +7525,20 @@ export const AdminDashboard = () => {
       return;
     }
 
+    if (
+      !assignFormData.insurerId ||
+      assignFormData.insurerId === "" ||
+      assignFormData.insurerId === "none-insurer"
+    ) {
+      toast({
+        title: "Validation Error",
+        description:
+          "Please select an insurer. Insurer is required for policy creation.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setAssigningAssessor(true);
     try {
       if (!selectedFarmForAssignment) {
@@ -8503,7 +8517,7 @@ export const AdminDashboard = () => {
               </div>
               <div>
                 <Label htmlFor="assignInsurerId" className="text-gray-900">
-                  Insurer (Optional)
+                  Insurer *
                 </Label>
                 <Select
                   value={assignFormData.insurerId || "none-insurer"}
@@ -8518,10 +8532,9 @@ export const AdminDashboard = () => {
                     id="assignInsurerId"
                     className="bg-gray-50 border-gray-300 text-gray-900 mt-1"
                   >
-                    <SelectValue placeholder="Select an insurer (optional)" />
+                    <SelectValue placeholder="Select an insurer" />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-300">
-                    <SelectItem value="none-insurer">None</SelectItem>
                     {!Array.isArray(insurers) || insurers.length === 0 ? (
                       <SelectItem value="none" disabled>
                         No insurers available
@@ -8571,7 +8584,12 @@ export const AdminDashboard = () => {
                 </Button>
                 <Button
                   onClick={handleAssignAssessor}
-                  disabled={assigningAssessor || !assignFormData.assessorId}
+                  disabled={
+                    assigningAssessor ||
+                    !assignFormData.assessorId ||
+                    !assignFormData.insurerId ||
+                    assignFormData.insurerId === "none-insurer"
+                  }
                   className="bg-green-600 hover:bg-green-700"
                 >
                   {assigningAssessor ? (
