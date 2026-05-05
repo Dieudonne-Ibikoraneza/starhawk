@@ -25,16 +25,18 @@ import {
 } from "lucide-react";
 import { getClaims, getClaimById, updateClaimAssessment, submitAssessment } from "@/services/claimsApi";
 import { getUserId } from "@/services/authAPI";
-import { getUserById } from "@/services/usersAPI";
 import { getFarmById } from "@/services/farmsApi";
 import { useToast } from "@/hooks/use-toast";
+import LeafletMap from "@/components/common/LeafletMap";
 
 interface LossAssessment {
   id: string;
   farmerName: string;
   fieldId: string;
+  farmId?: string;
   crop: string;
   area: string;
+  location?: string;
   cause: string;
   date: string;
   severity: string;
@@ -78,6 +80,26 @@ export default function LossAssessmentSystem() {
     }
   }, [selectedAssessment, viewMode]);
 
+  const normalizeId = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return String(value);
+    if (typeof value === "object") {
+      return value._id || value.id || value.farmId || "";
+    }
+    return "";
+  };
+
+  const getFarmerDisplayName = (claim: any): string => {
+    const farmer = claim.farmer || claim.farmerId;
+    if (farmer && typeof farmer === "object") {
+      const name = [farmer.firstName, farmer.lastName].filter(Boolean).join(" ").trim();
+      return name || farmer.name || farmer.email || farmer.phoneNumber || "Unknown Farmer";
+    }
+    const farmerId = normalizeId(farmer);
+    return farmerId ? `Farmer ${farmerId.slice(-6)}` : "Unknown Farmer";
+  };
+
   const loadLossAssessments = async () => {
     setLoading(true);
     setError(null);
@@ -89,7 +111,7 @@ export default function LossAssessmentSystem() {
       // Filter claims assigned to this assessor
       const assignedClaims = claimsArray.filter((claim: any) => {
         if (!assessorId) return false;
-        const claimAssessorId = claim.assessorId || claim.assessor?._id || claim.assessor?.id;
+        const claimAssessorId = normalizeId(claim.assessorId) || normalizeId(claim.assessor);
         return claimAssessorId === assessorId || claimAssessorId === assessorId.toString();
       });
 
@@ -98,40 +120,32 @@ export default function LossAssessmentSystem() {
         assignedClaims.map(async (claim: any) => {
           const claimId = claim._id || claim.id || "";
           const claimDate = claim.createdAt || claim.submittedAt || claim.date || new Date().toISOString();
-          const farmerId = claim.farmerId?._id || claim.farmerId || claim.farmer?.id || "";
-          let farmerName = "Unknown Farmer";
-          const fieldId = claim.fieldId || claim.farmId || "";
+          const farmerName = getFarmerDisplayName(claim);
+          const farmId = normalizeId(claim.fieldId) || normalizeId(claim.farmId) || normalizeId(claim.farm);
+          const fieldId = String(farmId || claim.claimNumber || claimId);
           let crop = claim.cropType || claim.crop || "Unknown";
           let area = "0 ha";
           let location = "";
 
-          // Get farmer info
-          if (claim.farmer || claim.farmerId) {
-            const farmer = claim.farmer || claim.farmerId;
-            if (typeof farmer === 'object') {
-              farmerName = farmer.firstName && farmer.lastName
-                ? `${farmer.firstName} ${farmer.lastName}`
-                : farmer.email || farmer.phoneNumber || "Unknown Farmer";
+          const claimFarm = claim.farm || claim.farmId;
+          if (claimFarm && typeof claimFarm === "object") {
+            crop = claimFarm.cropType || claimFarm.crop || crop;
+            if (claimFarm.area || claimFarm.size) {
+              area = `${claimFarm.area || claimFarm.size} ha`;
             }
-          }
-
-          // Try to get farmer info from API if needed
-          if (farmerName === "Unknown Farmer" && farmerId) {
-            try {
-              const farmerData: any = await getUserById(farmerId);
-              const farmer = farmerData.data || farmerData;
-              farmerName = farmer.firstName && farmer.lastName
-                ? `${farmer.firstName} ${farmer.lastName}`
-                : farmer.email || farmer.phoneNumber || "Unknown Farmer";
-            } catch (err) {
-              console.error('Failed to load farmer data:', err);
+            if (claimFarm.locationName && typeof claimFarm.locationName === "string") {
+              location = claimFarm.locationName;
+            } else if (typeof claimFarm.location === "string") {
+              location = claimFarm.location;
+            } else if (claimFarm.location?.coordinates && Array.isArray(claimFarm.location.coordinates)) {
+              location = `${claimFarm.location.coordinates[1]?.toFixed(4)}, ${claimFarm.location.coordinates[0]?.toFixed(4)}`;
             }
           }
 
           // Get farm/field info if available
-          if (fieldId) {
+          if (farmId) {
             try {
-              const farmData = await getFarmById(fieldId);
+              const farmData = await getFarmById(farmId);
               const farm = farmData.data || farmData;
               if (farm) {
                 crop = farm.cropType || farm.crop || crop;
@@ -152,7 +166,7 @@ export default function LossAssessmentSystem() {
           }
 
           // Determine severity based on claim amount or damage description
-          const lossEventType = claim.lossEventType || claim.damageType || claim.cause || "Unknown";
+          const lossEventType = String(claim.lossEventType || claim.damageType || claim.cause || "Unknown");
           const claimAmount = claim.amount || claim.claimAmount || 0;
           let severity = "Mild";
           if (claimAmount > 1000000 || lossEventType.toLowerCase().includes("severe") || lossEventType.toLowerCase().includes("drought")) {
@@ -163,18 +177,20 @@ export default function LossAssessmentSystem() {
 
           // Calculate affected area and percentage (if available in claim data)
           const affectedArea = claim.affectedArea || claim.damagedArea || "0 ha";
-          const affectedPercentage = claim.affectedPercentage || claim.damagePercentage || 0;
+          const affectedPercentage = Number(claim.affectedPercentage || claim.damagePercentage || 0);
 
           return {
             id: claimId,
             farmerName,
-            fieldId: fieldId || claim.claimNumber || claimId,
+            fieldId,
+            farmId,
+            location,
             crop,
             area,
             cause: lossEventType,
             date: new Date(claimDate).toLocaleDateString(),
             severity,
-            affectedArea: typeof affectedArea === 'number' ? `${affectedArea} ha` : affectedArea,
+            affectedArea: typeof affectedArea === 'number' ? `${affectedArea} ha` : String(affectedArea),
             affectedPercentage,
             status: claim.status || "Pending"
           };
