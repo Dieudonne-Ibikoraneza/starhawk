@@ -37,9 +37,10 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { API_BASE_URL as CENTRAL_API_BASE_URL } from "@/config/api";
 
 // Use environment variable for easy deployment across different environments
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/v1/satellite`;
+const API_BASE_URL = `${CENTRAL_API_BASE_URL}/satellite`;
 
 interface StatisticsResult {
   scene_id: string;
