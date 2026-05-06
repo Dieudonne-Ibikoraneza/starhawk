@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Sprout, Shield, FileWarning, 
   ClipboardList, Activity, Satellite, Hash, Loader2, 
   ChevronRight, TrendingUp, CloudRain, Droplets, Thermometer,
-  Wind, ShieldCheck, AlertTriangle
+  Wind, ShieldCheck, AlertTriangle, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { getFarmById, getVegetationStats, getWeatherForecast } from "@/services/farmsApi";
+import { getFarmerSuggestions, getMonitoringCycle } from "@/services/aiApi";
 import { useToast } from "@/hooks/use-toast";
 
 interface FarmDetailsTabProps {
@@ -27,6 +28,12 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
   const [monitoring, setMonitoring] = useState<any>(null);
   const [weather, setWeather] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // AI Insights State
+  const [aiInsights, setAiInsights] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [cycleAnalysis, setCycleAnalysis] = useState<any>(null);
+  const [cycleLoading, setCycleLoading] = useState(false);
 
   useEffect(() => {
     loadFarmData();
@@ -40,10 +47,10 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
     
     setLoading(true);
     try {
-      // AgroMonitoring API throws an error if endDate is even slightly in the future (timezone issues).
-      // We use yesterday as the safe endDate.
-      const endDate = format(subDays(new Date(), 1), "yyyy-MM-dd");
-      const startDate = format(subDays(new Date(), 31), "yyyy-MM-dd");
+      // AgroMonitoring API is very sensitive to timezone boundaries (throws 'end can not be after now').
+      // We use 2 days ago as the safe endDate to guarantee we never hit a timezone mismatch.
+      const endDate = format(subDays(new Date(), 2), "yyyy-MM-dd");
+      const startDate = format(subDays(new Date(), 32), "yyyy-MM-dd");
 
       const [farmRes, monitoringRes, weatherRes] = await Promise.all([
         getFarmById(farmId),
@@ -63,6 +70,51 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAskAI = async () => {
+    if (!farm) return;
+    setAiLoading(true);
+    try {
+      const insights = await getFarmerSuggestions(farm, weather, monitoring);
+      if (insights) {
+        setAiInsights(insights);
+      } else {
+        toast({ title: "AI Error", description: "Could not generate insights.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "AI Error", description: "Failed to connect to AI engine.", variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAnalyzeCycle = async () => {
+    if (!farm) return;
+    
+    setCycleLoading(true);
+    try {
+      // Historical data from monitoring and weather
+      const historicalNdvi = monitoring?.ndviData || [];
+      const historicalWeather = weather || [];
+      
+      const analysis = await getMonitoringCycle(farm, historicalNdvi, historicalWeather);
+      if (analysis) {
+        setCycleAnalysis(analysis);
+        toast({
+          title: "Cycle Analysis Complete",
+          description: "Our AI has generated a detailed monitoring report for your farm.",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Analysis Failed",
+        description: "Could not generate cycle analysis at this time.",
+        variant: "destructive"
+      });
+    } finally {
+      setCycleLoading(false);
     }
   };
 
@@ -178,7 +230,157 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
             </CardContent>
           </Card>
 
-          {/* Weather Panel */}
+          {/* AI Insights Card */}
+          <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Sparkles className="h-24 w-24 text-green-600" />
+            </div>
+            <CardHeader className="border-b border-green-100/50 pb-4">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span className="text-green-900">Starhawk AI Insights</span>
+                </div>
+                {!aiInsights && !aiLoading && (
+                  <Button 
+                    size="sm" 
+                    onClick={handleAskAI}
+                    className="bg-green-600 hover:bg-green-700 text-white shadow-sm gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Generate Advice
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {aiLoading ? (
+                <div className="flex flex-col items-center justify-center py-6 space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                  <p className="text-sm text-green-700 animate-pulse">Analyzing satellite and weather data...</p>
+                </div>
+              ) : aiInsights ? (
+                <div className="prose prose-sm prose-green max-w-none text-gray-700">
+                  {/* Cleanly render the bullet points from the LLM */}
+                  {(typeof aiInsights === 'string' ? aiInsights : (aiInsights.data || JSON.stringify(aiInsights)))
+                    .split('\n')
+                    .filter((line: string) => line.trim().length > 0)
+                    .map((line: string, i: number) => (
+                    <p key={i} className="flex items-start gap-3 mb-3 leading-relaxed">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 shrink-0" />
+                      <span>{line.replace(/^[-*•]\s*/, '').replace(/\"/g, '')}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-gray-500 mb-4">
+                    Click "Generate Advice" to have our AI analyze your field's satellite indices and weather forecast to give you actionable farming tips.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* AI Monitoring Cycle & Marketability Card */}
+          <Card className="border-blue-200 shadow-md bg-gradient-to-br from-white to-blue-50 overflow-hidden">
+            <CardHeader className="border-b border-blue-100/50">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-blue-600" />
+                  <span className="text-blue-900">Monitoring Cycle Analysis</span>
+                </div>
+                {!cycleAnalysis && !cycleLoading && (
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={handleAnalyzeCycle}
+                    className="border-blue-200 text-blue-700 hover:bg-blue-100 gap-2"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    Analyze Cycle
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {cycleLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                  <div className="relative">
+                    <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                    <Activity className="h-4 w-4 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <p className="text-sm text-blue-700 animate-pulse font-medium">Crunching historical satellite trends...</p>
+                </div>
+              ) : cycleAnalysis ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                      <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Current Stage</p>
+                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.currentStage || "N/A"}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                      <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Health Trend</p>
+                      <p className={`text-sm font-black ${
+                        cycleAnalysis.healthTrend === 'Improving' ? 'text-green-600' : 
+                        cycleAnalysis.healthTrend === 'Declining' ? 'text-red-500' : 'text-blue-600'
+                      }`}>
+                        {cycleAnalysis.healthTrend || "Stable"}
+                      </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                      <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Days to Harvest</p>
+                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.daysToHarvest || "N/A"} Days</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                      <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Market Score</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-black text-gray-900">{cycleAnalysis.marketValueScore || 0}%</p>
+                        <Progress value={cycleAnalysis.marketValueScore || 0} className="h-1.5 w-12 bg-blue-100" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-blue-900 uppercase tracking-widest">Cycle Report</h4>
+                    <p className="text-sm text-gray-700 leading-relaxed italic border-l-2 border-blue-200 pl-4 bg-blue-50/30 py-2 rounded-r-lg">
+                      {cycleAnalysis.cycleAnalysis}
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-green-700 uppercase tracking-widest">Growth Recommendations</h4>
+                      <ul className="space-y-1.5">
+                        {(cycleAnalysis.recommendations || []).map((rec: string, i: number) => (
+                          <li key={i} className="text-xs text-gray-600 flex items-center gap-2">
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-widest">Market Potential</h4>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {cycleAnalysis.investmentPotential}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-xs text-gray-500 italic">
+                    Run a full cycle analysis to see growth stages and investment potential.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Weather Forecast */}
           <Card className="border-gray-200 shadow-sm bg-white overflow-hidden">
             <CardHeader className="border-b border-gray-100">
               <CardTitle className="text-lg flex items-center gap-2">

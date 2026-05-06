@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { createFarm } from "@/services/farmsApi";
+import { getInsurers } from "@/services/usersAPI";
 
 // Predefined crop types
 const PREDEFINED_CROPS = [
@@ -43,7 +44,29 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
   const [formData, setFormData] = useState({
     cropType: "",
     sowingDate: defaultSowingDate,
+    selectedInsurerId: insurerId || "",
   });
+
+  const [availableInsurers, setAvailableInsurers] = useState<any[]>([]);
+  const [fetchingInsurers, setFetchingInsurers] = useState(false);
+
+  useEffect(() => {
+    if (!insurerId) {
+      fetchInsurers();
+    }
+  }, [insurerId]);
+
+  const fetchInsurers = async () => {
+    setFetchingInsurers(true);
+    try {
+      const response = await getInsurers();
+      setAvailableInsurers(response.content || response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch insurers:", err);
+    } finally {
+      setFetchingInsurers(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!formData.cropType) {
@@ -62,12 +85,9 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
       const generatedName = `New ${cropName} Farm`;
 
       await createFarm({
-        name: generatedName,
         cropType: formData.cropType,
         sowingDate: formData.sowingDate,
-        insurerId: insurerId,
-        // Placeholder coordinates, real mapping is handled by admins/assessors
-        coordinates: [0, 0] 
+        insurerId: formData.selectedInsurerId || undefined,
       });
 
       toast({
@@ -108,17 +128,34 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
         </CardHeader>
         
         <CardContent className="space-y-8 px-8">
-          {/* Insurer Section (if provided) */}
-          {insurerName && (
-            <div className="p-5 bg-green-50/50 border border-green-100 rounded-2xl flex items-center gap-4">
-              <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-green-600 shrink-0">
-                <Building2 className="h-6 w-6" />
-              </div>
-              <div>
-                <Label className="text-green-800/60 text-xs uppercase tracking-wider font-bold">Selected Insurer</Label>
-                <div className="text-lg font-bold text-green-900 flex items-center gap-2">
-                  {insurerName}
-                  <ShieldCheck className="h-4 w-4 text-green-600" />
+          {/* Insurer Selection (Only if pre-selected) */}
+          {(insurerId || insurerName) && (
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-green-600" />
+                Insurance Provider
+              </Label>
+              
+              <div className="p-4 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-green-600 overflow-hidden">
+                    {availableInsurers.find(ins => (ins.id || ins._id) === formData.selectedInsurerId)?.insurerProfile?.companyLogoUrl ? (
+                      <img 
+                        src={availableInsurers.find(ins => (ins.id || ins._id) === formData.selectedInsurerId).insurerProfile.companyLogoUrl} 
+                        alt={insurerName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Building2 className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-green-700 font-medium">Selected Provider</p>
+                    <p className="font-bold text-green-900">{insurerName || "Selected Insurer"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
                 </div>
               </div>
             </div>
@@ -152,6 +189,7 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
                 <Input 
                   id="sowing" 
                   type="date" 
+                  min={defaultSowingDate}
                   className="pl-10 h-12 rounded-xl border-gray-200 focus:border-green-500 focus:ring-green-500 text-base"
                   value={formData.sowingDate}
                   onChange={(e) => setFormData({...formData, sowingDate: e.target.value})}

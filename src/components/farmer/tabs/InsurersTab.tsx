@@ -16,9 +16,11 @@ interface InsurersTabProps {
   onRegisterFarm?: (insurerId: string, insurerName: string) => void;
   /** If true, shows prominent "Select" buttons (used in the farm registration flow) */
   selectionMode?: boolean;
+  /** Called when user wants to register a farm without an insurer */
+  onSkip?: () => void;
 }
 
-export default function InsurersTab({ onSelectProvider, onRegisterFarm, selectionMode = false }: InsurersTabProps) {
+export default function InsurersTab({ onSelectProvider, onRegisterFarm, onSkip, selectionMode = false }: InsurersTabProps) {
   const { toast } = useToast();
   const [insurers, setInsurers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,33 @@ export default function InsurersTab({ onSelectProvider, onRegisterFarm, selectio
                   <Globe className="h-5 w-5 text-teal-600" />
                 </div>
                 <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Contact Person</p>
+                  <p className="text-sm font-semibold text-gray-900">{profile.contactPerson || "N/A"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Official Email</p>
+                  <p className="text-sm font-semibold text-gray-900">{profile.officialEmail || insurer.email || "N/A"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Official Phone</p>
+                  <p className="text-sm font-semibold text-gray-900">{profile.officialPhone || insurer.phoneNumber || "N/A"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                  <Globe className="h-5 w-5" />
+                </div>
+                <div>
                   <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Website</p>
                   {profile.website ? (
                     <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-green-600 hover:underline flex items-center gap-1">
@@ -162,42 +191,78 @@ export default function InsurersTab({ onSelectProvider, onRegisterFarm, selectio
         </div>
 
         {/* Additional details */}
-        {(profile.licenseNumber || profile.address || profile.specialties) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="border-gray-200 shadow-sm bg-white">
             <CardHeader>
-              <CardTitle className="text-base">Additional Information</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Info className="h-4 w-4 text-green-600" />
+                About {name}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {profile.licenseNumber && (
-                <div className="flex items-start gap-3">
-                  <FileText className="h-4 w-4 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">License Number</p>
-                    <p className="text-sm text-gray-900">{profile.licenseNumber}</p>
-                  </div>
+              {profile.bio && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Bio</p>
+                  <p className="text-sm text-gray-700 leading-relaxed italic">"{profile.bio}"</p>
                 </div>
               )}
+              {profile.companyDescription && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Company Description</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{profile.companyDescription}</p>
+                </div>
+              )}
+              {!profile.bio && !profile.companyDescription && (
+                <p className="text-sm text-gray-500 italic">No description provided.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-gray-200 shadow-sm bg-white">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-600" />
+                Location & Compliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                {profile.province && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Province</p>
+                    <p className="text-sm text-gray-900">{profile.province}</p>
+                  </div>
+                )}
+                {profile.district && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">District</p>
+                    <p className="text-sm text-gray-900">{profile.district}</p>
+                  </div>
+                )}
+                {profile.sector && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Sector</p>
+                    <p className="text-sm text-gray-900">{profile.sector}</p>
+                  </div>
+                )}
+                {profile.licenseNumber && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">License #</p>
+                    <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50 font-mono">
+                      {profile.licenseNumber}
+                    </Badge>
+                  </div>
+                )}
+              </div>
               {profile.address && (
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Address</p>
-                    <p className="text-sm text-gray-900">{profile.address}</p>
-                  </div>
-                </div>
-              )}
-              {profile.specialties && (
-                <div className="flex items-start gap-3">
-                  <Sprout className="h-4 w-4 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Specialties</p>
-                    <p className="text-sm text-gray-900">{Array.isArray(profile.specialties) ? profile.specialties.join(', ') : profile.specialties}</p>
-                  </div>
+                <div className="pt-2 border-t border-gray-50">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Full Address</p>
+                  <p className="text-sm text-gray-900">{profile.address}</p>
                 </div>
               )}
             </CardContent>
           </Card>
-        )}
+        </div>
 
         {/* Action: Register farm with this insurer */}
         <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 shadow-sm">
@@ -258,6 +323,18 @@ export default function InsurersTab({ onSelectProvider, onRegisterFarm, selectio
               : "Browse through our trusted insurance partners. Click on a provider to view their full details."}
           </p>
         </div>
+        
+        {selectionMode && onSkip && (
+          <Button 
+            variant="outline" 
+            onClick={onSkip}
+            className="border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 px-6 h-12 rounded-xl flex items-center gap-2 group"
+          >
+            <ShieldCheck className="h-5 w-5 opacity-50 group-hover:opacity-100" />
+            Skip for now
+            <ArrowRight className="h-4 w-4 ml-1 opacity-50" />
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

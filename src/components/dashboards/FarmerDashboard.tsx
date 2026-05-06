@@ -2161,6 +2161,11 @@ export default function FarmerDashboard() {
         return (
           <InsurersTab 
             selectionMode={true}
+            onSkip={() => {
+              setSelectedInsurerId(null);
+              setSelectedInsurerName(null);
+              setActivePage("register-farm");
+            }}
             onRegisterFarm={(insurerId, insurerName) => {
               setSelectedInsurerId(insurerId);
               setSelectedInsurerName(insurerName);
