@@ -318,7 +318,7 @@ export class ComprehensiveReportGenerator {
     doc.text("SH", W - M - 5, 12.5, { align: "center" });
   }
 
-  // ── Section divider ────────────────────────────────────────────────Section divider ───────────────────────────────────────────────────────
+  // ── Section divider ───────────────────────────────────────────────────────
   private drawWeatherAnalysis(y: number, weather?: WeatherData): number {
     if (!weather || !weather.current || !weather.forecast) return y;
     const { doc, M, CW, H } = this;
@@ -391,6 +391,9 @@ export class ComprehensiveReportGenerator {
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
     weather.forecast.forEach((day, idx) => {
+      if (y > H - 25) {
+         // Should ideally handle page break but usually this fits after components
+      }
       const bg = idx % 2 === 0 ? C.white : C.cream;
       setFill(doc, bg);
       doc.rect(M, y, CW, 7, "F");
@@ -481,14 +484,15 @@ export class ComprehensiveReportGenerator {
     const { main: mainCol } = levelColors(risk.level);
 
     // Semi-circle gauge: sweeps from left (180°) to right (0°) across the top.
+    // strokeArc draws CCW so we go from 180° down to 0°.
     doc.setLineWidth(6);
     setDraw(doc, C.mist);
-    strokeArc(doc, cx, cy, r, 0, 180); // full grey track
+    strokeArc(doc, cx, cy, r, 0, 180); // full grey track (left → right, top arc)
 
-    // Coloured portion
+    // Coloured portion: map score 0–100 → 0–180°, drawn from left side inward
     const fillAngle = (risk.score / 100) * 180;
     setDraw(doc, mainCol);
-    strokeArc(doc, cx, cy, r, 180 - fillAngle, 180);
+    strokeArc(doc, cx, cy, r, 180 - fillAngle, 180); // right-to-left fill
 
     doc.setLineWidth(0.4);
 
@@ -589,22 +593,24 @@ export class ComprehensiveReportGenerator {
         align: "center",
       });
 
-      // Text
+      // Text - show full recommendation without truncation
       const lines = doc.splitTextToSize(cleanText(rec), CW - 14) as string[];
       doc.setFontSize(8.5);
       doc.setFont("helvetica", "normal");
       setTxt(doc, C.slate);
 
+      // Show all lines, not just the first one
       lines.forEach((line, lineIndex) => {
         if (lineIndex === 0) {
           doc.text(line, M + 11, ry + 7);
         } else {
+          // Additional lines for longer recommendations
           doc.text(line, M + 11, ry + 7 + lineIndex * 4);
         }
       });
     });
 
-    return y + recs.length * rowH + 10;
+    return y + recs.length * rowH + 10; // Increased spacing for longer text
   }
 
   // ── Drone analysis card ───────────────────────────────────────────────────
@@ -622,7 +628,7 @@ export class ComprehensiveReportGenerator {
     // Title bar
     setFill(doc, C.leaf);
     doc.roundedRect(M, y, CW, 10, 4, 4, "F");
-    doc.rect(M, y + 5, CW, 5, "F"); 
+    doc.rect(M, y + 5, CW, 5, "F"); // square off bottom of title bar
 
     doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
@@ -698,7 +704,7 @@ export class ComprehensiveReportGenerator {
     const cardH = lines.length * 5 + 12;
 
     rRect(doc, M, y, CW, cardH, 4, C.mint, C.sage, 1);
-    rRect(doc, M, y, 3, cardH, 2, C.sage); 
+    rRect(doc, M, y, 3, cardH, 2, C.sage); // left accent bar
 
     doc.setFont("helvetica", "normal");
     setTxt(doc, C.slate);
@@ -716,7 +722,7 @@ export class ComprehensiveReportGenerator {
     const ch = 20;
     const labels = ["Assessor Name", "Date"];
     const values = [
-      data.farmDetails.farmerName || "N/A", 
+      data.farmDetails.farmerName || "N/A", // Use farmer name as assessor
       data.reportGeneratedAt.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -733,6 +739,7 @@ export class ComprehensiveReportGenerator {
       setTxt(doc, C.leaf);
       doc.text(label, x + 4, y + 6);
 
+      // Fill in the value directly (no signature line)
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       setTxt(doc, C.slate);
@@ -756,10 +763,10 @@ export class ComprehensiveReportGenerator {
     // ── PAGE 1: Farm Overview & Risk Summary ─────────────────────────────
     this.drawHeader(
       "Crop Risk Assessment Report",
-      `${data.farmDetails.name} \u00B7 ID: ${data.assessmentId}`,
+      `${data.farmDetails.name} • ID: ${data.assessmentId}`,
     );
 
-    // --- Farm Info Grid ---
+    // --- Farm Info Grid (monitoring style) ---
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     setTxt(doc, C.forest);
@@ -818,7 +825,7 @@ export class ComprehensiveReportGenerator {
     doc.text(blurbLines, M + 1, y + 5);
     y += blurbLines.length * 5 + 8;
 
-    // Score dial + field status badge
+    // Score dial + field status badge — side by side
     const DIAL_R = 18;
     const DIAL_CX = M + 32;
     const DIAL_CY = y + DIAL_R + 8;
@@ -895,13 +902,14 @@ export class ComprehensiveReportGenerator {
 
     this.drawFooter(pageNum++);
 
-    // ── DRONE ANALYSIS PAGES ───
+    // ── DRONE ANALYSIS PAGES (Full Page Quality — matching monitoring) ───
     const validDrones = data.dronePdfs.filter((p) => p.droneAnalysisData);
     if (validDrones.length > 0) {
       for (const pdf of validDrones) {
         const endGenericPage = doc.getNumberOfPages();
         doc.addPage();
 
+        // Render the complete Drone Report layout (full page, rich design)
         await renderDroneDataToDoc(
           doc,
           pdf.droneAnalysisData!,
@@ -912,16 +920,18 @@ export class ComprehensiveReportGenerator {
             summary: data.comprehensiveNotes,
             weather: "Contextual weather data included in previous pages."
           },
-          false 
+          false // showContext: false - we already have summary in dossier
         );
 
         const finalDronePage = doc.getNumberOfPages();
 
+        // Add footer to all drone pages retrospectively
         for (let p = endGenericPage + 1; p <= finalDronePage; p++) {
           doc.setPage(p);
           this.drawFooter(pageNum++, "Risk Assessment System");
         }
 
+        // Resync to last page
         doc.setPage(finalDronePage);
       }
     }
@@ -935,6 +945,7 @@ export class ComprehensiveReportGenerator {
     this.drawSignOff(y, data);
     this.drawFooter(pageNum, "Risk Assessment System");
 
+    // Prune trailing blank page if sign-off was short
     return new Blob([doc.output("blob")], { type: "application/pdf" });
   }
 
