@@ -99,7 +99,7 @@ class CropMonitoringApiService {
 
   // Start Crop Monitoring
   // POST /crop-monitoring/start
-  async startMonitoring(policyId: string): Promise<MonitoringResponse> {
+  async startMonitoring(policyId: string): Promise<any> {
     const url = `${API_BASE_URL}${API_ENDPOINTS.CROP_MONITORING.START}`;
     const token = this.getToken();
     const headers: HeadersInit = {
@@ -131,36 +131,40 @@ class CropMonitoringApiService {
       throw new Error(data.message || data.error || data.detail || `HTTP error! status: ${response.status}`);
     }
 
-    return data;
+    return data?.data || data;
   }
 
   // Get Monitoring History
   // GET /crop-monitoring
-  async getMonitoringHistory(): Promise<MonitoringResponse[]> {
-    return this.request<MonitoringResponse[]>('');
+  async getMonitoringHistory(): Promise<any> {
+    const response = await this.request<any>('');
+    return response?.data || response || [];
   }
 
   // Get Monitoring by ID
   // GET /crop-monitoring/:id
-  async getMonitoringById(id: string): Promise<MonitoringResponse> {
-    return this.request<MonitoringResponse>(`/${id}`);
+  async getMonitoringById(id: string): Promise<any> {
+    const response = await this.request<any>(`/${id}`);
+    return response?.data || response || null;
   }
 
   // Update Monitoring Data
   // PUT /crop-monitoring/:id
-  async updateMonitoring(id: string, updateData: UpdateMonitoringRequest): Promise<MonitoringResponse> {
-    return this.request<MonitoringResponse>(`/${id}`, {
+  async updateMonitoring(id: string, updateData: UpdateMonitoringRequest): Promise<any> {
+    const response = await this.request<any>(`/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
     });
+    return response?.data || response || null;
   }
 
   // Generate Monitoring Report
   // POST /crop-monitoring/:id/generate-report
-  async generateReport(id: string): Promise<MonitoringResponse> {
-    return this.request<MonitoringResponse>(`/${id}/generate-report`, {
+  async generateReport(id: string): Promise<any> {
+    const response = await this.request<any>(`/${id}/generate-report`, {
       method: 'POST',
     });
+    return response?.data || response || null;
   }
 }
 

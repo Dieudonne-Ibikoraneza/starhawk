@@ -159,14 +159,14 @@ class FarmsApiService {
   //   "cropType": "MAIZE" // Optional, uppercase
   // }
   async createFarm(farmData: FarmData) {
-    // If no boundary or name is provided, use the simple register endpoint
-    const isSimpleRegister = !farmData.boundary && !farmData.name;
+    // If no boundary is provided, use the simple register endpoint
+    const isSimpleRegister = !farmData.boundary;
     const endpoint = isSimpleRegister ? '/register' : '';
 
     const requestBody: any = {
       cropType: farmData.cropType?.toUpperCase(),
       sowingDate: farmData.sowingDate,
-      insurerId: farmData.insurerId,
+      insurerId: farmData.insurerId || farmData.selectedInsurerId,
     };
 
     if (!isSimpleRegister) {
@@ -199,7 +199,7 @@ class FarmsApiService {
       if (!requestBody.location || !requestBody.location.coordinates) throw new Error('Location coordinates are required');
       if (!requestBody.boundary || !requestBody.boundary.coordinates) throw new Error('Boundary coordinates are required');
     } else {
-      // Validations for simple registration
+      // Validations for simple registration (Backend /register endpoint)
       if (!requestBody.cropType) throw new Error('Crop type is required');
       if (!requestBody.sowingDate) throw new Error('Sowing date is required');
     }

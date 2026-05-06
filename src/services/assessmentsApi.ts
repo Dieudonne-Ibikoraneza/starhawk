@@ -343,6 +343,12 @@ class AssessmentsApiService {
     return this.request(`/${id}`);
   }
 
+  // Get Assessment by Farm ID
+  // Endpoint: GET /assessments/farm/:farmId
+  async getAssessmentByFarm(farmId: string) {
+    return this.request(`/farm/${farmId}`);
+  }
+
   // Get Assigned Farmers (Assessor only)
   // Endpoint: GET /assessments/farmers/list
   async getAssignedFarmers() {
@@ -426,7 +432,7 @@ class AssessmentsApiService {
 async uploadDronePDF(
   assessmentId: string,
   file: File,
-  pdfType: 'plant_health' | 'flowering'
+  pdfType: string
 ) {
   const formData = new FormData();
   formData.append('file', file);
