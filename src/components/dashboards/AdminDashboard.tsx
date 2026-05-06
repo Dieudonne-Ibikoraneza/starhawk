@@ -777,7 +777,16 @@ export const AdminDashboard = () => {
         const firstName = safeString(user.firstName, "");
         const lastName = safeString(user.lastName, "");
         const fullName = `${firstName} ${lastName}`.trim();
-        const name = fullName || safeString(user.name, "Unknown");
+        const role = safeString(user.role, "Farmer");
+
+        // Use company name for insurers if available, otherwise use personal name
+        let name = fullName || safeString(user.name, "Unknown");
+        if (
+          (role.toUpperCase() === "INSURER" || role === "Insurer") &&
+          user.insurerProfile?.companyName
+        ) {
+          name = user.insurerProfile.companyName;
+        }
 
         return {
           id: safeString(user._id || user.id, ""),
@@ -787,7 +796,7 @@ export const AdminDashboard = () => {
           lastName: lastName,
           email: safeString(user.email, ""),
           phoneNumber: safeString(user.phoneNumber, ""),
-          role: safeString(user.role, "Farmer"),
+          role: role,
           status: user.active !== false ? "active" : "inactive",
           active: user.active !== false,
           region: (() => {
@@ -803,6 +812,7 @@ export const AdminDashboard = () => {
               : new Date(String(user.createdAt)).toISOString().split("T")[0]
             : "",
           createdAt: safeString(user.createdAt, ""),
+          insurerProfile: user.insurerProfile, // Preserve profile for detailed views
         };
       });
 
@@ -5900,6 +5910,16 @@ export const AdminDashboard = () => {
     }
   }, [activePage, policyStatusFilter, claimStatusFilter]);
 
+  // Load assessments and related data when switching to assessments page
+  useEffect(() => {
+    if (activePage === "assessments") {
+      loadAssessments();
+      loadPendingFarms();
+      loadInsurers(); // Needed for Pending Farms table to display company names
+      loadAssessors(); // Good to have ready for assignment
+    }
+  }, [activePage]);
+
   // Policy CRUD Functions
   const handleCreatePolicy = async () => {
     try {
@@ -7318,97 +7338,82 @@ export const AdminDashboard = () => {
   const loadInsurers = async () => {
     setInsurersLoading(true);
     try {
-      console.log("🔄 Loading insurers...");
-      // Use getAllUsers endpoint and filter by role
-      // Endpoint: GET /users
-      const usersResponse = await getAllUsers();
-      console.log("✅ Users API response:", usersResponse);
+      console.log("🔄 Loading insurers via dedicated endpoint...");
+      // Use the dedicated /users/insurers endpoint which returns full insurerProfile with companyName
+      const response = await getInsurers(0, 100);
+      console.log("✅ Insurers API response:", response);
 
-      let allUsers: any[] = [];
+      let insurerUsers: any[] = [];
 
       // Handle different response structures
-      if (Array.isArray(usersResponse)) {
-        allUsers = usersResponse;
-      } else if (usersResponse && typeof usersResponse === "object") {
-        // Try multiple possible response structures
-        if (Array.isArray(usersResponse.users)) {
-          allUsers = usersResponse.users;
-        } else if (Array.isArray(usersResponse.data)) {
-          allUsers = usersResponse.data;
-        } else if (Array.isArray(usersResponse.results)) {
-          allUsers = usersResponse.results;
-        } else if (Array.isArray(usersResponse.items)) {
-          allUsers = usersResponse.items;
-        } else if (Array.isArray(usersResponse.list)) {
-          allUsers = usersResponse.list;
-        } else if (usersResponse.data) {
-          if (Array.isArray(usersResponse.data)) {
-            allUsers = usersResponse.data;
-          } else if (
-            usersResponse.data.data &&
-            Array.isArray(usersResponse.data.data)
-          ) {
-            allUsers = usersResponse.data.data;
-          } else if (
-            usersResponse.data.users &&
-            Array.isArray(usersResponse.data.users)
-          ) {
-            allUsers = usersResponse.data.users;
-          } else if (
-            usersResponse.data.results &&
-            Array.isArray(usersResponse.data.results)
-          ) {
-            allUsers = usersResponse.data.results;
-          } else if (
-            usersResponse.data.items &&
-            Array.isArray(usersResponse.data.items)
-          ) {
-            allUsers = usersResponse.data.items;
-          } else if (
-            usersResponse.data.list &&
-            Array.isArray(usersResponse.data.list)
-          ) {
-            allUsers = usersResponse.data.list;
-          }
-        } else {
+      if (Array.isArray(response)) {
+        insurerUsers = response;
+      } else if (response && typeof response === "object") {
+        insurerUsers =
+          response.data?.items ||
+          response.data?.content ||
+          response.items ||
+          response.content ||
+          response.data ||
+          response.users ||
+          response.results ||
+          response.list ||
+          [];
+        // Ensure we got an array
+        if (!Array.isArray(insurerUsers)) {
           // Try to find any array property
-          const keys = Object.keys(usersResponse);
+          const keys = Object.keys(response.data || response);
           for (const key of keys) {
-            if (Array.isArray(usersResponse[key])) {
-              allUsers = usersResponse[key];
+            const target = response.data || response;
+            if (Array.isArray(target[key])) {
+              insurerUsers = target[key];
               break;
             }
           }
         }
       }
 
-      // Ensure allUsers is an array
-      if (!Array.isArray(allUsers)) {
-        console.warn("⚠️ allUsers is not an array, converting:", allUsers);
-        allUsers = [];
+      // Ensure insurerUsers is an array
+      if (!Array.isArray(insurerUsers)) {
+        console.warn("⚠️ insurerUsers is not an array, converting:", insurerUsers);
+        insurerUsers = [];
       }
-
-      // Filter users by role to get only insurers
-      const insurerUsers = allUsers.filter((user: any) => {
-        const role = user.role || "";
-        return role.toUpperCase() === "INSURER" || role === "Insurer";
-      });
 
       setInsurers(insurerUsers);
       console.log(
-        `✅ Filtered ${insurerUsers.length} insurers from ${allUsers.length} total users`,
+        `✅ Loaded ${insurerUsers.length} insurers`,
       );
       if (insurerUsers.length > 0) {
-        console.log("📊 Sample insurer:", insurerUsers[0]);
+        console.log("📊 Sample insurer:", JSON.stringify(insurerUsers[0], null, 2));
+        console.log("📊 Company name:", insurerUsers[0]?.insurerProfile?.companyName);
       }
     } catch (err: any) {
-      console.error("❌ Failed to load insurers:", err);
-      setInsurers([]);
-      toast({
-        title: "Warning",
-        description: "Could not load insurers. Please try refreshing the page.",
-        variant: "default",
-      });
+      console.error("❌ Failed to load insurers via dedicated endpoint, falling back to getAllUsers:", err);
+      // Fallback: use getAllUsers and filter
+      try {
+        const usersResponse = await getAllUsers();
+        let allUsers: any[] = [];
+        if (Array.isArray(usersResponse)) {
+          allUsers = usersResponse;
+        } else if (usersResponse && typeof usersResponse === "object") {
+          allUsers = usersResponse.data || usersResponse.users || usersResponse.items || usersResponse.results || [];
+          if (!Array.isArray(allUsers)) allUsers = [];
+        }
+        const filtered = allUsers.filter((user: any) => {
+          const role = user.role || "";
+          return role.toUpperCase() === "INSURER";
+        });
+        setInsurers(filtered);
+        console.log(`✅ Fallback: Filtered ${filtered.length} insurers from ${allUsers.length} users`);
+      } catch (fallbackErr: any) {
+        console.error("❌ Fallback also failed:", fallbackErr);
+        setInsurers([]);
+        toast({
+          title: "Warning",
+          description: "Could not load insurers. Please try refreshing the page.",
+          variant: "default",
+        });
+      }
     } finally {
       setInsurersLoading(false);
     }
@@ -7774,6 +7779,9 @@ export const AdminDashboard = () => {
                         Farm Location
                       </th>
                       <th className="text-left py-3 px-6 font-medium text-gray-900">
+                        Preferred Insurer
+                      </th>
+                      <th className="text-left py-3 px-6 font-medium text-gray-900">
                         Actions
                       </th>
                     </tr>
@@ -7861,6 +7869,30 @@ export const AdminDashboard = () => {
                                 </span>
                               </div>
                             </td>
+                            <td className="py-3 px-6 text-gray-900">
+                              {(() => {
+                                const prefInsurerId = farm.insurerId || farm.preferredInsurerId;
+                                if (!prefInsurerId) return <span className="text-gray-400 text-xs italic">None preferred</span>;
+                                
+                                const insurer = insurers.find(i => (i.id || i._id) === prefInsurerId);
+                                if (insurer) {
+                                  const companyName = insurer.insurerProfile?.companyName;
+                                  const personalName = (insurer.firstName && insurer.lastName) 
+                                    ? `${insurer.firstName} ${insurer.lastName}` 
+                                    : insurer.firstName || insurer.lastName || "";
+                                  
+                                  return (
+                                    <div className="flex items-center gap-1.5">
+                                      <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                                      <span className="text-sm font-medium text-blue-600">
+                                        {companyName || personalName}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                return <span className="text-gray-500 text-xs">ID: {prefInsurerId.substring(0, 8)}...</span>;
+                              })()}
+                            </td>
                             <td className="py-3 px-6">
                               <Button
                                 onClick={() => {
@@ -7868,7 +7900,7 @@ export const AdminDashboard = () => {
                                     setSelectedFarmForAssignment(farm);
                                     setAssignFormData({
                                       assessorId: "",
-                                      insurerId: "",
+                                      insurerId: farm.insurerId || farm.preferredInsurerId || "",
                                     });
                                     setShowAssignDialog(true);
                                   } else {
@@ -7978,6 +8010,9 @@ export const AdminDashboard = () => {
                         Assessor
                       </th>
                       <th className="text-left py-4 px-6 font-medium text-gray-900">
+                        Insurer
+                      </th>
+                      <th className="text-left py-4 px-6 font-medium text-gray-900">
                         Status
                       </th>
                       <th className="text-left py-4 px-6 font-medium text-gray-900">
@@ -8061,6 +8096,44 @@ export const AdminDashboard = () => {
                                 return assessment.assessorId;
                               }
                               return "Not Assigned";
+                            })()}
+                          </td>
+                          <td className="py-4 px-6 text-gray-900">
+                            {(() => {
+                              // Look up insurer from the assessment's insurerId
+                              const insurerIdVal = assessment.insurerId;
+                              if (!insurerIdVal) return <span className="text-gray-400 text-xs italic">N/A</span>;
+                              // If insurerId is a populated object
+                              if (typeof insurerIdVal === "object") {
+                                const companyName = insurerIdVal.insurerProfile?.companyName;
+                                if (companyName) return (
+                                  <div className="flex items-center gap-1.5">
+                                    <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                                    <span className="text-sm font-medium text-blue-600">{companyName}</span>
+                                  </div>
+                                );
+                                const personalName = (insurerIdVal.firstName && insurerIdVal.lastName)
+                                  ? `${insurerIdVal.firstName} ${insurerIdVal.lastName}`
+                                  : insurerIdVal.firstName || insurerIdVal.lastName || "";
+                                return personalName || <span className="text-gray-400 text-xs italic">Unknown</span>;
+                              }
+                              // insurerId is a string — look up from loaded insurers
+                              const insurer = insurers.find(i => (i.id || i._id) === insurerIdVal);
+                              if (insurer) {
+                                const companyName = insurer.insurerProfile?.companyName;
+                                const personalName = (insurer.firstName && insurer.lastName)
+                                  ? `${insurer.firstName} ${insurer.lastName}`
+                                  : insurer.firstName || insurer.lastName || "";
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                                    <span className="text-sm font-medium text-blue-600">
+                                      {companyName || personalName || "Unknown"}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return <span className="text-gray-500 text-xs">ID: {String(insurerIdVal).substring(0, 8)}...</span>;
                             })()}
                           </td>
                           <td className="py-4 px-6">
@@ -8233,16 +8306,15 @@ export const AdminDashboard = () => {
                         const insurerValue =
                           insurer._id || insurer.id || `insurer-${index}`;
                         const insurerName = (() => {
-                          if (insurer.firstName && insurer.lastName) {
-                            return `${insurer.firstName} ${insurer.lastName}`;
+                          const companyName = insurer.insurerProfile?.companyName;
+                          const personalName = (insurer.firstName && insurer.lastName) 
+                            ? `${insurer.firstName} ${insurer.lastName}` 
+                            : insurer.firstName || insurer.lastName || "";
+                          
+                          if (companyName) {
+                            return companyName;
                           }
-                          if (insurer.firstName) return insurer.firstName;
-                          if (insurer.lastName) return insurer.lastName;
-                          if (typeof insurer.name === "string")
-                            return insurer.name;
-                          if (insurer.email) return insurer.email;
-                          if (insurer.phoneNumber) return insurer.phoneNumber;
-                          return "Unknown Insurer";
+                          return personalName || "Unknown Insurer";
                         })();
                         const contactInfo =
                           insurer.email || insurer.phoneNumber || "";
@@ -8527,6 +8599,7 @@ export const AdminDashboard = () => {
                       insurerId: value === "none-insurer" ? "" : value,
                     })
                   }
+                  disabled={!!(selectedFarmForAssignment?.insurerId || selectedFarmForAssignment?.preferredInsurerId)}
                 >
                   <SelectTrigger
                     id="assignInsurerId"
@@ -8546,16 +8619,15 @@ export const AdminDashboard = () => {
                           insurer.id ||
                           `insurer-${insurerIndex}`;
                         const insurerName = (() => {
-                          if (insurer.firstName && insurer.lastName) {
-                            return `${insurer.firstName} ${insurer.lastName}`;
+                          const companyName = insurer.insurerProfile?.companyName;
+                          const personalName = (insurer.firstName && insurer.lastName) 
+                            ? `${insurer.firstName} ${insurer.lastName}` 
+                            : insurer.firstName || insurer.lastName || "";
+                          
+                          if (companyName) {
+                            return personalName ? `${companyName} (${personalName})` : companyName;
                           }
-                          if (insurer.firstName) return insurer.firstName;
-                          if (insurer.lastName) return insurer.lastName;
-                          if (typeof insurer.name === "string")
-                            return insurer.name;
-                          if (insurer.email) return insurer.email;
-                          if (insurer.phoneNumber) return insurer.phoneNumber;
-                          return "Unknown Insurer";
+                          return personalName || "Unknown Insurer";
                         })();
                         const contactInfo =
                           insurer.email || insurer.phoneNumber || "";
@@ -8830,12 +8902,13 @@ export const AdminDashboard = () => {
 
   // Get display name from profile if available
   const displayName = adminProfile
-    ? adminProfile.firstName && adminProfile.lastName
-      ? `${adminProfile.firstName} ${adminProfile.lastName}`.trim()
-      : adminProfile.name ||
-        adminProfile.firstName ||
-        adminProfile.lastName ||
-        adminName
+    ? adminProfile.insurerProfile?.companyName ||
+      (adminProfile.firstName && adminProfile.lastName
+        ? `${adminProfile.firstName} ${adminProfile.lastName}`.trim()
+        : adminProfile.name ||
+          adminProfile.firstName ||
+          adminProfile.lastName ||
+          adminName)
     : adminName;
 
   return (
