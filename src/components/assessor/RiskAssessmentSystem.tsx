@@ -80,6 +80,7 @@ import {
 import OverviewTab from "./tabs/OverviewTab";
 import DroneTab from "./tabs/DroneTab";
 import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
+import { BasicInfoTab } from "./tabs/BasicInfoTab";
 import { useComprehensiveNotes } from "@/hooks/useComprehensiveNotes";
 
 interface Farmer {
@@ -100,8 +101,14 @@ interface Farm {
   id: string;
   cropType: string;
   sowingDate: string;
-  status: "PENDING" | "REGISTERED";
+  status: "PENDING" | "REGISTERED" | string;
   name: string | null;
+  boundary?: {
+    type: string;
+    coordinates: number[][][];
+  } | null;
+  eosdaFieldId?: string | null;
+  [key: string]: any;
 }
 
 interface Assessment {
@@ -136,7 +143,7 @@ interface Assessment {
 }
 
 export default function RiskAssessmentSystem(): JSX.Element {
-  const { toast: uiToast } = useToast();
+  const { toast } = useToast();
   const [viewMode, setViewMode] = useState<"farmers" | "assessment">("farmers");
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -604,6 +611,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
     setUploadingKML(true);
     try {
       const result = await uploadKML(selectedKMLFile, farmId, farmName.trim());
+      console.log("✅ KML upload result:", JSON.stringify(result, null, 2));
 
       toast({
         title: "Success",
@@ -614,9 +622,18 @@ export default function RiskAssessmentSystem(): JSX.Element {
       setFarmName("");
       setShowKMLUpload(null);
 
+      // Always reload farmers to reflect the updated boundary data
       await loadFarmers();
 
-      if (result.status === "REGISTERED") {
+      // Extract farm data from API response (may be wrapped in `data`)
+      const farmData = result?.data || result;
+      const farmStatus = farmData?.status;
+
+      // If the farm is now REGISTERED (has boundary), auto-load the assessment
+      if (
+        farmStatus === "REGISTERED" ||
+        farmData?.boundary?.coordinates?.length
+      ) {
         await loadAssessmentForFarm(farmId);
       }
     } catch (err: any) {
@@ -635,20 +652,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
   const loadAssessmentForFarm = async (farmId: string) => {
     setLoadingAssessment(true);
     try {
-      const assessments = await assessmentsApiService.getAssessments();
-      const assessmentsData =
-        assessments.data || assessments.items || assessments || [];
-      const existingAssessment = Array.isArray(assessmentsData)
-        ? assessmentsData.find(
-            (a: any) => a.farmId?._id === farmId || a.farmId === farmId,
-          )
-        : null;
+      const assessmentDetails =
+        await assessmentsApiService.getAssessmentByFarm(farmId);
+      const assessmentData = assessmentDetails.data || assessmentDetails;
 
-      if (existingAssessment) {
-        const assessmentDetails = await assessmentsApiService.getAssessmentById(
-          existingAssessment._id || existingAssessment.id,
-        );
-        const assessmentData = assessmentDetails.data || assessmentDetails;
+      if (assessmentData) {
         setAssessment(assessmentData);
 
         const riskScoreValue = assessmentData.riskScore;
@@ -697,21 +705,22 @@ export default function RiskAssessmentSystem(): JSX.Element {
         return `${year}-${month}-${day}`;
       };
 
-      // Use local-date formatting to avoid UTC rollover producing a future end date.
+      // AGROmonitoring strictly enforces that the end date cannot be after "now".
+      // To be completely safe across timezones, we use yesterday as the end date.
       const now = new Date();
-      const today = new Date(
+      const yesterday = new Date(
         now.getFullYear(),
         now.getMonth(),
-        now.getDate(),
+        now.getDate() - 1,
         12,
         0,
         0,
       );
       const startDate = new Date();
-      startDate.setFullYear(today.getFullYear() - 3);
+      startDate.setFullYear(yesterday.getFullYear() - 3);
 
       const startDateStr = formatDateForApi(startDate);
-      const endDateStr = formatDateForApi(today);
+      const endDateStr = formatDateForApi(yesterday);
 
       try {
         const stats = await getVegetationStats(
@@ -1349,21 +1358,23 @@ export default function RiskAssessmentSystem(): JSX.Element {
 
         // Percentage blocks (rendered on top of lines)
         blockX = pieX;
-        levels.forEach((lv: { level?: string; percentage?: number }, i: number) => {
-          const [r, g, b] = hexToRgb(getLevelColor(i));
-          doc.setFillColor(r, g, b);
-          doc.rect(blockX, blockY, blockW, blockH, "F");
-          doc.setFontSize(6);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(255, 255, 255);
-          doc.text(
-            `${(lv.percentage ?? 0).toFixed(1)}%`,
-            blockX + blockW / 2,
-            blockY + blockH - 1.5,
-            { align: "center" },
-          );
-          blockX += blockW + blockGap;
-        });
+        levels.forEach(
+          (lv: { level?: string; percentage?: number }, i: number) => {
+            const [r, g, b] = hexToRgb(getLevelColor(i));
+            doc.setFillColor(r, g, b);
+            doc.rect(blockX, blockY, blockW, blockH, "F");
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(255, 255, 255);
+            doc.text(
+              `${(lv.percentage ?? 0).toFixed(1)}%`,
+              blockX + blockW / 2,
+              blockY + blockH - 1.5,
+              { align: "center" },
+            );
+            blockX += blockW + blockGap;
+          },
+        );
       }
 
       // ─── TABLE (right side) ───────────────────────────────────────────────
@@ -1711,7 +1722,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
     totalFarms: farmers.reduce((sum, f) => sum + f.farms.length, 0),
     pendingFarms: farmers.reduce(
       (sum, f) =>
-        sum + f.farms.filter((farm) => farm.status === "PENDING").length,
+        sum +
+        f.farms.filter(
+          (farm) =>
+            farm.status === "PENDING" || !farm.boundary?.coordinates?.length,
+        ).length,
       0,
     ),
     registeredFarms: farmers.reduce(
@@ -1870,12 +1885,6 @@ export default function RiskAssessmentSystem(): JSX.Element {
                         <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase">
                           Farms
                         </th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase">
-                          Status
-                        </th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase">
-                          Actions
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1926,75 +1935,67 @@ export default function RiskAssessmentSystem(): JSX.Element {
                                 farmer.farms.map((farm) => (
                                   <div
                                     key={farm.id}
-                                    className="flex items-center gap-2"
+                                    className="flex items-center justify-between gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100"
                                   >
-                                    <Sprout className="h-3.5 w-3.5 text-green-600" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-gray-900 truncate">
-                                        {farm.name || farm.cropType}
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        {farm.cropType} •{" "}
-                                        {new Date(
-                                          farm.sowingDate,
-                                        ).toLocaleDateString()}
-                                      </p>
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-medium text-gray-900 truncate">
+                                          {farm.name || farm.cropType}
+                                        </p>
+                                        <p className="text-[10px] text-gray-500">
+                                          {farm.cropType} •{" "}
+                                          {new Date(
+                                            farm.sowingDate,
+                                          ).toLocaleDateString()}
+                                        </p>
+                                      </div>
                                     </div>
+                                    <Badge
+                                      className={
+                                        farm.status === "PENDING" ||
+                                        !farm.boundary?.coordinates?.length
+                                          ? "bg-yellow-100 text-yellow-800 border-yellow-300 text-[10px] shrink-0"
+                                          : "bg-green-100 text-green-800 border-green-300 text-[10px] shrink-0"
+                                      }
+                                    >
+                                      {farm.status === "PENDING" ||
+                                      !farm.boundary?.coordinates?.length
+                                        ? "PENDING KML"
+                                        : farm.status}
+                                    </Badge>
+                                    {farm.status === "PENDING" ||
+                                    !farm.boundary?.coordinates?.length ? (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedFarm(farm);
+                                          setSelectedFarmer(farmer);
+                                          setShowKMLUpload(farm.id);
+                                        }}
+                                        className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-2.5 shrink-0"
+                                      >
+                                        <Upload className="h-3 w-3 mr-1" />
+                                        Upload KML
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedFarm(farm);
+                                          setSelectedFarmer(farmer);
+                                          loadAssessmentForFarm(farm.id);
+                                        }}
+                                        className="border-green-600 text-green-600 hover:bg-green-50 text-xs h-7 px-2.5 shrink-0"
+                                      >
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        View
+                                      </Button>
+                                    )}
                                   </div>
                                 ))
                               )}
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="space-y-2">
-                              {farmer.farms.map((farm) => (
-                                <Badge
-                                  key={farm.id}
-                                  className={
-                                    farm.status === "PENDING"
-                                      ? "bg-yellow-100 text-yellow-800 border-yellow-300 text-xs"
-                                      : "bg-green-100 text-green-800 border-green-300 text-xs"
-                                  }
-                                >
-                                  {farm.status}
-                                </Badge>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="space-y-2">
-                              {farmer.farms.map((farm) => (
-                                <div key={farm.id}>
-                                  {farm.status === "PENDING" ? (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedFarm(farm);
-                                        setSelectedFarmer(farmer);
-                                        setShowKMLUpload(farm.id);
-                                      }}
-                                      className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                                    >
-                                      <Upload className="h-3 w-3 mr-1.5" />
-                                      Upload KML
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setSelectedFarm(farm);
-                                        setSelectedFarmer(farmer);
-                                        loadAssessmentForFarm(farm.id);
-                                      }}
-                                      className="border-green-600 text-green-600 hover:bg-green-50 text-xs"
-                                    >
-                                      <Eye className="h-3 w-3 mr-1.5" />
-                                      View
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
                             </div>
                           </td>
                         </tr>
@@ -2155,6 +2156,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
           <Card
             className={`bg-gradient-to-br ${
               (assessment.droneAnalysisPdfs?.length ?? 0) > 0 ||
+              (assessment.dronePdfs?.length ?? 0) > 0 ||
               assessment.droneAnalysisPdfUrl
                 ? "from-purple-50 to-purple-100 border-purple-200"
                 : "from-gray-50 to-gray-100 border-gray-200"
@@ -2166,14 +2168,16 @@ export default function RiskAssessmentSystem(): JSX.Element {
                   <p className="text-xs font-medium mb-1">Drone PDF</p>
                   <p className="text-lg font-bold">
                     {(assessment.droneAnalysisPdfs?.length ?? 0) > 0 ||
+                    (assessment.dronePdfs?.length ?? 0) > 0 ||
                     assessment.droneAnalysisPdfUrl
-                      ? `${assessment.droneAnalysisPdfs?.length ?? 1} Uploaded`
+                      ? `${(assessment.droneAnalysisPdfs?.length || 0) + (assessment.dronePdfs?.length || 0) || 1} Uploaded`
                       : "Not Uploaded"}
                   </p>
                 </div>
                 <Upload
                   className={`h-5 w-5 ${
                     (assessment.droneAnalysisPdfs?.length ?? 0) > 0 ||
+                    (assessment.dronePdfs?.length ?? 0) > 0 ||
                     assessment.droneAnalysisPdfUrl
                       ? "text-purple-600"
                       : "text-gray-400"
@@ -2216,11 +2220,11 @@ export default function RiskAssessmentSystem(): JSX.Element {
         >
           <TabsList className="bg-white border border-gray-200 shadow-md inline-flex h-12 items-center justify-center rounded-xl p-1.5 gap-1">
             <TabsTrigger
-              value="overview"
+              value="basic"
               className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md px-5 py-2.5 rounded-lg text-sm font-medium transition-all"
             >
               <FileText className="h-4 w-4 mr-2" />
-              Overview
+              Basic Info
             </TabsTrigger>
             <TabsTrigger
               value="weather"
@@ -2236,28 +2240,70 @@ export default function RiskAssessmentSystem(): JSX.Element {
               <Activity className="h-4 w-4 mr-2" />
               Drone Analysis
             </TabsTrigger>
+            <TabsTrigger
+              value="overview"
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md px-5 py-2.5 rounded-lg text-sm font-medium transition-all"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Overview
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
-            <OverviewTab 
-              assessment={assessment} 
-              onRefresh={() => loadAssessmentForFarm(selectedFarm._id || (selectedFarm as any).id)} 
+          <TabsContent value="basic">
+            <BasicInfoTab
+              fieldId={selectedFarm?._id || (selectedFarm as any)?.id}
+              farmerId={selectedFarmer?.id || ""}
+              fieldName={
+                selectedFarm?.name || selectedFarm?.cropType || "Unknown"
+              }
+              farmerName={`${selectedFarmer?.firstName || ""} ${selectedFarmer?.lastName || ""}`.trim()}
+              cropType={selectedFarm?.cropType || ""}
+              area={selectedFarm?.area || 0}
+              season={selectedFarm?.season || "Unknown"}
+              location={(selectedFarm as any)?.locationName || "N/A"}
+              sowingDate={selectedFarm?.sowingDate}
+              boundary={(selectedFarm as any)?.boundary}
+              locationCoords={(selectedFarm as any)?.location?.coordinates}
             />
           </TabsContent>
 
-          <TabsContent value="weather">
-            <WeatherAnalysisTab 
-              fieldId={selectedFarm._id || (selectedFarm as any).id}
-              farmerName={`${selectedFarmer?.firstName} ${selectedFarmer?.lastName}`}
-              cropType={selectedFarm.cropType}
-              location={(selectedFarm as any).locationName || (selectedFarm as any).location?.coordinates?.join(', ') || 'N/A'}
+          <TabsContent
+            value="weather"
+            forceMount
+            className="data-[state=inactive]:hidden mt-0"
+          >
+            <WeatherAnalysisTab
+              fieldId={selectedFarm?._id || (selectedFarm as any)?.id}
+              farmerName={`${selectedFarmer?.firstName || ""} ${selectedFarmer?.lastName || ""}`.trim()}
+              cropType={selectedFarm?.cropType}
+              location={
+                (selectedFarm as any)?.locationName ||
+                (selectedFarm as any)?.location?.coordinates?.join(", ") ||
+                "N/A"
+              }
             />
           </TabsContent>
 
           <TabsContent value="drone">
-            <DroneTab 
+            <DroneTab
               assessment={assessment}
-              onRefresh={() => loadAssessmentForFarm(selectedFarm._id || (selectedFarm as any).id)}
+              onRefresh={() =>
+                loadAssessmentForFarm(
+                  selectedFarm?._id || (selectedFarm as any)?.id,
+                )
+              }
+            />
+          </TabsContent>
+          <TabsContent value="overview">
+            <OverviewTab
+              assessment={assessment}
+              farm={selectedFarm}
+              farmer={selectedFarmer}
+              onRefresh={() =>
+                loadAssessmentForFarm(
+                  selectedFarm?._id || (selectedFarm as any)?.id,
+                )
+              }
             />
           </TabsContent>
         </Tabs>
