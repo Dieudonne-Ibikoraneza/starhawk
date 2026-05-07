@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   AlertTriangle, 
   FileText, 
@@ -21,7 +22,8 @@ import {
   Wind,
   Droplets,
   Thermometer,
-  ShieldAlert
+  ShieldAlert,
+  Save
 } from "lucide-react";
 import { useComprehensiveNotes } from "@/hooks/useComprehensiveNotes";
 import { 
@@ -45,19 +47,32 @@ import { apiClient } from "@/lib/api";
 
 interface OverviewTabProps {
   assessment: any;
+  farm: any;
+  farmer: any;
   onRefresh?: () => void;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, onRefresh }) => {
+const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, farmer: farmerProp, onRefresh }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { notes } = useComprehensiveNotes();
+  const { 
+    comprehensiveNotes: notes,
+    setComprehensiveNotes,
+    hasChanges,
+    isSaving,
+    saveNotes,
+    lastSaved
+  } = useComprehensiveNotes({
+    assessmentId: assessment?._id || assessment?.id,
+    initialNotes: assessment?.comprehensiveNotes || "",
+  });
 
   if (!assessment) return null;
-
-  const farm = assessment.farmId || {};
-  const farmer = farm.farmerId || {};
+  
+  // Use passed down props, fallback to assessment if needed
+  const farm = farmProp || (typeof assessment.farmId === 'object' ? assessment.farmId : {}) || {};
+  const farmer = farmerProp || farm.farmerId || {};
   
   // Calculate risk using the utility
   const riskAssessment: RiskAssessment = calculateOverallRisk(
@@ -80,7 +95,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, onRefresh }) => {
         },
         dronePdfs: assessment.dronePdfs || [],
         weatherData: assessment.weatherData,
-        comprehensiveNotes: notes.summary || notes.agronomic || "No notes provided.",
+        comprehensiveNotes: notes || "No notes provided.",
         riskAssessment,
         reportGeneratedAt: new Date(),
       });
@@ -100,7 +115,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, onRefresh }) => {
         status: "COMPLETED",
         riskScore: riskAssessment.score,
         riskLevel: riskAssessment.level,
-        notes: notes.summary || notes.agronomic,
+        notes: notes || "",
         completedAt: new Date().toISOString()
       });
       toast.success("Assessment submitted successfully");
@@ -144,7 +159,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, onRefresh }) => {
                 <CardTitle className="text-2xl font-bold text-slate-900">{farm.name || "Farm Overview"}</CardTitle>
                 <CardDescription className="flex items-center mt-1">
                   <MapPin className="h-3 w-3 mr-1" />
-                  {farm.location || "Location not specified"}
+                  {farm.locationName || (farm.location && typeof farm.location === 'object' && 'coordinates' in farm.location 
+                    ? `Coordinates: ${farm.location.coordinates[1].toFixed(4)}, ${farm.location.coordinates[0].toFixed(4)}`
+                    : farm.location) || "Location not specified"}
                 </CardDescription>
               </div>
               <Badge variant="outline" className={`px-3 py-1 ${getRiskColor(riskAssessment.level)}`}>
@@ -176,13 +193,36 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, onRefresh }) => {
             </div>
             
             <div className="mt-8 pt-6 border-t border-slate-100">
-              <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-emerald-600" />
-                Assessment Summary
-              </h4>
-              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
-                "{notes.summary || "No summary notes provided yet. Head to the Notes tab to add your professional observations."}"
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-emerald-600" />
+                  Comprehensive Assessment Notes
+                </h4>
+                {lastSaved && (
+                  <span className="text-xs font-normal text-slate-500">
+                    Last saved: {lastSaved.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-4">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setComprehensiveNotes(e.target.value)}
+                  placeholder="Write comprehensive feedback about the field assessment..."
+                  className="min-h-[200px] text-sm text-slate-700 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500"
+                  disabled={assessment.status === 'COMPLETED'}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={saveNotes}
+                    disabled={isSaving || !hasChanges || assessment.status === 'COMPLETED'}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {isSaving ? <Clock className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Notes
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

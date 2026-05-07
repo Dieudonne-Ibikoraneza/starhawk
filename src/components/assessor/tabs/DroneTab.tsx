@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { FILE_SERVER_URL } from "@/config/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +31,8 @@ import {
   X,
   Check,
   AlertTriangle,
-  FileDown
+  FileDown,
+  Layers
 } from "lucide-react";
 import { toast } from "sonner";
 import assessmentsApiService from "@/services/assessmentsApi";
@@ -46,7 +48,7 @@ interface DroneTabProps {
 function pdfRowLabel(pdfs: any[], idx: number): string {
   const pdf = pdfs[idx];
   if (!pdf) return "";
-  const label = formatReportTypeLabel(pdf.pdfType);
+  const label = pdf.pdfType === 'plant_health' || pdf.pdfType === 'flowering' ? formatReportTypeLabel(pdf.pdfType) : pdf.pdfType;
   const sameType = pdfs.filter((p) => p.pdfType === pdf.pdfType).length;
   if (sameType > 1) {
     const nth = pdfs.slice(0, idx + 1).filter((p) => p.pdfType === pdf.pdfType).length;
@@ -76,7 +78,6 @@ export const DroneTab = ({
 }: DroneTabProps) => {
   const [dataSource, setDataSource] = useState<"drone" | "manual">("drone");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadType, setUploadType] = useState<'plant_health' | 'flowering'>('plant_health');
   
   // Manual metrics state
   const [manualStress, setManualStress] = useState([15]);
@@ -90,7 +91,14 @@ export const DroneTab = ({
     if (readOnly) setDataSource("drone");
   }, [readOnly]);
 
-  const uploadedPdfs = useMemo(() => assessment?.dronePdfs || [], [assessment]);
+  const uploadedPdfs = useMemo(() => assessment?.droneAnalysisPdfs || assessment?.dronePdfs || [], [assessment]);
+  
+  const getFullPdfUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${FILE_SERVER_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   const firstDroneMapUrl = useMemo(() => firstMapImageFromPdfs(uploadedPdfs), [uploadedPdfs]);
 
   const [showExtractedMap, setShowExtractedMap] = useState(true);
@@ -115,8 +123,9 @@ export const DroneTab = ({
 
       try {
         const updated = await assessmentsApiService.getAssessmentById(assessmentId);
-        if (updated.dronePdfs?.length > 0) {
-          const withData = updated.dronePdfs.find((p: any) => dronePayload(p));
+        const currentPdfs = updated.droneAnalysisPdfs || updated.dronePdfs || [];
+        if (currentPdfs.length > 0) {
+          const withData = currentPdfs.find((p: any) => dronePayload(p));
           if (withData) {
             stopPollingForData();
             toast.success("Analysis complete!");
@@ -151,8 +160,15 @@ export const DroneTab = ({
 
     setIsUploading(true);
     try {
-      await assessmentsApiService.uploadDronePDF(assessment._id, file, uploadType);
-      toast.success(`Uploading ${formatReportTypeLabel(uploadType)}...`);
+      // Format pdfType from filename: remove .pdf extension, replace spaces/special chars with underscores, lowercase
+      const pdfType = file.name
+        .replace(/\.pdf$/i, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .toLowerCase();
+      await assessmentsApiService.uploadDronePDF(assessment._id, file, pdfType);
+      toast.success(`Uploading ${file.name}...`);
       if (onRefresh) onRefresh();
       startPollingForData(assessment._id);
     } catch (error: any) {
@@ -213,59 +229,33 @@ export const DroneTab = ({
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row gap-6 items-center">
-                  <div className="w-full md:w-1/3 space-y-4">
-                    <p className="text-sm font-medium text-slate-700">Analysis Type</p>
-                    <div className="flex flex-col gap-2">
-                      <Button 
-                        variant={uploadType === 'plant_health' ? 'default' : 'outline'}
-                        className={`justify-start gap-3 h-12 rounded-xl ${uploadType === 'plant_health' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
-                        onClick={() => setUploadType('plant_health')}
-                      >
-                        <Satellite className="h-4 w-4" />
-                        Crop Health Analysis
-                      </Button>
-                      <Button 
-                        variant={uploadType === 'flowering' ? 'default' : 'outline'}
-                        className={`justify-start gap-3 h-12 rounded-xl ${uploadType === 'flowering' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
-                        onClick={() => setUploadType('flowering')}
-                      >
-                        <Calendar className="h-4 w-4" />
-                        Flowering Detection
-                      </Button>
+                <div 
+                  className={`w-full border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${isUploading ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-400 hover:bg-slate-50'}`}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-emerald-600 animate-spin" />
+                  ) : (
+                    <div className="bg-emerald-100 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-8 w-8 text-emerald-600" />
                     </div>
-                  </div>
-
-                  <div className="flex-1 w-full">
-                    <div 
-                      className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${isUploading ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-400 hover:bg-slate-50'}`}
-                      onDragOver={(e) => e.preventDefault()}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="h-12 w-12 mx-auto mb-4 text-emerald-600 animate-spin" />
-                      ) : (
-                        <div className="bg-emerald-100 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <FileText className="h-8 w-8 text-emerald-600" />
-                        </div>
-                      )}
-                      <p className="text-sm font-bold mb-1">
-                        {isUploading ? "Uploading & Analyzing..." : `Upload ${formatReportTypeLabel(uploadType)}`}
-                      </p>
-                      <p className="text-xs text-slate-500 mb-4">Drag and drop or click to select Agremo PDF report</p>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        ref={fileInputRef}
-                        onChange={handlePdfUpload}
-                        disabled={isUploading}
-                      />
-                      <Button variant="outline" className="rounded-full font-bold px-6 border-slate-200" disabled={isUploading}>
-                        Select File
-                      </Button>
-                    </div>
-                  </div>
+                  )}
+                  <p className="text-sm font-bold mb-1">
+                    {isUploading ? "Uploading & Analyzing..." : `Upload Drone Report`}
+                  </p>
+                  <p className="text-xs text-slate-500 mb-4">Drag and drop or click to select Agremo PDF report</p>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={handlePdfUpload}
+                    disabled={isUploading}
+                  />
+                  <Button variant="outline" className="rounded-full font-bold px-6 border-slate-200" disabled={isUploading}>
+                    Select File
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -289,7 +279,15 @@ export const DroneTab = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="rounded-full gap-2 h-9 px-4 border-slate-200" onClick={() => handleDownloadReport(pdf)}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="rounded-full gap-2 h-9 px-4 border-slate-200" 
+                          onClick={() => {
+                            const url = getFullPdfUrl(pdf.pdfUrl || pdf.fileUrl || pdf.url);
+                            if (url) window.open(url, '_blank');
+                          }}
+                        >
                           <FileDown className="h-4 w-4" /> PDF
                         </Button>
                         {!readOnly && !isCompleted && (
@@ -315,7 +313,7 @@ export const DroneTab = ({
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <DroneAnalysisView data={dronePayload(pdf)} pdfType={pdf.pdfType} />
+                    <DroneAnalysisView data={dronePayload(pdf)} pdfType={pdfRowLabel([pdf], 0)} />
                   </CardContent>
                 </Card>
               ))}
@@ -410,10 +408,14 @@ export const DroneTab = ({
                     max={100}
                     step={1}
                     className="py-4"
+                    disabled={isCompleted || readOnly}
                   />
                 </div>
               ))}
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 rounded-xl font-bold shadow-lg shadow-emerald-200">
+              <Button 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 rounded-xl font-bold shadow-lg shadow-emerald-200"
+                disabled={isCompleted || readOnly}
+              >
                 Save Observations
               </Button>
             </CardContent>
