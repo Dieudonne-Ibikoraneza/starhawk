@@ -12,6 +12,9 @@ import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, up
 import policiesApiService from "@/services/policiesApi";
 import { getUserId } from "@/services/authAPI";
 import { useToast } from "@/hooks/use-toast";
+import { MonitoringOverviewTab } from "./tabs/MonitoringOverviewTab";
+import { FieldMapWithLayers } from "./FieldMapWithLayers";
+import meteosourceApiService from "@/services/meteosourceApi";
 import { 
   MapPin,
   Search,
@@ -133,8 +136,10 @@ export default function CropMonitoringSystem() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedMonitoring, setSelectedMonitoring] = useState<MonitoringData | null>(null);
-  const [viewMode, setViewMode] = useState<"policies" | "monitoring" | "detail">("policies");
+  const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
+  const [selectedField, setSelectedField] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("basic-info");
+  const [viewMode, setViewMode] = useState<any>("policies");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -303,12 +308,15 @@ export default function CropMonitoringSystem() {
 
   // Filter monitoring history
   const filteredMonitoring = monitoringHistory.filter(monitoring => {
+    const policyStr = typeof monitoring.policyId === "object"
+      ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
+      : (monitoring.policyId || "");
+
     const matchesSearch = searchQuery === "" || 
       monitoring._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      monitoring.policyId.toLowerCase().includes(searchQuery.toLowerCase());
+      policyStr.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || monitoring.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
@@ -463,16 +471,58 @@ export default function CropMonitoringSystem() {
     setSelectedField(null);
   };
 
-  const getFieldDetails = (field: Field): FieldDetail => {
+  const getSeasonFromSowingDate = (sowingDate?: string): string => {
+    if (!sowingDate) return "B";
+    const date = new Date(sowingDate);
+    if (isNaN(date.getTime())) return "B";
+    const month = date.getMonth(); // 0-11
+    if (month >= 8 || month <= 0) {
+      return "A";
+    } else if (month >= 1 && month <= 5) {
+      return "B";
+    }
+    return "B";
+  };
+
+  const getFieldDetails = (field: any): FieldDetail => {
+    if (!field) {
+      return {
+        fieldId: "N/A",
+        fieldName: "N/A",
+        farmer: "N/A",
+        cropType: "N/A",
+        area: 0,
+        season: "N/A",
+        sowingDate: "N/A",
+        location: "N/A"
+      };
+    }
+
+    // If it's a real backend farm/field object
+    const fieldId = field._id || field.id || "";
+    const displayFieldId = fieldId ? `FLD-${String(fieldId).slice(-6).toUpperCase()}` : 'FLD-000';
+    
+    // Resolve farmer name from policy
+    const activePolicy = policies.find(p => {
+      const pId = p._id || p.id;
+      const mPolicyId = typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?._id : selectedMonitoring?.policyId;
+      return pId === mPolicyId;
+    });
+    
+    const farmer = activePolicy?.farmerId;
+    const farmerName = farmer 
+      ? (farmer.name || `${farmer.firstName || ''} ${farmer.lastName || ''}`.trim() || 'Unknown Farmer')
+      : (field.farmerName || 'Unknown Farmer');
+
     return {
-      fieldId: field.id,
-      fieldName: field.fieldName,
-      farmer: field.farmerName,
-      cropType: field.crop,
-      area: field.area,
-      season: field.season,
-      sowingDate: field.sowingDate,
-      location: monitorings.find(m => m.farmerName === field.farmerName)?.location || ""
+      fieldId: displayFieldId,
+      fieldName: field.name || field.fieldName || `Field ${displayFieldId}`,
+      farmer: farmerName,
+      cropType: field.cropType || field.crop || activePolicy?.cropType || 'Beans',
+      area: field.area || 2.78,
+      season: field.season || (field.sowingDate ? getSeasonFromSowingDate(field.sowingDate) : "B"),
+      sowingDate: field.sowingDate ? new Date(field.sowingDate).toLocaleDateString() : "N/A",
+      location: field.locationName || (field.location?.coordinates ? `${field.location.coordinates[1].toFixed(4)}, ${field.location.coordinates[0].toFixed(4)}` : "Nyagatare District, Eastern Province, Rwanda")
     };
   };
 
@@ -975,8 +1025,39 @@ export default function CropMonitoringSystem() {
   };
 
   const renderFieldDetail = () => {
-    if (!selectedField) return null;
-    const fieldDetails = getFieldDetails(selectedField);
+    // Resolve active policy from selectedMonitoring
+    const activePolicy = policies.find(p => {
+      const pId = p._id || p.id;
+      const mPolicyId = typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?._id : selectedMonitoring?.policyId;
+      return pId === mPolicyId;
+    }) || {
+      _id: typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?._id : selectedMonitoring?.policyId,
+      policyNumber: typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?.policyNumber : selectedMonitoring?.policyId,
+      farmId: selectedMonitoring?.farmId,
+      farmerId: selectedMonitoring?.policyId?.farmerId || selectedMonitoring?.farmerId
+    };
+
+    const activeMonitoring = selectedMonitoring;
+    const field = selectedField || activePolicy?.farmId;
+    if (!field) {
+      return (
+        <div className="p-6 text-center text-white/60">
+          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-white/40" />
+          <p>No field data available for this monitoring cycle.</p>
+          <Button onClick={handleBackToList} className="mt-4 bg-teal-600 hover:bg-teal-700 text-white">
+            Back to History
+          </Button>
+        </div>
+      );
+    }
+
+    const fieldDetails = getFieldDetails(field);
+
+    const locationCoords = field?.location?.coordinates;
+    const center =
+      locationCoords && locationCoords.length >= 2
+        ? ([locationCoords[1], locationCoords[0]] as [number, number])
+        : undefined;
 
     return (
       <div className="space-y-6">
@@ -992,7 +1073,7 @@ export default function CropMonitoringSystem() {
             onClick={handleBackToFields}
             className="text-teal-400 hover:text-teal-300"
           >
-            {selectedMonitoring?.farmerName}
+            {fieldDetails.farmer}
           </button>
         </div>
         
@@ -1027,6 +1108,13 @@ export default function CropMonitoringSystem() {
             >
               <Leaf className="h-4 w-4 mr-2" />
               Crop Analysis
+            </TabsTrigger>
+            <TabsTrigger 
+              value="overview" 
+              className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-white/70"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Overview
             </TabsTrigger>
           </TabsList>
 
@@ -1085,12 +1173,13 @@ export default function CropMonitoringSystem() {
                 <CardHeader>
                   <CardTitle className="text-white">Field Map</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[500px] flex items-center justify-center bg-gray-900/50 rounded-lg border border-gray-800">
-                  <div className="text-center">
-                    <MapPin className="h-16 w-16 mx-auto mb-4 text-white/30" />
-                    <p className="text-white/60 text-lg">Map Integration</p>
-                    <p className="text-white/40 text-sm mt-2">Field boundary visualization</p>
-                  </div>
+                <CardContent className="h-[500px] p-0 overflow-hidden rounded-lg border border-gray-800">
+                  <FieldMapWithLayers
+                    fieldId={field?._id || field?.id}
+                    showLayerControls={true}
+                    boundary={field?.boundary}
+                    center={center}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -1102,6 +1191,20 @@ export default function CropMonitoringSystem() {
 
           <TabsContent value="crop" className="mt-6">
             <CropAnalysisTab fieldDetails={fieldDetails} />
+          </TabsContent>
+
+          <TabsContent value="overview" className="mt-6">
+            <MonitoringOverviewTab
+              monitoringId={activePolicy._id || activePolicy.id}
+              policyId={activePolicy.policyNumber}
+              fieldName={fieldDetails.fieldName}
+              farmerName={`${fieldDetails.farmer}`}
+              cropType={fieldDetails.cropType}
+              area={fieldDetails.area}
+              location={fieldDetails.location}
+              cycles={monitoringHistory}
+              activeCycle={activeMonitoring}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -1315,7 +1418,11 @@ export default function CropMonitoringSystem() {
                       }`}
                     >
                       <td className="py-4 px-6 text-white">{monitoring.monitoringNumber}</td>
-                      <td className="py-4 px-6 text-white">{monitoring.policyId.slice(-8)}</td>
+                      <td className="py-4 px-6 text-white">
+                        {typeof monitoring.policyId === "object"
+                          ? (monitoring.policyId.policyNumber || (monitoring.policyId._id ? `POL-${monitoring.policyId._id.slice(-6).toUpperCase()}` : "N/A"))
+                          : (monitoring.policyId?.startsWith("POL-") ? monitoring.policyId : `POL-${monitoring.policyId?.slice(-6).toUpperCase()}`)}
+                      </td>
                       <td className="py-4 px-6 text-white/80">
                         {new Date(monitoring.monitoringDate).toLocaleDateString()}
                       </td>
@@ -1473,15 +1580,25 @@ export default function CropMonitoringSystem() {
             <CardContent className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-white/70">Monitoring ID:</span>
-                <span className="text-white">{selectedMonitoring._id.slice(-8)}</span>
+                <span className="text-white">
+                  {selectedMonitoring._id ? `MON-${selectedMonitoring._id.slice(-6).toUpperCase()}` : "N/A"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/70">Policy ID:</span>
-                <span className="text-white">{selectedMonitoring.policyId.slice(-8)}</span>
+                <span className="text-white">
+                  {typeof selectedMonitoring.policyId === "object"
+                    ? (selectedMonitoring.policyId.policyNumber || (selectedMonitoring.policyId._id ? `POL-${selectedMonitoring.policyId._id.slice(-6).toUpperCase()}` : "N/A"))
+                    : (selectedMonitoring.policyId?.startsWith("POL-") ? selectedMonitoring.policyId : `POL-${selectedMonitoring.policyId?.slice(-6).toUpperCase()}`)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/70">Farm ID:</span>
-                <span className="text-white">{selectedMonitoring.farmId.slice(-8)}</span>
+                <span className="text-white">
+                  {typeof selectedMonitoring.farmId === "object"
+                    ? (selectedMonitoring.farmId.name || (selectedMonitoring.farmId._id ? `FLD-${selectedMonitoring.farmId._id.slice(-6).toUpperCase()}` : "N/A"))
+                    : (selectedMonitoring.farmId?.startsWith("FLD-") ? selectedMonitoring.farmId : `FLD-${selectedMonitoring.farmId?.slice(-6).toUpperCase()}`)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/70">Date:</span>
@@ -1550,8 +1667,12 @@ export default function CropMonitoringSystem() {
   };
 
   // Render view based on mode
-  if (viewMode === "detail") {
-    return renderDetailView();
+  if (viewMode === "detail" || viewMode === "fieldDetail") {
+    return renderFieldDetail();
+  }
+
+  if (viewMode === "fieldSelection") {
+    return renderFieldSelection();
   }
 
   if (viewMode === "monitoring") {
