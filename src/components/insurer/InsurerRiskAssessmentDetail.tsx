@@ -143,31 +143,52 @@ export default function InsurerRiskAssessmentDetail({
       </div>
 
       {/* Reused Assessor Tabs for Data Representation */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="basic-info" className="w-full">
         <TabsList className="bg-white border border-gray-100 p-1 mb-6 rounded-xl flex flex-wrap gap-2 justify-start shadow-sm h-auto">
-          <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Overview</TabsTrigger>
-          <TabsTrigger value="drone" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Drone Analysis</TabsTrigger>
-          <TabsTrigger value="weather" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Weather Analysis</TabsTrigger>
           <TabsTrigger value="basic-info" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Basic Info</TabsTrigger>
+          <TabsTrigger value="weather" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Weather Analysis</TabsTrigger>
+          <TabsTrigger value="drone" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Drone Analysis</TabsTrigger>
+          <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Overview</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-0">
-          <OverviewTab assessment={assessment} farm={farm} farmer={farmer} />
-        </TabsContent>
-        <TabsContent value="drone" className="mt-0">
-          <DroneTab assessment={assessment} mapImageUrl={null} isInsurerView={true} />
-        </TabsContent>
-        <TabsContent value="weather" className="mt-0">
-          <WeatherAnalysisTab assessment={assessment} />
-        </TabsContent>
-        <TabsContent value="basic-info" className="mt-0">
+        <TabsContent value="basic-info" forceMount className="data-[state=inactive]:hidden mt-0">
           <BasicInfoTab 
-            farm={farm} 
-            farmer={farmer} 
-            fieldStatistics={null} 
-            weatherData={null}
-            loadingData={false}
+            fieldId={farm._id || farm.id || ""}
+            farmerId={farmer._id || farmer.id || ""}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={`${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || farmer.name || "Unknown Farmer"}
+            cropType={farm.cropType || farm.crop || "Unknown"}
+            area={farm.area || farm.size || farm.farmSize || 0}
+            season={
+              farm.season ||
+              (farm.sowingDate
+                ? (() => {
+                    const m = new Date(farm.sowingDate).getMonth();
+                    return m >= 8 || m <= 0 ? "A" : "B";
+                  })()
+                : "B")
+            }
+            location={farm.locationName || (farm.location && typeof farm.location === 'string' ? farm.location : "N/A")}
+            sowingDate={farm.sowingDate}
+            boundary={farm.boundary}
+            locationCoords={farm.location?.coordinates}
+            showActions={false}
           />
+        </TabsContent>
+        <TabsContent value="weather" forceMount className="data-[state=inactive]:hidden mt-0">
+          <WeatherAnalysisTab 
+            fieldId={farm._id || farm.id || ""}
+            farmerName={`${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || farmer.name || "Unknown Farmer"}
+            cropType={farm.cropType || farm.crop || "Unknown"}
+            location={farm.locationName || (farm.location && typeof farm.location === 'string' ? farm.location : "N/A")}
+            readOnly={true}
+          />
+        </TabsContent>
+        <TabsContent value="drone" forceMount className="data-[state=inactive]:hidden mt-0">
+          <DroneTab assessment={assessment} readOnly={true} />
+        </TabsContent>
+        <TabsContent value="overview" forceMount className="data-[state=inactive]:hidden mt-0">
+          <OverviewTab assessment={assessment} farm={farm} farmer={farmer} isInsurerView={true} />
         </TabsContent>
       </Tabs>
     </div>

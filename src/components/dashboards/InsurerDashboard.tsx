@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BarChart3,
   Bell,
@@ -67,6 +68,7 @@ export default function InsurerDashboard() {
   
   // Submitted Assessments state
   const [submittedAssessments, setSubmittedAssessments] = useState<any[]>([]);
+  const [historicalAssessments, setHistoricalAssessments] = useState<any[]>([]);
   const [submittedAssessmentsLoading, setSubmittedAssessmentsLoading] = useState(false);
   const [createPolicyDialog, setCreatePolicyDialog] = useState<{
     open: boolean;
@@ -101,7 +103,7 @@ export default function InsurerDashboard() {
   useEffect(() => {
     if (activePage === 'insurance-requests') {
       loadInsuranceRequests();
-    } else if (activePage === 'submitted-assessments') {
+    } else if (activePage === 'submitted-assessments' || activePage === 'risk-assessments') {
       loadSubmittedAssessments();
     } else if (activePage === 'dashboard' && insurerId) {
       loadInsurerProfile();
@@ -426,14 +428,22 @@ export default function InsurerDashboard() {
       
       console.log('Final extracted assessments array:', assessmentsArray);
       
-      // Filter only submitted assessments
-      const submitted = assessmentsArray.filter((assessment: any) => 
-        (assessment.status || '').toUpperCase() === 'SUBMITTED'
-      );
+      // Filter pending/submitted assessments
+      const pending = assessmentsArray.filter((assessment: any) => {
+        const s = (assessment.status || '').toUpperCase();
+        return s === 'SUBMITTED' || s === 'PENDING';
+      });
       
-      setSubmittedAssessments(submitted);
+      // Filter historical (approved/rejected) assessments
+      const historical = assessmentsArray.filter((assessment: any) => {
+        const s = (assessment.status || '').toUpperCase();
+        return s === 'APPROVED' || s === 'REJECTED';
+      });
       
-      if (submitted.length === 0) {
+      setSubmittedAssessments(pending);
+      setHistoricalAssessments(historical);
+      
+      if (pending.length === 0 && historical.length === 0) {
         if (response?.data?.totalItems > 0) {
           console.error('❌ API reports assessments exist but none were returned. This is likely a backend pagination bug.');
           toast({
@@ -442,7 +452,7 @@ export default function InsurerDashboard() {
             variant: 'destructive'
           });
         } else {
-          console.log('No submitted assessments found.');
+          console.log('No assessments found.');
         }
       }
     } catch (err: any) {
@@ -776,115 +786,212 @@ export default function InsurerDashboard() {
         />
       );
     }
+
+    const formatCropTypeLabel = (crop: string) => {
+      if (!crop || crop === "Unknown") return "Unknown Crop";
+      return crop.split('_').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+    };
+
+    const getFarmLocation = (farm: any) => {
+      if (!farm) return "Unknown";
+      if (farm.locationName) return farm.locationName;
+      if (farm.location && typeof farm.location === 'string') return farm.location;
+      if (farm.location?.coordinates && Array.isArray(farm.location.coordinates)) {
+        const coords = farm.location.coordinates;
+        if (coords.length >= 2) {
+          return `GPS: [${Number(coords[1]).toFixed(4)}, ${Number(coords[0]).toFixed(4)}]`;
+        }
+      }
+      return "Unknown";
+    };
+
+    const getFarmArea = (farm: any) => {
+      if (!farm) return "0.00 ha";
+      const area = farm.area || farm.size || farm.farmSize || 0;
+      return `${Number(area).toFixed(2)} ha`;
+    };
+
+    const renderAssessmentsTable = (assessments: any[]) => (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50/70 text-gray-600 text-xs uppercase font-semibold">
+              <th className="py-4 px-4">Farm Name</th>
+              <th className="py-4 px-4">Farmer</th>
+              <th className="py-4 px-4">Crop</th>
+              <th className="py-4 px-4">Location</th>
+              <th className="py-4 px-4">Area (ha)</th>
+              <th className="py-4 px-4 text-center">Risk Score</th>
+              <th className="py-4 px-4 text-center">Status</th>
+              <th className="py-4 px-4 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {assessments.map((assessment, index) => {
+              const farm = assessment.farmId || assessment.farm || {};
+              const farmer = assessment.farmerId || farm.farmerId || assessment.farmer || {};
+              const farmerName = (() => {
+                if (farmer.firstName || farmer.lastName) {
+                  return `${farmer.firstName || ''} ${farmer.lastName || ''}`.trim();
+                }
+                return farmer.name || farmer.email || "Unknown Farmer";
+              })();
+              
+              const statusUpper = (assessment.status || '').toUpperCase();
+              const isPending = statusUpper === 'SUBMITTED' || statusUpper === 'PENDING';
+
+              return (
+                <tr
+                  key={assessment._id || assessment.id || index}
+                  className="hover:bg-gray-50/50 transition-colors"
+                >
+                  <td className="py-4 px-4 font-semibold text-gray-900">
+                    {farm.name || "Unknown Farm"}
+                  </td>
+                  <td className="py-4 px-4">
+                    <div>
+                      <div className="font-semibold text-gray-900">{farmerName}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{farmer.email || farmer.phoneNumber || ""}</div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 capitalize font-semibold text-gray-900">
+                    {formatCropTypeLabel(farm.cropType || farm.crop)}
+                  </td>
+                  <td className="py-4 px-4 text-gray-500 font-medium">
+                    {getFarmLocation(farm)}
+                  </td>
+                  <td className="py-4 px-4 font-semibold text-gray-700">
+                    {getFarmArea(farm)}
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    {assessment.riskScore !== null && assessment.riskScore !== undefined ? (
+                      <Badge className={`text-[10px] font-bold shadow-none border-0 ${
+                        assessment.riskScore < 40 
+                          ? "bg-green-100 text-green-800"
+                          : assessment.riskScore < 70 
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}>
+                        {assessment.riskScore}% Risk
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400 font-medium text-xs">Pending Calcs</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <Badge className={`text-[10px] font-bold shadow-none border-0 uppercase ${
+                      statusUpper === 'APPROVED' 
+                        ? "bg-green-100 text-green-800"
+                        : statusUpper === 'REJECTED' 
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}>
+                      {assessment.status || "PENDING"}
+                    </Badge>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <Button
+                      size="sm"
+                      onClick={() => setSelectedRiskAssessmentId(assessment._id || assessment.id)}
+                      className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-xl shadow-none text-xs font-bold px-4 h-8"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View Details
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
     
     return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Submitted Assessments</h1>
-          <p className="text-sm text-gray-600 mt-1">Review submitted assessments and create policies</p>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Risk Assessments</h1>
+            <p className="text-sm font-semibold text-gray-500 mt-1">Review drone, climate, and soil telemetry reports to accept or decline farmer request applications</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={loadSubmittedAssessments}
+            disabled={submittedAssessmentsLoading}
+            className="border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl px-4"
+          >
+            <Clock className={`h-4 w-4 mr-2 text-gray-500 ${submittedAssessmentsLoading ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          onClick={loadSubmittedAssessments}
-          disabled={submittedAssessmentsLoading}
-          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-        >
-          <ArrowRight className={`h-4 w-4 mr-2 ${submittedAssessmentsLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
 
-      {submittedAssessmentsLoading ? (
-        <Card className="bg-white border-gray-200">
-          <CardContent className="p-12">
-            <div className="flex items-center justify-center">
-              <img src="/loading.gif" alt="Loading" className="w-16 h-16" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : submittedAssessments.length === 0 ? (
-        <Card className="bg-white border-gray-200">
-          <CardContent className="p-12">
-            <div className="text-center">
-              <CheckCircle className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 text-lg mb-2">No submitted assessments</p>
-              <p className="text-gray-500 text-sm">Assessments will appear here once assessors submit them</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="bg-white border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-gray-900">Ready for Policy Creation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-1.5 px-2 font-medium text-gray-700 text-xs">Farm Name</th>
-                    <th className="text-left py-1.5 px-2 font-medium text-gray-700 text-xs">Crop Type</th>
-                    <th className="text-left py-1.5 px-2 font-medium text-gray-700 text-xs">Risk Score</th>
-                    <th className="text-left py-1.5 px-2 font-medium text-gray-700 text-xs">Submitted Date</th>
-                    <th className="text-left py-1.5 px-2 font-medium text-gray-700 text-xs">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submittedAssessments.map((assessment: any, index: number) => {
-                    const farm = assessment.farmId || assessment.farm || {};
-                    return (
-                      <tr
-                        key={assessment._id || assessment.id || index}
-                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? "bg-gray-50" : ""
-                        }`}
-                      >
-                        <td className="py-1 px-2 text-gray-900 font-medium text-xs">
-                          {farm.name || "N/A"}
-                        </td>
-                        <td className="py-1 px-2 text-gray-700 text-xs">
-                          {farm.cropType || farm.crop || "N/A"}
-                        </td>
-                        <td className="py-1 px-2 text-gray-700 text-xs">
-                          <Badge className={`text-xs py-0 px-1.5 ${
-                            assessment.riskScore < 50 
-                              ? "bg-green-100 text-green-700 border border-green-200"
-                              : assessment.riskScore < 75 
-                              ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                              : "bg-red-100 text-red-700 border border-red-200"
-                          }`}>
-                            {assessment.riskScore || "N/A"}
-                          </Badge>
-                        </td>
-                        <td className="py-1 px-2 text-gray-700 text-xs">
-                          {assessment.submittedAt || assessment.completedAt
-                            ? new Date(assessment.submittedAt || assessment.completedAt).toLocaleDateString()
-                            : "N/A"}
-                        </td>
-                        <td className="py-1 px-2">
-                          <Button
-                            size="sm"
-                            onClick={() => setSelectedRiskAssessmentId(assessment._id || assessment.id)}
-                            className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-xl shadow-none text-xs font-bold px-4 h-6"
-                          >
-                            <Eye className="h-3 w-3 mr-1.5" />
-                            View Details
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-};
+        {submittedAssessmentsLoading ? (
+          <Card className="bg-white border-gray-100 shadow-sm rounded-2xl">
+            <CardContent className="p-16 text-center">
+              <Clock className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm font-medium">Loading premium assessment data from the server...</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Tabs defaultValue="pending" className="w-full space-y-6">
+            <TabsList className="bg-slate-100 p-1 rounded-xl h-11 border border-slate-200/40 inline-flex gap-1">
+              <TabsTrigger 
+                value="pending" 
+                className="rounded-lg px-4 text-xs font-bold text-gray-600 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm h-9"
+              >
+                Pending Review ({submittedAssessments.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="history" 
+                className="rounded-lg px-4 text-xs font-bold text-gray-600 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm h-9"
+              >
+                Assessed History ({historicalAssessments.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="pending" className="mt-0 outline-none">
+              <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <CardHeader className="py-4 border-b border-gray-50">
+                  <CardTitle className="text-lg font-bold text-gray-900">Pending Review</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {submittedAssessments.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 font-semibold text-sm">No pending assessments</p>
+                      <p className="text-gray-400 text-xs mt-1">All submitted risk assessments have been processed!</p>
+                    </div>
+                  ) : (
+                    renderAssessmentsTable(submittedAssessments)
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="history" className="mt-0 outline-none">
+              <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <CardHeader className="py-4 border-b border-gray-50">
+                  <CardTitle className="text-lg font-bold text-gray-900">Assessed History</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {historicalAssessments.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 font-semibold text-sm">No historical records found</p>
+                      <p className="text-gray-400 text-xs mt-1">Assessments will display here once they have been approved or rejected.</p>
+                    </div>
+                  ) : (
+                    renderAssessmentsTable(historicalAssessments)
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
+    );
+  };
 
   const [policyKey, setPolicyKey] = useState(0);
 

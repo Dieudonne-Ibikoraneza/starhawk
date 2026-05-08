@@ -50,9 +50,10 @@ interface OverviewTabProps {
   farm: any;
   farmer: any;
   onRefresh?: () => void;
+  isInsurerView?: boolean;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, farmer: farmerProp, onRefresh }) => {
+const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, farmer: farmerProp, onRefresh, isInsurerView = false }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -213,27 +214,30 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   placeholder="Write comprehensive feedback about the field assessment..."
                   className="min-h-[200px] text-sm text-slate-700 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500"
                   disabled={
+                    isInsurerView ||
                     assessment.status === "SUBMITTED" ||
                     assessment.status === "APPROVED" ||
                     assessment.status === "COMPLETED"
                   }
                 />
-                <div className="flex justify-end">
-                  <Button
-                    onClick={saveNotes}
-                    disabled={
-                      isSaving ||
-                      !hasChanges ||
-                      assessment.status === "SUBMITTED" ||
-                      assessment.status === "APPROVED" ||
-                      assessment.status === "COMPLETED"
-                    }
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {isSaving ? <Clock className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save Notes
-                  </Button>
-                </div>
+                {!isInsurerView && (
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveNotes}
+                      disabled={
+                        isSaving ||
+                        !hasChanges ||
+                        assessment.status === "SUBMITTED" ||
+                        assessment.status === "APPROVED" ||
+                        assessment.status === "COMPLETED"
+                      }
+                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      {isSaving ? <Clock className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save Notes
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -302,22 +306,24 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   {isGenerating ? <Clock className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
                   PDF Dossier
                 </Button>
-                {assessment.status === "SUBMITTED" ||
-                assessment.status === "APPROVED" ||
-                assessment.status === "COMPLETED" ? (
-                  <div className="flex items-center gap-2 bg-emerald-950/40 text-white border border-white/20 h-9 px-4 rounded-full text-xs font-bold">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    Submitted to Insurer
-                  </div>
-                ) : (
-                  <Button 
-                    size="sm" 
-                    className="bg-emerald-950/30 hover:bg-emerald-950/40 text-white border border-white/20 rounded-full font-bold h-9 px-4"
-                    onClick={() => setShowConfirmSubmit(true)}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Submit
-                  </Button>
+                {!isInsurerView && (
+                  assessment.status === "SUBMITTED" ||
+                  assessment.status === "APPROVED" ||
+                  assessment.status === "COMPLETED" ? (
+                    <div className="flex items-center gap-2 bg-emerald-950/40 text-white border border-white/20 h-9 px-4 rounded-full text-xs font-bold">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      Submitted to Insurer
+                    </div>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      className="bg-emerald-950/30 hover:bg-emerald-950/40 text-white border border-white/20 rounded-full font-bold h-9 px-4"
+                      onClick={() => setShowConfirmSubmit(true)}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Submit
+                    </Button>
+                  )
                 )}
               </div>
             </div>
