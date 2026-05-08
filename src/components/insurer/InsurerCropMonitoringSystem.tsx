@@ -141,7 +141,7 @@ export default function InsurerCropMonitoringSystem() {
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("basic-info");
-  const [viewMode, setViewMode] = useState<any>("policies");
+  const [viewMode, setViewMode] = useState<any>("monitoring");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -463,7 +463,7 @@ export default function InsurerCropMonitoringSystem() {
   };
 
   const handleBackToList = () => {
-    setViewMode("list");
+    setViewMode("monitoring");
     setSelectedMonitoring(null);
     setSelectedField(null);
   };
@@ -1528,202 +1528,245 @@ export default function InsurerCropMonitoringSystem() {
     );
   };
 
-  const renderMonitoringHistory = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Monitoring History</h2>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+  const renderMonitoringHistory = () => {
+    const totalScans = monitoringHistory.length;
+    const completedScans = monitoringHistory.filter(m => m.status === 'COMPLETED').length;
+    const inProgressScans = monitoringHistory.filter(m => m.status === 'IN_PROGRESS').length;
+    const reportsFiled = monitoringHistory.filter(m => m.reportGenerated).length;
+
+    const filteredMonitoring = monitoringHistory.filter(monitoring => {
+      const monitoringId = monitoring.monitoringNumber ? `MON-${monitoring.monitoringNumber}` : `MON-${monitoring._id.slice(-6).toUpperCase()}`;
+      const policyNum = typeof monitoring.policyId === "object"
+        ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
+        : (monitoring.policyId || "");
+      
+      const activePolicy = policies.find(p => p._id === (typeof monitoring.policyId === 'object' ? monitoring.policyId?._id : monitoring.policyId));
+      const farmerName = activePolicy?.farmerId?.name || activePolicy?.farmerId?.firstName || "Unknown Farmer";
+      const cropType = activePolicy?.cropType || "";
+
+      const matchesSearch = searchQuery === "" || 
+        monitoringId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        policyNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        farmerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cropType.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || monitoring.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Crop Monitoring & Scans</h1>
+          <p className="text-sm text-gray-500 mt-1">Review drone assessment cycles, satellite loss metrics, and field boundary inspections compiled by field assessors</p>
+        </div>
+
+        {/* Premium Metrics Grid */}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="rounded-2xl border border-gray-200 bg-white p-5 shadow-none transition-all hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Assessor Scans</p>
+                <h3 className="mt-2 text-3xl font-bold text-gray-900">{totalScans}</h3>
+              </div>
+              <div className="rounded-2xl bg-teal-50 p-3 text-teal-600">
+                <Activity className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-teal-600">
+              <span className="font-semibold">Active</span>
+              <span className="text-gray-500">monitoring logging</span>
+            </div>
+          </Card>
+
+          <Card className="rounded-2xl border border-gray-200 bg-white p-5 shadow-none transition-all hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Completed cycles</p>
+                <h3 className="mt-2 text-3xl font-bold text-gray-900">{completedScans}</h3>
+              </div>
+              <div className="rounded-2xl bg-green-50 p-3 text-green-600">
+                <CheckCircle className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-green-600">
+              <span className="font-semibold">{totalScans > 0 ? Math.round((completedScans / totalScans) * 100) : 0}%</span>
+              <span className="text-gray-500">scans completed</span>
+            </div>
+          </Card>
+
+          <Card className="rounded-2xl border border-gray-200 bg-white p-5 shadow-none transition-all hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">In Progress</p>
+                <h3 className="mt-2 text-3xl font-bold text-gray-900">{inProgressScans}</h3>
+              </div>
+              <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
+                <Clock className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-600">
+              <span className="font-semibold">{inProgressScans}</span>
+              <span className="text-gray-500">scans currently running</span>
+            </div>
+          </Card>
+
+          <Card className="rounded-2xl border border-gray-200 bg-white p-5 shadow-none transition-all hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Reports Filed</p>
+                <h3 className="mt-2 text-3xl font-bold text-gray-900">{reportsFiled}</h3>
+              </div>
+              <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+                <FileText className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-blue-600">
+              <span className="font-semibold">{totalScans > 0 ? Math.round((reportsFiled / totalScans) * 100) : 0}%</span>
+              <span className="text-gray-500">formal reports generated</span>
+            </div>
+          </Card>
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-none">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
-              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`${dashboardTheme.input} pl-10 w-64 border-gray-300`}
+              placeholder="Search scan ID, policy ID, farmer name..."
+              className="w-full pl-10 pr-4 py-2 border-gray-200 rounded-xl bg-gray-50 text-xs focus:bg-white focus:ring-1 focus:ring-teal-500 transition-all text-gray-900"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className={`${dashboardTheme.select} w-40`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={dashboardTheme.card}>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button 
-            onClick={() => setViewMode('policies')}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            View Policies
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] h-9 border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-900">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200 rounded-xl shadow-lg">
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
 
-      <Card className={`${dashboardTheme.card}`}>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-4 px-6 font-medium text-gray-900/80">Monitoring #</th>
-                  <th className="text-left py-4 px-6 font-medium text-gray-900/80">Policy ID</th>
-                  <th className="text-left py-4 px-6 font-medium text-gray-900/80">Date</th>
-                  <th className="text-left py-4 px-6 font-medium text-gray-900/80">Status</th>
-                  <th className="text-left py-4 px-6 font-medium text-gray-900/80">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMonitoring.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-900/60">
-                      No monitoring records found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredMonitoring.map((monitoring, index) => (
-                    <tr
-                      key={monitoring._id}
-                      className={`border-b border-gray-200 hover:bg-gray-100 transition-colors ${
-                        index % 2 === 0 ? "bg-gray-50/30" : ""
-                      }`}
-                    >
-                      <td className="py-4 px-6 text-gray-900">{monitoring.monitoringNumber}</td>
-                      <td className="py-4 px-6 text-gray-900">
-                        {typeof monitoring.policyId === "object"
-                          ? (monitoring.policyId.policyNumber || (monitoring.policyId._id ? `POL-${monitoring.policyId._id.slice(-6).toUpperCase()}` : "N/A"))
-                          : (monitoring.policyId?.startsWith("POL-") ? monitoring.policyId : `POL-${monitoring.policyId?.slice(-6).toUpperCase()}`)}
-                      </td>
-                      <td className="py-4 px-6 text-gray-900/80">
-                        {new Date(monitoring.monitoringDate).toLocaleDateString()}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          monitoring.status === 'COMPLETED'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                            : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                        }`}>
-                          {monitoring.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2">
-                          {monitoring.status === 'IN_PROGRESS' && (
-                            <>
+        {/* Premium Scan Table View */}
+        {loading ? (
+          <Card className="rounded-2xl border border-gray-200 bg-white shadow-none">
+            <CardContent className="p-12">
+              <div className="flex items-center justify-center">
+                <img src="/loading.gif" alt="Loading" className="w-16 h-16" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="rounded-2xl border border-gray-200 bg-white shadow-none overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50/50 text-left">
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Scan ID</th>
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Policy & Crop</th>
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Farmer Name</th>
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Scan Date</th>
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredMonitoring.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <Activity className="h-8 w-8 text-gray-300 animate-pulse" />
+                            <p className="text-sm font-medium text-gray-900">No monitoring scans found</p>
+                            <p className="text-xs text-gray-400">Try adjusting your filters or search terms</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredMonitoring.map((monitoring) => {
+                        const monitoringDisplayId = monitoring.monitoringNumber ? `MON-#${monitoring.monitoringNumber}` : `MON-${monitoring._id.slice(-6).toUpperCase()}`;
+                        
+                        const activePolicy = policies.find(p => p._id === (typeof monitoring.policyId === 'object' ? monitoring.policyId?._id : monitoring.policyId));
+                        const farmerName = activePolicy?.farmerId?.name || activePolicy?.farmerId?.firstName || "Unknown Farmer";
+                        const cropType = activePolicy?.cropType || "N/A";
+                        const policyDisplayId = activePolicy?.policyNumber || (typeof monitoring.policyId === 'object' ? monitoring.policyId?.policyNumber : `POL-${String(monitoring.policyId).slice(-6).toUpperCase()}`);
+
+                        return (
+                          <tr key={monitoring._id} className="hover:bg-gray-50/50 transition-colors">
+                            {/* Scan ID */}
+                            <td className="py-4 px-6">
+                              <div className="font-semibold text-sm text-gray-900">{monitoringDisplayId}</div>
+                              <div className="text-xxs text-gray-400 font-mono mt-0.5">{monitoring._id}</div>
+                            </td>
+
+                            {/* Policy & Crop */}
+                            <td className="py-4 px-6">
+                              <div className="font-semibold text-sm text-gray-900">{policyDisplayId}</div>
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                                <Leaf className="h-3.5 w-3.5 text-emerald-500" />
+                                <span>{cropType}</span>
+                              </div>
+                            </td>
+
+                            {/* Farmer Name */}
+                            <td className="py-4 px-6">
+                              <div className="font-medium text-sm text-gray-900">{farmerName}</div>
+                              <div className="text-xxs text-gray-400 mt-0.5">Primary policyholder</div>
+                            </td>
+
+                            {/* Scan Date */}
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-2 text-sm text-gray-700">
+                                <Calendar className="h-4 w-4 text-teal-500" />
+                                <span>{new Date(monitoring.monitoringDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-4 px-6">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                monitoring.status === 'COMPLETED'
+                                  ? 'bg-green-50 text-green-700 border border-green-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  monitoring.status === 'COMPLETED' ? 'bg-green-500' : 'bg-amber-500'
+                                }`} />
+                                {monitoring.status}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-4 px-6 text-right">
                               <Button
-                                size="sm"
                                 onClick={() => {
                                   setSelectedMonitoring(monitoring);
-                                  setUpdateData({
-                                    observations: monitoring.observations || [],
-                                    photoUrls: monitoring.photoUrls || [],
-                                    notes: monitoring.notes || ''
-                                  });
-                                  setUpdateDialogOpen(true);
+                                  setViewMode('detail');
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                                className="rounded-xl text-xs font-bold px-4 h-8 shadow-none bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-800"
                               >
-                                Update
+                                View Analysis →
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleGenerateReport(monitoring._id)}
-                                disabled={generateReportLoading}
-                                className="bg-teal-600 hover:bg-teal-700 text-white text-xs"
-                              >
-                                {generateReportLoading ? 'Generating...' : 'Generate Report'}
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMonitoring(monitoring);
-                              setViewMode('detail');
-                            }}
-                            className="bg-gray-600 hover:bg-gray-700 text-gray-900 text-xs"
-                          >
-                            View
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Update Monitoring Dialog */}
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className={`${dashboardTheme.card} border-gray-200 max-w-2xl`}>
-          <DialogHeader>
-            <DialogTitle className="text-gray-900">Update Monitoring Data</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <Label htmlFor="observations" className="text-gray-900/80">Observations</Label>
-              <Textarea
-                id="observations"
-                value={updateData.observations.join('\n')}
-                onChange={(e) => setUpdateData({
-                  ...updateData,
-                  observations: e.target.value.split('\n').filter(o => o.trim())
-                })}
-                placeholder="Enter observations (one per line)"
-                className={`${dashboardTheme.input} mt-1`}
-                rows={4}
-              />
-            </div>
-            <div>
-              <Label htmlFor="photoUrls" className="text-gray-900/80">Photo URLs</Label>
-              <Textarea
-                id="photoUrls"
-                value={updateData.photoUrls.join('\n')}
-                onChange={(e) => setUpdateData({
-                  ...updateData,
-                  photoUrls: e.target.value.split('\n').filter(u => u.trim())
-                })}
-                placeholder="Enter photo URLs (one per line)"
-                className={`${dashboardTheme.input} mt-1`}
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="notes" className="text-gray-900/80">Notes</Label>
-              <Textarea
-                id="notes"
-                value={updateData.notes}
-                onChange={(e) => setUpdateData({ ...updateData, notes: e.target.value })}
-                placeholder="Enter additional notes"
-                className={`${dashboardTheme.input} mt-1`}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setUpdateDialogOpen(false)}
-              className="border-gray-700 text-gray-900 hover:bg-gray-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpdateMonitoring}
-              disabled={updatingMonitoring}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              {updatingMonitoring ? 'Updating...' : 'Update'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
 
   // Render detail view
   const renderDetailView = () => {
