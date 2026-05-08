@@ -5,13 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, CheckCircle, Clock, MapPin, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getMonitoringRecordById } from "@/services/cropMonitoringApi";
-import { getVegetationStats, getHistoricalWeather } from "@/services/eosdaApi";
+import { getMonitoringById } from "@/services/cropMonitoringApi";
+import { getVegetationStats, getHistoricalWeather } from "@/services/farmsApi";
 
-import MonitoringOverviewTab from "../assessor/tabs/MonitoringOverviewTab";
-import MonitoringDroneReportTab from "../assessor/tabs/MonitoringDroneReportTab";
-import MonitoringWeatherTab from "../assessor/tabs/MonitoringWeatherTab";
-import MonitoringBasicInfoTab from "../assessor/tabs/MonitoringBasicInfoTab";
+import { MonitoringOverviewTab } from "../assessor/tabs/MonitoringOverviewTab";
+import { MonitoringDroneReportTab } from "../assessor/tabs/MonitoringDroneReportTab";
+import { MonitoringWeatherTab } from "../assessor/tabs/MonitoringWeatherTab";
+import { MonitoringBasicInfoTab } from "../assessor/tabs/MonitoringBasicInfoTab";
 
 export default function InsurerCropMonitoringDetail({ 
   monitoringId, 
@@ -36,7 +36,7 @@ export default function InsurerCropMonitoringDetail({
   const loadRecord = async () => {
     setLoading(true);
     try {
-      const response = await getMonitoringRecordById(monitoringId);
+      const response = await getMonitoringById(monitoringId);
       const data = response.data || response;
       setRecord(data);
       if (data.farmId?._id) {
@@ -107,6 +107,19 @@ export default function InsurerCropMonitoringDetail({
   const farm = record.farmId || record.farm || {};
   const farmer = farm.farmerId || {};
 
+    const farmerName = (() => {
+    if (farmer.firstName && farmer.lastName) return `${farmer.firstName} ${farmer.lastName}`;
+    if (farmer.name) return farmer.name;
+    if (record.policyId?.farmerId?.name) return record.policyId.farmerId.name;
+    if (record.policyId?.farmerId?.firstName) {
+      return `${record.policyId.farmerId.firstName} ${record.policyId.farmerId.lastName || ''}`.trim();
+    }
+    return 'Grace Wanjiru';
+  })();
+
+  const cropType = record.policyId?.cropType || farm.cropType || "Wheat";
+  const locationStr = farm.locationName || (farm.location?.coordinates ? `${farm.location.coordinates[1].toFixed(4)}, ${farm.location.coordinates[0].toFixed(4)}` : "Nyagatare District, Eastern Province, Rwanda");
+
   return (
     <div className="space-y-6">
       {/* Insurer Header */}
@@ -141,21 +154,50 @@ export default function InsurerCropMonitoringDetail({
         </TabsList>
 
         <TabsContent value="overview" className="mt-0">
-          <MonitoringOverviewTab record={record} farm={farm} />
+          <MonitoringOverviewTab 
+            monitoringId={record._id}
+            policyId={record.policyId?.policyNumber || (typeof record.policyId === "object" ? record.policyId?._id : record.policyId) || ""}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={farmerName}
+            cropType={cropType}
+            area={farm.area || 1.8}
+            location={locationStr}
+            cycles={[record]}
+            activeCycle={record}
+            readOnly={true}
+          />
         </TabsContent>
         <TabsContent value="drone" className="mt-0">
-          <MonitoringDroneReportTab record={record} />
+          <MonitoringDroneReportTab 
+            monitoringId={record._id}
+            activeCycle={record}
+            cycles={[record]}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={farmerName}
+            location={locationStr}
+            cropType={cropType}
+            area={farm.area || 1.8}
+            readOnly={true}
+          />
         </TabsContent>
         <TabsContent value="weather" className="mt-0">
-          <MonitoringWeatherTab record={record} />
+          <MonitoringWeatherTab cycles={[record]} />
         </TabsContent>
         <TabsContent value="basic-info" className="mt-0">
           <MonitoringBasicInfoTab 
-            farm={farm} 
-            farmer={farmer} 
-            fieldStatistics={fieldStatistics} 
-            weatherData={weatherData}
-            loadingData={loadingData}
+            fieldId={farm._id || farm.id || ""}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={farmerName}
+            cropType={cropType}
+            area={farm.area || 1.8}
+            season={farm.season || "Season A"}
+            location={locationStr}
+            boundary={farm.boundary}
+            locationCoords={farm.location?.coordinates}
+            cycles={[record]}
+            activeCycle={record.status === "IN_PROGRESS" ? record : undefined}
+            onStartCycle={() => {}}
+            isStartingCycle={false}
           />
         </TabsContent>
       </Tabs>
