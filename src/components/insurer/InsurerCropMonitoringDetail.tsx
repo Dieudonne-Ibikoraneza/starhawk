@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, CheckCircle, Clock, MapPin, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getMonitoringById } from "@/services/cropMonitoringApi";
+import { getMonitoringById, getMonitoringHistory } from "@/services/cropMonitoringApi";
 import { getVegetationStats, getHistoricalWeather } from "@/services/farmsApi";
 
 import { MonitoringOverviewTab } from "../assessor/tabs/MonitoringOverviewTab";
@@ -24,6 +24,7 @@ export default function InsurerCropMonitoringDetail({
 }) {
   const { toast } = useToast();
   const [record, setRecord] = useState<any>(null);
+  const [allCycles, setAllCycles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fieldStatistics, setFieldStatistics] = useState<any>(null);
   const [weatherData, setWeatherData] = useState<any>(null);
@@ -39,6 +40,23 @@ export default function InsurerCropMonitoringDetail({
       const response = await getMonitoringById(monitoringId);
       const data = response.data || response;
       setRecord(data);
+
+      const pId = data.policyId?._id || data.policyId;
+
+      try {
+        const history = await getMonitoringHistory();
+        const historyData = Array.isArray(history) ? history : (history.data || []);
+        const filteredCycles = historyData.filter((m: any) => {
+          const mPolicyId = m.policyId?._id || m.policyId;
+          return String(mPolicyId) === String(pId);
+        }).sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
+        
+        setAllCycles(filteredCycles);
+      } catch (err) {
+        console.warn("Failed to load cycles history:", err);
+        setAllCycles([data]);
+      }
+
       if (data.farmId?._id) {
         await loadFieldData(data.farmId._id);
       }
@@ -120,38 +138,112 @@ export default function InsurerCropMonitoringDetail({
   const cropType = record.policyId?.cropType || farm.cropType || "Wheat";
   const locationStr = farm.locationName || (farm.location?.coordinates ? `${farm.location.coordinates[1].toFixed(4)}, ${farm.location.coordinates[0].toFixed(4)}` : "Nyagatare District, Eastern Province, Rwanda");
 
+  const displayFieldId = farm._id ? `FLD-${String(farm._id).slice(-3).padStart(3, '0')}` : 'FLD-000';
+  const policyDisplayId = record.policyId?.policyNumber || (record.policyId?._id ? `POL-${record.policyId._id.slice(-6).toUpperCase()}` : "N/A");
+
   return (
     <div className="space-y-6">
-      {/* Insurer Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center gap-2 text-sm">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-700 font-medium"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Crop Monitoring
+        </button>
+      </div>
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Logs
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Monitoring Cycle {record.monitoringNumber || 1}</h1>
-          <p className="text-sm text-gray-600 flex items-center mt-1">
-            <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-            {farm.name || "Unknown Farm"} • {new Date(record.monitoringDate).toLocaleDateString()}
+          <h1 className="text-2xl font-semibold text-gray-900 uppercase">
+            CROP MONITORING AUDIT: {displayFieldId}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1 font-medium">
+            {farmerName} — {cropType} • {allCycles.length} {allCycles.length === 1 ? 'Cycle' : 'Cycles'} Evaluated
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <Badge className={`h-8 px-4 font-semibold border-none ${
-            record.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {record.status}
+        {record.policyId && (
+          <Badge
+            variant="outline"
+            className="text-sm px-4 py-1.5 border-green-200 bg-green-50 text-green-700 font-semibold"
+          >
+            Active Policy: {policyDisplayId}
           </Badge>
-        </div>
+        )}
       </div>
 
-      {/* Reused Assessor Tabs for Data Representation */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="bg-white border border-gray-100 p-1 mb-6 rounded-xl flex flex-wrap gap-2 justify-start shadow-sm h-auto">
-          <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Overview</TabsTrigger>
-          <TabsTrigger value="drone" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Drone Data</TabsTrigger>
-          <TabsTrigger value="weather" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Weather Analysis</TabsTrigger>
-          <TabsTrigger value="basic-info" className="rounded-lg data-[state=active]:bg-gray-900 data-[state=active]:text-white">Basic Info</TabsTrigger>
+      <Tabs defaultValue="basic" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-6 bg-gray-100 p-1 rounded-lg">
+          <TabsTrigger 
+            value="basic" 
+            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 text-gray-600 font-medium py-2 rounded-md transition-all"
+          >
+            📋 Basic Info
+          </TabsTrigger>
+          <TabsTrigger 
+            value="weather" 
+            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 text-gray-600 font-medium py-2 rounded-md transition-all"
+          >
+            🌦️ Weather Analysis
+          </TabsTrigger>
+          <TabsTrigger 
+            value="drone" 
+            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 text-gray-600 font-medium py-2 rounded-md transition-all"
+          >
+            🛸 Drone Report
+          </TabsTrigger>
+          <TabsTrigger 
+            value="overview" 
+            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 text-gray-600 font-medium py-2 rounded-md transition-all"
+          >
+            📝 Overview
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="basic" className="mt-0">
+          <MonitoringBasicInfoTab 
+            fieldId={farm._id || farm.id || ""}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={farmerName}
+            cropType={cropType}
+            area={farm.area || 1.8}
+            season={farm.season || "Season A"}
+            location={locationStr}
+            boundary={farm.boundary}
+            locationCoords={(() => {
+              if (farm?.location?.coordinates && Array.isArray(farm.location.coordinates)) {
+                const coords = farm.location.coordinates;
+                if (coords.length >= 2) return [coords[1], coords[0]];
+              }
+              return undefined;
+            })()}
+            cycles={allCycles}
+            activeCycle={allCycles.find(c => c.status === "IN_PROGRESS")}
+            onStartCycle={() => {}}
+            isStartingCycle={false}
+            readOnly={true}
+          />
+        </TabsContent>
+
+        <TabsContent value="weather" className="mt-0">
+          <MonitoringWeatherTab cycles={allCycles} />
+        </TabsContent>
+
+        <TabsContent value="drone" className="mt-0">
+          <MonitoringDroneReportTab 
+            monitoringId={record._id}
+            activeCycle={allCycles.find(c => c.status === "IN_PROGRESS")}
+            cycles={allCycles}
+            fieldName={farm.name || "Unknown Farm"}
+            farmerName={farmerName}
+            location={locationStr}
+            cropType={cropType}
+            area={farm.area || 1.8}
+            readOnly={true}
+          />
+        </TabsContent>
 
         <TabsContent value="overview" className="mt-0">
           <MonitoringOverviewTab 
@@ -162,42 +254,9 @@ export default function InsurerCropMonitoringDetail({
             cropType={cropType}
             area={farm.area || 1.8}
             location={locationStr}
-            cycles={[record]}
-            activeCycle={record}
+            cycles={allCycles}
+            activeCycle={allCycles.find(c => c.status === "IN_PROGRESS")}
             readOnly={true}
-          />
-        </TabsContent>
-        <TabsContent value="drone" className="mt-0">
-          <MonitoringDroneReportTab 
-            monitoringId={record._id}
-            activeCycle={record}
-            cycles={[record]}
-            fieldName={farm.name || "Unknown Farm"}
-            farmerName={farmerName}
-            location={locationStr}
-            cropType={cropType}
-            area={farm.area || 1.8}
-            readOnly={true}
-          />
-        </TabsContent>
-        <TabsContent value="weather" className="mt-0">
-          <MonitoringWeatherTab cycles={[record]} />
-        </TabsContent>
-        <TabsContent value="basic-info" className="mt-0">
-          <MonitoringBasicInfoTab 
-            fieldId={farm._id || farm.id || ""}
-            fieldName={farm.name || "Unknown Farm"}
-            farmerName={farmerName}
-            cropType={cropType}
-            area={farm.area || 1.8}
-            season={farm.season || "Season A"}
-            location={locationStr}
-            boundary={farm.boundary}
-            locationCoords={farm.location?.coordinates}
-            cycles={[record]}
-            activeCycle={record.status === "IN_PROGRESS" ? record : undefined}
-            onStartCycle={() => {}}
-            isStartingCycle={false}
           />
         </TabsContent>
       </Tabs>

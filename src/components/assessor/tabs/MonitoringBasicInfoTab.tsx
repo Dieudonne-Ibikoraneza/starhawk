@@ -25,6 +25,7 @@ interface MonitoringBasicInfoTabProps {
   onStartCycle: () => void;
   isStartingCycle: boolean;
   sowingDate?: string;
+  readOnly?: boolean;
 }
 
 export const MonitoringBasicInfoTab = ({
@@ -43,13 +44,17 @@ export const MonitoringBasicInfoTab = ({
   onStartCycle,
   isStartingCycle,
   sowingDate,
+  readOnly = false,
 }: MonitoringBasicInfoTabProps) => {
-  const sowingDateObj = new Date(sowingDate || "");
+  const sowingDateObj = sowingDate ? new Date(sowingDate) : null;
   const completedCount = cycles.filter(c => c.status === "COMPLETED").length;
-  const fallbackRecommendedDate = new Date(sowingDateObj);
-  fallbackRecommendedDate.setDate(sowingDateObj.getDate() + (completedCount + 1) * 30);
-
-  const recommendedDateStr = fallbackRecommendedDate.toISOString();
+  
+  let recommendedDateStr = "";
+  if (sowingDateObj && !isNaN(sowingDateObj.getTime())) {
+    const fallbackRecommendedDate = new Date(sowingDateObj);
+    fallbackRecommendedDate.setDate(sowingDateObj.getDate() + (completedCount + 1) * 30);
+    recommendedDateStr = fallbackRecommendedDate.toISOString();
+  }
 
   const maxReached = completedCount >= (totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || Number.MAX_SAFE_INTEGER);
   
@@ -139,24 +144,26 @@ export const MonitoringBasicInfoTab = ({
               {completedCount} / {totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || "?"} Completed
             </Badge>
           </CardTitle>
-          <div className="flex flex-col items-end gap-1">
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              disabled={
-                maxReached ||
-                !!activeCycle ||
-                isStartingCycle
-              }
-              onClick={onStartCycle}
-            >
-              {isStartingCycle ? "Starting..." : "Start Monitoring Cycle"}
-            </Button>
-            {!!activeCycle && (
-              <p className="text-[10px] text-blue-600 font-medium">
-                Complete active cycle to start next
-              </p>
-            )}
-          </div>
+          {!readOnly && (
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                disabled={
+                  maxReached ||
+                  !!activeCycle ||
+                  isStartingCycle
+                }
+                onClick={onStartCycle}
+              >
+                {isStartingCycle ? "Starting..." : "Start Monitoring Cycle"}
+              </Button>
+              {!!activeCycle && (
+                <p className="text-[10px] text-blue-600 font-medium">
+                  Complete active cycle to start next
+                </p>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {cycles.length === 0 && (

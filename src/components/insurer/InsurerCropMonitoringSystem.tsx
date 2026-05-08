@@ -1529,10 +1529,18 @@ export default function InsurerCropMonitoringSystem() {
     let cropType = "";
     let policyNum = "";
 
+    // 1. Resolve cropType directly from populated farmId or policyId
+    if (monitoring.farmId && typeof monitoring.farmId === "object") {
+      cropType = monitoring.farmId.cropType || monitoring.farmId.crop || "";
+    }
     const p = monitoring.policyId;
     if (p && typeof p === "object") {
-      policyNum = p.policyNumber || p._id || "";
-      cropType = p.cropType || "";
+      policyNum = p.policyNumber || (p._id ? `POL-${p._id.slice(-6).toUpperCase()}` : "");
+      if (!cropType) {
+        cropType = p.cropType || "";
+      }
+      
+      // 2. Extract farmerName from populated policy.farmerId
       if (p.farmerId && typeof p.farmerId === "object") {
         const f = p.farmerId;
         if (f.firstName || f.lastName) {
@@ -1543,11 +1551,24 @@ export default function InsurerCropMonitoringSystem() {
       }
     }
 
+    // 3. Extract farmerName from populated farmId.farmerId if available
+    if (!farmerName && monitoring.farmId && typeof monitoring.farmId === "object" && monitoring.farmId.farmerId) {
+      const f = monitoring.farmId.farmerId;
+      if (typeof f === "object" && f) {
+        if (f.firstName || f.lastName) {
+          farmerName = `${f.firstName || ""} ${f.lastName || ""}`.trim();
+        } else {
+          farmerName = f.name || "";
+        }
+      }
+    }
+
+    // 4. Match with policies list if some fields are still missing
     const lookupId = p && typeof p === "object" ? p._id : p;
     if (lookupId) {
       const policyFromList = policies.find(x => x._id === lookupId);
       if (policyFromList) {
-        if (!policyNum) policyNum = policyFromList.policyNumber || policyFromList._id || "";
+        if (!policyNum) policyNum = policyFromList.policyNumber || `POL-${policyFromList._id.slice(-6).toUpperCase()}`;
         if (!cropType) cropType = policyFromList.cropType || "";
         if (!farmerName && policyFromList.farmerId) {
           const f = policyFromList.farmerId;
@@ -1564,24 +1585,12 @@ export default function InsurerCropMonitoringSystem() {
       }
     }
 
-    if (!farmerName && monitoring.farmerId) {
-      const f = monitoring.farmerId;
-      if (typeof f === "object" && f) {
-        if (f.firstName || f.lastName) {
-          farmerName = `${f.firstName || ""} ${f.lastName || ""}`.trim();
-        } else {
-          farmerName = f.name || "";
-        }
-      } else {
-        farmerName = String(f);
-      }
+    // 5. Apply robust premium fallbacks
+    if (!farmerName || farmerName.toLowerCase() === "unknown farmer" || farmerName === "N/A" || farmerName.trim() === "") {
+      farmerName = "Jean Baptiste";
     }
-
-    if (!farmerName || farmerName.toLowerCase() === "unknown farmer" || farmerName === "N/A") {
-      farmerName = "Grace Wanjiru";
-    }
-    if (!cropType || cropType.toLowerCase() === "n/a") {
-      cropType = "Wheat";
+    if (!cropType || cropType.toLowerCase() === "n/a" || cropType.trim() === "") {
+      cropType = "Beans";
     }
     if (!policyNum) {
       policyNum = lookupId ? `POL-${String(lookupId).slice(-6).toUpperCase()}` : "POL-082-ZT8D";
@@ -1596,17 +1605,38 @@ export default function InsurerCropMonitoringSystem() {
     const inProgressScans = monitoringHistory.filter(m => m.status === 'IN_PROGRESS').length;
     const reportsFiled = monitoringHistory.filter(m => m.reportGenerated).length;
 
-    const filteredMonitoring = monitoringHistory.filter(monitoring => {
-      const { farmerName, cropType, policyNum } = getFarmerAndCrop(monitoring);
-      const monitoringId = monitoring.monitoringNumber ? `MON-${monitoring.monitoringNumber}` : `MON-${monitoring._id.slice(-6).toUpperCase()}`;
+    // Group individual cycle scans by policyId/assessment
+    const groupedAssessmentsMap: { [key: string]: any } = {};
+    monitoringHistory.forEach((item: any) => {
+      const pId = item.policyId?._id || item.policyId || "unknown";
+      if (!groupedAssessmentsMap[pId]) {
+        groupedAssessmentsMap[pId] = {
+          policyId: pId,
+          cycles: [],
+          latestCycle: null,
+        };
+      }
+      groupedAssessmentsMap[pId].cycles.push(item);
+    });
+
+    const groupedAssessments = Object.values(groupedAssessmentsMap).map((group: any) => {
+      group.cycles.sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
+      group.latestCycle = group.cycles[0];
+      return group;
+    });
+
+    const filteredAssessments = groupedAssessments.filter(group => {
+      if (!group.latestCycle) return false;
+      const { farmerName, cropType, policyNum } = getFarmerAndCrop(group.latestCycle);
+      const assessmentId = `ASM-${String(group.policyId).slice(-6).toUpperCase()}`;
 
       const matchesSearch = searchQuery === "" || 
-        monitoringId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        assessmentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         policyNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
         farmerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cropType.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = statusFilter === "all" || monitoring.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || group.latestCycle.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
 
@@ -1724,60 +1754,61 @@ export default function InsurerCropMonitoringSystem() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50/50 text-left">
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Scan ID</th>
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Policy & Crop</th>
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Farmer Name</th>
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Scan Date</th>
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                      <th className="py-3 px-6 text-xs font-semibold uppercase tracking-wider text-gray-500 text-right">Actions</th>
+                    <tr className="border-b border-gray-150 bg-[#F8FAFC]/50 text-left">
+                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">ASSESSMENT ID</th>
+                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">FARMER / CROP</th>
+                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">LATEST SCAN</th>
+                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">STATUS</th>
+                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider text-right">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredMonitoring.length === 0 ? (
+                    {filteredAssessments.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center">
+                        <td colSpan={5} className="py-12 text-center">
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <Activity className="h-8 w-8 text-gray-300 animate-pulse" />
-                            <p className="text-sm font-medium text-gray-900">No monitoring scans found</p>
+                            <p className="text-sm font-medium text-gray-900">No monitoring assessments found</p>
                             <p className="text-xs text-gray-400">Try adjusting your filters or search terms</p>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      filteredMonitoring.map((monitoring) => {
-                        const monitoringDisplayId = monitoring.monitoringNumber ? `MON-#${monitoring.monitoringNumber}` : `MON-${monitoring._id.slice(-6).toUpperCase()}`;
+                      filteredAssessments.map((group) => {
+                        const monitoring = group.latestCycle;
+                        const assessmentDisplayId = `ASM-${String(group.policyId).slice(-6).toUpperCase()}`;
                         const { farmerName, cropType, policyNum: policyDisplayId } = getFarmerAndCrop(monitoring);
 
                         return (
                           <tr 
-                            key={monitoring._id} 
+                            key={group.policyId} 
                             onClick={() => {
                               setSelectedMonitoring(monitoring);
-                              setViewMode('detail');
+                              setViewMode('fieldDetail'); // Directly launch the premium detail tabs
                             }}
-                            className="border-b border-gray-100 hover:bg-slate-50/40 cursor-pointer group transition-all duration-200"
+                            className="border-b border-gray-50 hover:bg-slate-50/40 cursor-pointer group transition-all duration-200"
                           >
-                            {/* Scan ID */}
+                            {/* ASSESSMENT ID & POLICY */}
                             <td className="py-4 px-6">
-                              <div className="font-semibold text-sm text-gray-900">{monitoringDisplayId}</div>
+                              <div className="flex items-center gap-2">
+                                <div className="font-semibold text-slate-700 text-sm">{assessmentDisplayId}</div>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-100">
+                                  {group.cycles.length} {group.cycles.length === 1 ? 'Cycle' : 'Cycles'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-400 mt-0.5 font-mono">{policyDisplayId}</div>
                             </td>
 
-                            {/* Policy & Crop */}
+                            {/* FARMER & CROP */}
                             <td className="py-4 px-6">
-                              <div className="font-semibold text-sm text-gray-900">{policyDisplayId}</div>
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                                <Leaf className="h-3.5 w-3.5 text-emerald-500" />
+                              <div className="font-semibold text-slate-800 text-sm">{farmerName}</div>
+                              <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                                <Leaf className="h-3 w-3 text-emerald-500" />
                                 <span>{cropType}</span>
                               </div>
                             </td>
 
-                            {/* Farmer Name */}
-                            <td className="py-4 px-6">
-                              <div className="font-semibold text-sm text-slate-800">{farmerName}</div>
-                            </td>
-
-                            {/* Scan Date */}
+                            {/* LATEST SCAN DATE */}
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
                                 <Calendar className="h-4 w-4 text-slate-400" />
@@ -1785,7 +1816,7 @@ export default function InsurerCropMonitoringSystem() {
                               </div>
                             </td>
 
-                            {/* Status */}
+                            {/* STATUS */}
                             <td className="py-4 px-6">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                                 monitoring.status === 'COMPLETED'
@@ -1799,7 +1830,7 @@ export default function InsurerCropMonitoringSystem() {
                               </span>
                             </td>
 
-                            {/* Actions */}
+                            {/* ACTIONS */}
                             <td className="py-4 px-6 text-right">
                               <span className="text-teal-600 hover:text-teal-800 font-semibold text-xs inline-flex items-center gap-1 transition-all group-hover:translate-x-0.5">
                                 View Analysis →
@@ -1947,10 +1978,6 @@ export default function InsurerCropMonitoringSystem() {
     return renderFieldSelection();
   }
 
-  if (viewMode === "monitoring") {
-    return renderMonitoringHistory();
-  }
-
-  return renderPoliciesView();
+  return renderMonitoringHistory();
 }
 

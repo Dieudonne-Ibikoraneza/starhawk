@@ -87,13 +87,16 @@ export const MonitoringOverviewTab = ({
 
   // Seed local state from the active cycle
   useEffect(() => {
-    if (activeCycle && !initialized) {
+    if (activeCycle) {
       setObservations(activeCycle.observations || []);
       setNotes(activeCycle.notes || "");
       setPhotoUrls(activeCycle.photoUrls || []);
-      setInitialized(true);
+    } else {
+      setObservations([]);
+      setNotes("");
+      setPhotoUrls([]);
     }
-  }, [activeCycle, initialized]);
+  }, [activeCycle?._id]);
 
   // ---------- mutations ----------
   const updateMutation = useMutation({
@@ -251,7 +254,7 @@ export const MonitoringOverviewTab = ({
       </div>
 
       {/* Active Cycle Editor */}
-      {activeCycle ? (
+      {activeCycle && activeCycle.status === "IN_PROGRESS" ? (
         <>
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold flex items-center gap-2">
@@ -289,14 +292,16 @@ export const MonitoringOverviewTab = ({
                             {obs}
                           </span>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                          onClick={() => removeObservation(idx)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {!readOnly && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={() => removeObservation(idx)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     ))}
                     {observations.length === 0 && (
@@ -305,7 +310,7 @@ export const MonitoringOverviewTab = ({
                       </p>
                     )}
                   </div>
-                  {!isCompleted && (
+                  {!isCompleted && !readOnly && (
                     <div className="flex gap-2">
                       <Input
                         value={newObservation}
@@ -346,37 +351,41 @@ export const MonitoringOverviewTab = ({
                           alt={`Photo ${idx + 1}`}
                           className="w-full h-full object-cover"
                         />
-                        <button
-                          onClick={() => removePhoto(idx)}
-                          className="absolute top-1 right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => removePhoto(idx)}
+                            className="absolute top-1 right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handlePhotoUpload}
-                      disabled={isCompleted}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading || isCompleted}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Plus className="h-4 w-4 mr-2" />
-                      )}
-                      {isUploading ? "Uploading..." : "Add Photo"}
-                    </Button>
-                  </div>
+                  {!readOnly && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                        disabled={isCompleted}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading || isCompleted}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        {isUploading ? "Uploading..." : "Add Photo"}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -396,10 +405,10 @@ export const MonitoringOverviewTab = ({
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Provide additional details about the field condition..."
                     className="min-h-[250px] resize-none"
-                    disabled={isCompleted}
+                    disabled={isCompleted || readOnly}
                   />
 
-                  {!isCompleted && (
+                  {!isCompleted && !readOnly && (
                     <div className="flex flex-col gap-3 pt-4 border-t">
                       <Button
                         onClick={() => updateMutation.mutate()}
@@ -478,7 +487,7 @@ export const MonitoringOverviewTab = ({
             </div>
           </div>
         </>
-      ) : (
+      ) : !readOnly ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Plus className="h-10 w-10 mx-auto mb-3 opacity-50" />
@@ -488,7 +497,7 @@ export const MonitoringOverviewTab = ({
             </p>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Completed Cycles History */}
       {completedCycles.length > 0 && (
