@@ -237,7 +237,7 @@ class PoliciesApiService {
     return this.request<any>(endpoint);
   }
 
-  // Get Policy by ID
+   // Get Policy by ID
   async getPolicyById(id: string) {
     return this.request<any>(`/${id}`);
   }
@@ -254,6 +254,21 @@ class PoliciesApiService {
   async deletePolicy(id: string) {
     return this.request<any>(`/${id}`, {
       method: "DELETE",
+    });
+  }
+
+  // Farmer acknowledges policy -> ACTIVE
+  async farmerAcknowledgePolicy(id: string) {
+    return this.request<any>(`/${id}/farmer-acknowledge`, {
+      method: "POST",
+    });
+  }
+
+  // Farmer rejects policy -> DECLINED
+  async farmerRejectPolicy(id: string, reason: string) {
+    return this.request<any>(`/${id}/farmer-reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
     });
   }
 }
@@ -286,3 +301,7 @@ export const getPolicyById = (id: string) =>
 export const updatePolicy = (id: string, updateData: UpdatePolicyData) =>
   policiesApiService.updatePolicy(id, updateData);
 export const deletePolicy = (id: string) => policiesApiService.deletePolicy(id);
+export const farmerAcknowledgePolicy = (id: string) =>
+  policiesApiService.farmerAcknowledgePolicy(id);
+export const farmerRejectPolicy = (id: string, reason: string) =>
+  policiesApiService.farmerRejectPolicy(id, reason);

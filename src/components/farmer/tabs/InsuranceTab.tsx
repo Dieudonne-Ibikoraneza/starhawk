@@ -26,7 +26,7 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
       const [polRes, reqRes, farmsRes] = await Promise.all([
         getPolicies(1, 100),
         getInsuranceRequests(1, 100),
-        getFarms(1, 100)
+        getFarms(0, 100)
       ]);
 
       setPolicies(polRes?.data || polRes || []);
@@ -50,6 +50,18 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
     return map;
   }, [farms]);
 
+  const getPolicyFarmName = (policy: any) => {
+    if (!policy) return "Unnamed Farm";
+    const farm = policy.farmId;
+    if (farm && typeof farm === 'object') {
+      return farm.name || farmNameById.get(farm._id || farm.id) || "Unnamed Farm";
+    }
+    if (typeof farm === 'string') {
+      return farmNameById.get(farm) || "Unnamed Farm";
+    }
+    return "Unnamed Farm";
+  };
+
   const policyGroups = useMemo(() => {
     const pArr = Array.isArray(policies) ? policies : [];
     return {
@@ -66,7 +78,7 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
   const handleAcceptPolicy = async (id: string) => {
     setIsAccepting(true);
     try {
-      await updatePolicy(id, { status: "ACTIVE" });
+      await farmerAcknowledgePolicy(id);
       toast({
         title: "Success",
         description: "Policy accepted! Your coverage is now active.",
@@ -136,13 +148,13 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
               ) : (
                 <div className="space-y-6">
                   {policyGroups.pending.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={farmNameById.get(p.farmId?._id || p.farmId)} onReview={() => setReviewDialog({ open: true, policy: p })} onViewDetails={onViewDetails} />
+                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => setReviewDialog({ open: true, policy: p })} onViewDetails={onViewDetails} />
                   ))}
                   {policyGroups.active.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={farmNameById.get(p.farmId?._id || p.farmId)} onReview={() => {}} onViewDetails={onViewDetails} />
+                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => {}} onViewDetails={onViewDetails} />
                   ))}
                   {policyGroups.others.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={farmNameById.get(p.farmId?._id || p.farmId)} onReview={() => {}} onViewDetails={onViewDetails} />
+                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => {}} onViewDetails={onViewDetails} />
                   ))}
                 </div>
               )}
@@ -217,7 +229,7 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-gray-500 uppercase font-bold">Farm</span>
-                  <p className="font-medium">{farmNameById.get(reviewDialog.policy.farmId?._id || reviewDialog.policy.farmId)}</p>
+                  <p className="font-medium">{getPolicyFarmName(reviewDialog.policy)}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-gray-500 uppercase font-bold">Coverage Amount</span>
@@ -330,4 +342,4 @@ const Hash = ({ className }: { className?: string }) => (
 );
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { updatePolicy } from "@/services/policiesApi";
+import { farmerAcknowledgePolicy, farmerRejectPolicy } from "@/services/policiesApi";

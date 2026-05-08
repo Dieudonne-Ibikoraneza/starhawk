@@ -162,9 +162,25 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                 <CardTitle className="text-2xl font-bold text-slate-900">{farm.name || "Farm Overview"}</CardTitle>
                 <CardDescription className="flex items-center mt-1">
                   <MapPin className="h-3 w-3 mr-1" />
-                  {farm.locationName || (farm.location && typeof farm.location === 'object' && 'coordinates' in farm.location 
-                    ? `Coordinates: ${farm.location.coordinates[1].toFixed(4)}, ${farm.location.coordinates[0].toFixed(4)}`
-                    : farm.location) || "Location not specified"}
+                  {farm.locationName || (() => {
+                    if (!farm.location) return null;
+                    if (typeof farm.location === 'string') return farm.location;
+                    if (typeof farm.location === 'object') {
+                      if ('coordinates' in farm.location && Array.isArray(farm.location.coordinates)) {
+                        const coords = farm.location.coordinates;
+                        if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+                          return `Coordinates: ${Number(coords[1]).toFixed(4)}, ${Number(coords[0]).toFixed(4)}`;
+                        } else if (coords.length > 0 && Array.isArray(coords[0])) {
+                          const firstRing = coords[0];
+                          if (Array.isArray(firstRing) && firstRing.length >= 2 && typeof firstRing[0] === 'number' && typeof firstRing[1] === 'number') {
+                            return `Boundary Coordinates: ${Number(firstRing[1]).toFixed(4)}, ${Number(firstRing[0]).toFixed(4)}`;
+                          }
+                        }
+                      }
+                      return "Boundary Defined";
+                    }
+                    return null;
+                  })() || "Location not specified"}
                 </CardDescription>
               </div>
               <Badge variant="outline" className={`px-3 py-1 ${getRiskColor(riskAssessment.level)}`}>

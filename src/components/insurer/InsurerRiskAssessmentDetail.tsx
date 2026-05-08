@@ -3,7 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, CheckCircle, AlertTriangle, MapPin, Download, Shield } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, CheckCircle, AlertTriangle, MapPin, Download, Shield, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { createPolicyFromAssessment } from "@/services/policiesApi";
@@ -25,8 +30,18 @@ export default function InsurerRiskAssessmentDetail({
   const [assessment, setAssessment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
+  
+  // Rejection Dialog state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  // Policy Creation Dialog state
+  const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   const [isCreatingPolicy, setIsCreatingPolicy] = useState(false);
+  const [coverageLevel, setCoverageLevel] = useState<"BASIC" | "STANDARD" | "PREMIUM">("STANDARD");
+  const [policyStartDate, setPolicyStartDate] = useState("");
+  const [policyEndDate, setPolicyEndDate] = useState("");
 
   useEffect(() => {
     loadAssessment();
@@ -62,10 +77,19 @@ export default function InsurerRiskAssessmentDetail({
   };
 
   const handleReject = async () => {
+    if (!rejectionReason.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Rejection reason is required",
+        variant: "destructive"
+      });
+      return;
+    }
     setIsRejecting(true);
     try {
-      await assessmentsApiService.rejectAssessment(assessmentId, "Rejected by insurer");
+      await assessmentsApiService.rejectAssessment(assessmentId, rejectionReason);
       toast({ title: "Success", description: "Assessment rejected successfully" });
+      setShowRejectDialog(false);
       onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to reject", variant: "destructive" });
@@ -75,10 +99,27 @@ export default function InsurerRiskAssessmentDetail({
   };
 
   const handleCreatePolicy = async () => {
+    if (!policyStartDate || !policyEndDate) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
     setIsCreatingPolicy(true);
     try {
-      await createPolicyFromAssessment(assessmentId);
+      // Convert dates to ISO format
+      const startDateISO = new Date(policyStartDate + 'T00:00:00Z').toISOString();
+      const endDateISO = new Date(policyEndDate + 'T23:59:59Z').toISOString();
+      await createPolicyFromAssessment(
+        assessmentId,
+        coverageLevel,
+        startDateISO,
+        endDateISO
+      );
       toast({ title: "Success", description: "Policy created successfully" });
+      setShowPolicyDialog(false);
       onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to create policy", variant: "destructive" });
@@ -120,13 +161,13 @@ export default function InsurerRiskAssessmentDetail({
         
         <div className="flex items-center gap-3">
           {assessment.status === 'APPROVED' ? (
-            <Button onClick={handleCreatePolicy} disabled={isCreatingPolicy} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10">
+            <Button onClick={() => setShowPolicyDialog(true)} disabled={isCreatingPolicy} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10">
               <Shield className="h-4 w-4 mr-2" />
               {isCreatingPolicy ? "Creating..." : "Create Policy"}
             </Button>
           ) : assessment.status === 'SUBMITTED' || assessment.status === 'PENDING' ? (
             <>
-              <Button onClick={handleReject} disabled={isRejecting} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 rounded-xl h-10">
+              <Button onClick={() => setShowRejectDialog(true)} disabled={isRejecting} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 rounded-xl h-10">
                 Reject
               </Button>
               <Button onClick={handleApprove} disabled={isApproving} className="bg-green-600 hover:bg-green-700 text-white rounded-xl h-10">
@@ -191,6 +232,176 @@ export default function InsurerRiskAssessmentDetail({
           <OverviewTab assessment={assessment} farm={farm} farmer={farmer} isInsurerView={true} />
         </TabsContent>
       </Tabs>
+
+      {/* Reject Dialog overlay */}
+      <Dialog open={showRejectDialog} onOpenChange={(open) => {
+        if (!open) {
+          setRejectionReason("");
+        }
+        setShowRejectDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">Reject Assessment</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Please provide a reason for rejecting this assessment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="text-sm">
+                <span className="text-gray-600">Farm: </span>
+                <span className="font-medium text-gray-900">{farm.name || "N/A"}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-600">Crop: </span>
+                <span className="font-medium text-gray-900">{farm.cropType || farm.crop || "N/A"}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-600">Risk Score: </span>
+                <span className="font-medium text-gray-900">{assessment.riskScore !== null && assessment.riskScore !== undefined ? `${assessment.riskScore}%` : "N/A"}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="rejectionReason" className="text-gray-900 font-semibold">Rejection Reason *</Label>
+              <Textarea
+                id="rejectionReason"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason for rejection..."
+                className="mt-2 min-h-[100px] border-gray-300"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRejectDialog(false);
+                  setRejectionReason("");
+                }}
+                className="border-gray-300 text-gray-900 hover:bg-gray-100 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleReject}
+                disabled={isRejecting || !rejectionReason.trim()}
+                className="bg-red-600 hover:bg-red-700 text-white rounded-xl"
+              >
+                {isRejecting ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Reject Assessment
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Policy Dialog overlay */}
+      <Dialog open={showPolicyDialog} onOpenChange={(open) => setShowPolicyDialog(open)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">Create Policy from Assessment</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Create an insurance policy based on the submitted assessment
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="text-sm">
+                <span className="text-gray-600">Farm: </span>
+                <span className="font-medium text-gray-900">{farm.name || "N/A"}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-600">Crop: </span>
+                <span className="font-medium text-gray-900">{farm.cropType || farm.crop || "N/A"}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-600">Risk Score: </span>
+                <span className="font-medium text-gray-900">{assessment.riskScore !== null && assessment.riskScore !== undefined ? `${assessment.riskScore}%` : "N/A"}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-gray-700 font-semibold">Coverage Level *</Label>
+              <Select 
+                value={coverageLevel} 
+                onValueChange={(val: any) => setCoverageLevel(val)}
+              >
+                <SelectTrigger className="mt-2 border-gray-300">
+                  <SelectValue placeholder="Select coverage level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BASIC">Basic Coverage</SelectItem>
+                  <SelectItem value="STANDARD">Standard Coverage</SelectItem>
+                  <SelectItem value="PREMIUM">Premium Coverage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-700 font-semibold">Policy Start Date *</Label>
+                <Input
+                  type="date"
+                  value={policyStartDate}
+                  onChange={(e) => setPolicyStartDate(e.target.value)}
+                  className="mt-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-gray-700 font-semibold">Policy End Date *</Label>
+                <Input
+                  type="date"
+                  value={policyEndDate}
+                  onChange={(e) => setPolicyEndDate(e.target.value)}
+                  className="mt-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPolicyDialog(false)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-100 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreatePolicy}
+                disabled={isCreatingPolicy || !policyStartDate || !policyEndDate}
+                className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl"
+              >
+                {isCreatingPolicy ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="h-4 w-4 mr-2" />
+                    Create Policy
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

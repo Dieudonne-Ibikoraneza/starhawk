@@ -398,7 +398,7 @@ export default function RiskAssessmentSystem(): JSX.Element {
   const [pollingForDroneData, setPollingForDroneData] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingStartTimeRef = useRef<number | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("basic");
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [loadingMapImage, setLoadingMapImage] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
