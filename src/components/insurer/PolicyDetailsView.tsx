@@ -1,39 +1,25 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft,
-  Edit,
-  Download,
-  Share,
-  Trash2,
   User,
   MapPin,
   Calendar,
   DollarSign,
   Shield,
   Crop,
-  AlertTriangle,
   CheckCircle,
   Clock,
+  AlertTriangle,
   X,
-  FileText,
-  TrendingUp,
-  BarChart3,
-  Phone,
-  Mail,
-  Building2
+  Sprout,
+  Maximize2
 } from "lucide-react";
 
 interface Policy {
   id: string;
+  policyNumber: string;
   farmerId: string;
   farmerName: string;
   cropType: string;
@@ -44,18 +30,11 @@ interface Policy {
   status: "active" | "pending" | "expired" | "cancelled";
   location: string;
   farmSize: number;
+  farmName: string;
   riskLevel: "low" | "medium" | "high";
   deductible: number;
   createdAt: string;
-  phoneNumber?: string;
-  email?: string;
-  address?: string;
-  policyType?: string;
-  renewalDate?: string;
-  lastPaymentDate?: string;
-  nextPaymentDate?: string;
-  claimsCount?: number;
-  totalClaimsPaid?: number;
+  coverageLevel: string;
 }
 
 interface PolicyDetailsViewProps {
@@ -64,417 +43,189 @@ interface PolicyDetailsViewProps {
 }
 
 export default function PolicyDetailsView({ policy, onBack }: PolicyDetailsViewProps) {
-  const isEditing = false;
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "expired": return "bg-red-100 text-red-800";
-      case "cancelled": return "bg-gray-100 text-white/90";
-      default: return "bg-gray-100 text-white/90";
+      case "active": return "bg-green-100 text-green-800 border-green-200";
+      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "expired": return "bg-red-100 text-red-800 border-red-200";
+      case "cancelled": return "bg-gray-100 text-gray-800 border-gray-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "active": return <CheckCircle className="h-4 w-4" />;
-      case "pending": return <Clock className="h-4 w-4" />;
-      case "expired": return <AlertTriangle className="h-4 w-4" />;
-      case "cancelled": return <X className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case "active": return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case "pending": return <Clock className="h-4 w-4 text-yellow-600" />;
+      case "expired": return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case "cancelled": return <X className="h-4 w-4 text-gray-600" />;
+      default: return <Clock className="h-4 w-4 text-gray-600" />;
     }
   };
 
-  const getRiskLevelColor = (level: string) => {
-    switch (level) {
-      case "low": return "bg-green-100 text-green-800";
-      case "medium": return "bg-yellow-100 text-yellow-800";
-      case "high": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-white/90";
-    }
+  const getCoverageLevelBadgeColor = (level: string) => {
+    const l = level.toUpperCase();
+    if (l === "PREMIUM") return "bg-indigo-100 text-indigo-800 border-indigo-200";
+    if (l === "STANDARD") return "bg-sky-100 text-sky-800 border-sky-200";
+    return "bg-slate-100 text-slate-800 border-slate-200";
   };
 
-  // Claims and payments will be loaded from API in the future
-  const mockClaims: any[] = [];
-  const mockPayments: any[] = [];
+  const formatCropTypeLabel = (crop: string) => {
+    if (!crop || crop === "Unknown") return "Unknown Crop";
+    return crop.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  };
+
+  const formattedDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString("en-US", {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onBack}
+            className="rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Policies
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-white">Policy Details</h1>
-            <p className="text-white/70 mt-1">Policy ID: {policy.id}</p>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Policy Details</h1>
+            <p className="text-sm font-semibold text-gray-500 mt-1 font-mono">Number: {policy.policyNumber}</p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <Badge className={getStatusColor(policy.status)}>
+          <Badge variant="outline" className={`${getStatusColor(policy.status)} py-1.5 px-3 rounded-xl flex items-center gap-1.5 shadow-none text-xs font-bold`}>
             {getStatusIcon(policy.status)}
-            <span className="ml-1 capitalize">{policy.status}</span>
+            <span className="capitalize">{policy.status}</span>
           </Badge>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline">
-            <Share className="h-4 w-4 mr-2" />
-            Share
-          </Button>
         </div>
       </div>
 
-      {/* Policy Overview Cards */}
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white/70">Coverage Amount</p>
-                <p className="text-2xl font-bold text-white">
-                  {policy.coverageAmount.toLocaleString()} RWF
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Shield className="h-6 w-6 text-blue-600" />
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Policy Status & Period Card */}
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl overflow-hidden">
+          <CardHeader className="bg-slate-50/70 border-b border-gray-100 py-4">
+            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-blue-600" />
+              Policy Status & Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between py-2 border-b border-slate-50">
+              <span className="text-sm font-semibold text-gray-500">Current Status</span>
+              <Badge variant="outline" className={`${getStatusColor(policy.status)} py-1 px-2.5 rounded-lg shadow-none text-xs font-bold capitalize`}>
+                {policy.status}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-slate-50">
+              <span className="text-sm font-semibold text-gray-500">Date Issued</span>
+              <span className="text-sm font-bold text-gray-900">{formattedDate(policy.createdAt)}</span>
+            </div>
+            <div className="space-y-2 pt-2">
+              <span className="text-sm font-semibold text-gray-500 block">Coverage Period</span>
+              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="text-xs text-slate-500 font-medium">Valid From</span>
+                  <span className="text-sm font-bold text-slate-900">{formattedDate(policy.startDate)} to {formattedDate(policy.endDate)}</span>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white/70">Premium Amount</p>
-                <p className="text-2xl font-bold text-white">
-                  {policy.premiumAmount.toLocaleString()} RWF
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
+        {/* Coverage & Premium Card */}
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl overflow-hidden">
+          <CardHeader className="bg-slate-50/70 border-b border-gray-100 py-4">
+            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-blue-600" />
+              Coverage & Premium
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between py-2 border-b border-slate-50">
+              <span className="text-sm font-semibold text-gray-500">Coverage Level</span>
+              <Badge variant="outline" className={`${getCoverageLevelBadgeColor(policy.coverageLevel)} py-1 px-2.5 rounded-lg shadow-none text-xs font-bold`}>
+                {policy.coverageLevel.toUpperCase()}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2 pt-4">
+              <span className="text-sm font-semibold text-gray-500">Premium Amount</span>
+              <div className="text-right">
+                <p className="text-2xl font-black text-gray-900">{policy.premiumAmount.toLocaleString()} RWF</p>
+                <p className="text-[10px] text-gray-400 font-medium">Total policy cost</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white/70">Risk Level</p>
-                <p className="text-2xl font-bold text-white capitalize">
-                  {policy.riskLevel}
-                </p>
+        {/* Farmer & Farm Details Card */}
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl overflow-hidden md:col-span-2">
+          <CardHeader className="bg-slate-50/70 border-b border-gray-100 py-4">
+            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <User className="h-4 w-4 text-blue-600" />
+              Farmer & Farm Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Farmer Name</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <User className="h-4 w-4 text-slate-400" />
+                  {policy.farmerName}
+                </span>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-orange-600" />
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Farm Name</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Maximize2 className="h-4 w-4 text-slate-400" />
+                  {policy.farmName}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Farm Size</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Maximize2 className="h-4 w-4 text-slate-400" />
+                  {policy.farmSize.toFixed(2)} hectares
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white/70">Claims Filed</p>
-                <p className="text-2xl font-bold text-white">
-                  {policy.claimsCount || 0}
-                </p>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Location</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  {policy.location}
+                </span>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-purple-600" />
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-2">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Crop Type</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Sprout className="h-4 w-4 text-slate-400" />
+                  {formatCropTypeLabel(policy.cropType)}
+                </span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Detailed Information Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="farmer">Farmer Details</TabsTrigger>
-          <TabsTrigger value="claims">Claims History</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Policy Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  Policy Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Policy ID</Label>
-                    <Input value={isEditing ? editedPolicy.id : policy.id} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Policy Type</Label>
-                    <Input value={isEditing ? editedPolicy.policyType || "Crop Insurance" : policy.policyType || "Crop Insurance"} 
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, policyType: e.target.value})} 
-                           disabled={!isEditing} />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Start Date</Label>
-                    <Input type="date" 
-                           value={isEditing ? editedPolicy.startDate : policy.startDate}
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, startDate: e.target.value})}
-                           disabled={!isEditing} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" 
-                           value={isEditing ? editedPolicy.endDate : policy.endDate}
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, endDate: e.target.value})}
-                           disabled={!isEditing} />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Coverage Amount (RWF)</Label>
-                    <Input type="number" 
-                           value={isEditing ? editedPolicy.coverageAmount : policy.coverageAmount}
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, coverageAmount: parseFloat(e.target.value)})}
-                           disabled={!isEditing} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Premium Amount (RWF)</Label>
-                    <Input type="number" 
-                           value={isEditing ? editedPolicy.premiumAmount : policy.premiumAmount}
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, premiumAmount: parseFloat(e.target.value)})}
-                           disabled={!isEditing} />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Deductible (RWF)</Label>
-                    <Input type="number" 
-                           value={isEditing ? editedPolicy.deductible : policy.deductible}
-                           onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, deductible: parseFloat(e.target.value)})}
-                           disabled={!isEditing} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Risk Level</Label>
-                    <Select value={isEditing ? editedPolicy.riskLevel : policy.riskLevel}
-                            onValueChange={(value) => isEditing && setEditedPolicy({...editedPolicy, riskLevel: value as "low" | "medium" | "high"})}
-                            disabled={!isEditing}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low Risk</SelectItem>
-                        <SelectItem value="medium">Medium Risk</SelectItem>
-                        <SelectItem value="high">High Risk</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Crop Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Crop className="h-5 w-5 mr-2" />
-                  Crop Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Crop Type</Label>
-                  <Select value={isEditing ? editedPolicy.cropType : policy.cropType}
-                          onValueChange={(value) => isEditing && setEditedPolicy({...editedPolicy, cropType: value})}
-                          disabled={!isEditing}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="maize">Maize</SelectItem>
-                      <SelectItem value="rice">Rice</SelectItem>
-                      <SelectItem value="potatoes">Potatoes</SelectItem>
-                      <SelectItem value="beans">Beans</SelectItem>
-                      <SelectItem value="wheat">Wheat</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Farm Size (hectares)</Label>
-                  <Input type="number" 
-                         value={isEditing ? editedPolicy.farmSize : policy.farmSize}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, farmSize: parseFloat(e.target.value)})}
-                         disabled={!isEditing} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input value={isEditing ? editedPolicy.location : policy.location}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, location: e.target.value})}
-                         disabled={!isEditing} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Policy Status</Label>
-                  <Select value={isEditing ? editedPolicy.status : policy.status}
-                          onValueChange={(value) => isEditing && setEditedPolicy({...editedPolicy, status: value as Policy["status"]})}
-                          disabled={!isEditing}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="expired">Expired</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="farmer" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Farmer Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Farmer ID</Label>
-                  <Input value={isEditing ? editedPolicy.farmerId : policy.farmerId}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, farmerId: e.target.value})}
-                         disabled={!isEditing} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Farmer Name</Label>
-                  <Input value={isEditing ? editedPolicy.farmerName : policy.farmerName}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, farmerName: e.target.value})}
-                         disabled={!isEditing} />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Phone Number</Label>
-                  <Input value={isEditing ? editedPolicy.phoneNumber || "" : policy.phoneNumber || ""}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, phoneNumber: e.target.value})}
-                         disabled={!isEditing} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" 
-                         value={isEditing ? editedPolicy.email || "" : policy.email || ""}
-                         onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, email: e.target.value})}
-                         disabled={!isEditing} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Textarea value={isEditing ? editedPolicy.address || "" : policy.address || ""}
-                          onChange={(e) => isEditing && setEditedPolicy({...editedPolicy, address: e.target.value})}
-                          disabled={!isEditing}
-                          rows={3} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="claims" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
-                Claims History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockClaims.map((claim) => (
-                  <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{claim.id}</p>
-                        <p className="text-sm text-gray-500">{claim.description}</p>
-                        <p className="text-xs text-gray-400">{claim.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{claim.amount.toLocaleString()} RWF</p>
-                      <Badge className={claim.status === "approved" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                        {claim.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <DollarSign className="h-5 w-5 mr-2" />
-                Payment History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockPayments.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{payment.id}</p>
-                        <p className="text-sm text-gray-500 capitalize">{payment.type} payment</p>
-                        <p className="text-xs text-gray-400">{payment.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{payment.amount.toLocaleString()} RWF</p>
-                      <Badge className={payment.status === "completed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                        {payment.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
     </div>
   );
 }

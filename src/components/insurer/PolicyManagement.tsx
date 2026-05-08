@@ -25,6 +25,7 @@ import {
 
 interface Policy {
   id: string;
+  policyNumber: string;
   farmerId: string;
   farmerName: string;
   cropType: string;
@@ -35,9 +36,11 @@ interface Policy {
   status: "active" | "pending" | "expired" | "cancelled";
   location: string;
   farmSize: number;
+  farmName: string;
   riskLevel: "low" | "medium" | "high";
   deductible: number;
   createdAt: string;
+  coverageLevel: string;
 }
 
 interface PolicyManagementProps {
@@ -93,6 +96,7 @@ export default function PolicyManagement({
       // Map API response to Policy interface
       const mappedPolicies: Policy[] = policiesData.map((policy: any) => ({
         id: policy._id || policy.id || '',
+        policyNumber: policy.policyNumber || (policy._id ? `POL-${policy._id.slice(-6).toUpperCase()}` : 'N/A'),
         farmerId: typeof policy.farmerId === 'object' && policy.farmerId
           ? (policy.farmerId._id || policy.farmerId.id || '') 
           : (policy.farmerId || policy.farmer?._id || policy.farmer?.id || ''),
@@ -103,7 +107,7 @@ export default function PolicyManagement({
           if (typeof policy.farmerName === 'string') return policy.farmerName;
           return 'Unknown Farmer';
         })(),
-        cropType: policy.cropType || 'Unknown',
+        cropType: policy.cropType || policy.farmId?.cropType || 'Unknown',
         coverageAmount: policy.coverageAmount || policy.coverage || 0,
         premiumAmount: policy.premiumAmount || policy.premium || 0,
         startDate: policy.startDate || policy.validityPeriod?.start || new Date().toISOString().split('T')[0],
@@ -111,9 +115,16 @@ export default function PolicyManagement({
                  policy.validityPeriod?.end || 
                  (typeof policy.validityPeriod === 'string' ? policy.validityPeriod : '') || 
                  new Date().toISOString().split('T')[0],
-        status: (policy.status || 'pending').toLowerCase() as "active" | "pending" | "expired" | "cancelled",
+        status: (() => {
+          const s = (policy.status || 'pending').toUpperCase();
+          if (s === 'PENDING_ACCEPTANCE') return 'pending';
+          if (s === 'ACTIVE') return 'active';
+          if (s === 'EXPIRED') return 'expired';
+          if (s === 'CANCELLED' || s === 'DECLINED') return 'cancelled';
+          return 'pending';
+        })() as "active" | "pending" | "expired" | "cancelled",
         location: (() => {
-          const loc = policy.location || policy.farm?.location;
+          const loc = policy.location || policy.farmId?.locationName || policy.farm?.location;
           if (!loc) return 'Unknown';
           if (typeof loc === 'string') return loc;
           if (typeof loc === 'object') {
@@ -125,10 +136,12 @@ export default function PolicyManagement({
           }
           return 'Unknown';
         })(),
-        farmSize: policy.farmSize || policy.farm?.size || 0,
+        farmSize: policy.farmSize || policy.farmId?.area || policy.farm?.size || 0,
+        farmName: policy.farmId?.name || 'Unknown Farm',
         riskLevel: (policy.riskLevel || 'medium').toLowerCase() as "low" | "medium" | "high",
         deductible: policy.deductible || 0,
         createdAt: policy.createdAt || policy.created || new Date().toISOString().split('T')[0],
+        coverageLevel: policy.coverageLevel || "STANDARD",
       }));
       
       setPolicies(mappedPolicies);
@@ -374,20 +387,18 @@ export default function PolicyManagement({
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/70 text-gray-600 text-xs uppercase font-semibold">
-                    <th className="py-4 px-4">Policy ID</th>
+                    <th className="py-4 px-4">Policy Number</th>
                     <th className="py-4 px-4">Farmer</th>
                     <th className="py-4 px-4">Crop</th>
-                    <th className="py-4 px-4">Coverage</th>
                     <th className="py-4 px-4">Premium</th>
                     <th className="py-4 px-4">Status</th>
-                    <th className="py-4 px-4">Risk</th>
                     <th className="py-4 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredPolicies.map((policy) => (
                     <tr key={policy.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-4 px-4 font-mono font-bold text-xs text-blue-600">{policy.id}</td>
+                      <td className="py-4 px-4 font-mono font-bold text-xs text-blue-600">{policy.policyNumber}</td>
                       <td className="py-4 px-4">
                         <div>
                           <div className="font-semibold text-gray-900">{policy.farmerName}</div>
@@ -397,16 +408,10 @@ export default function PolicyManagement({
                         </div>
                       </td>
                       <td className="py-4 px-4 capitalize font-semibold text-gray-900">{policy.cropType}</td>
-                      <td className="py-4 px-4 font-bold text-gray-900">{policy.coverageAmount.toLocaleString()} RWF</td>
                       <td className="py-4 px-4 font-semibold text-gray-700">{policy.premiumAmount.toLocaleString()} RWF</td>
                       <td className="py-4 px-4">
                         <Badge className={`${getStatusColor(policy.status)} border-0 text-[10px] font-bold shadow-none`}>
                           <span className="capitalize">{policy.status}</span>
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-4">
-                        <Badge className={`${getRiskLevelColor(policy.riskLevel)} border-0 text-[10px] font-bold shadow-none`}>
-                          <span>{policy.riskLevel} risk</span>
                         </Badge>
                       </td>
                       <td className="py-4 px-4 text-center">
