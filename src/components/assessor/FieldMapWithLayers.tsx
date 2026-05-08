@@ -275,6 +275,8 @@ export const FieldMapWithLayers = ({
   }, [boundary, selectedLayer, liveNdvi, hasLiveNdvi]);
 
   useEffect(() => {
+    if (!mapContainerRef.current) return;
+
     if (!boundary || !boundary.coordinates || !boundary.coordinates[0]) {
       const defaultCenter = center || [-1.9565, 30.0615];
       const map = L.map(mapContainerRef.current!).setView(
@@ -328,91 +330,127 @@ export const FieldMapWithLayers = ({
       ],
     };
 
-    boundaryLayerRef.current = L.geoJSON(fieldGeometry as any, {
-      style: {
-        color: "#ffffff",
-        weight: 3,
-        fillColor: "transparent",
-        fillOpacity: 0,
-      },
-    }).addTo(map);
+    try {
+      boundaryLayerRef.current = L.geoJSON(fieldGeometry as any, {
+        style: {
+          color: "#ffffff",
+          weight: 3,
+          fillColor: "transparent",
+          fillOpacity: 0,
+        },
+      }).addTo(map);
 
-    const bounds = boundaryLayerRef.current.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [30, 30], animate: false });
+      const bounds = boundaryLayerRef.current.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [30, 30], animate: false });
+      }
+    } catch (err) {
+      console.warn("Leaflet error initializing boundary layer:", err);
     }
 
     setMapInstance(map);
 
     return () => {
-      map.off();
-      map.remove();
+      try {
+        map.off();
+        map.remove();
+      } catch (err) {
+        console.warn("Leaflet error during map cleanup:", err);
+      }
       setMapInstance(null);
     };
   }, [boundary, center]);
 
   useEffect(() => {
-    if (!mapInstance) return;
+    if (!mapInstance || !mapInstance.getContainer() || !(mapInstance as any)._panes) return;
 
-    if (tileLayerRef.current) {
-      mapInstance.removeLayer(tileLayerRef.current);
+    try {
+      if (tileLayerRef.current) {
+        mapInstance.removeLayer(tileLayerRef.current);
+      }
+    } catch (e) {
+      console.warn("Leaflet error removing tile layer:", e);
     }
-    if (labelsLayerRef.current) {
-      mapInstance.removeLayer(labelsLayerRef.current);
-      labelsLayerRef.current = null;
+
+    try {
+      if (labelsLayerRef.current) {
+        mapInstance.removeLayer(labelsLayerRef.current);
+        labelsLayerRef.current = null;
+      }
+    } catch (e) {
+      console.warn("Leaflet error removing labels layer:", e);
     }
 
     const terrainConfig = terrainOptions[terrain];
-    tileLayerRef.current = L.tileLayer(terrainConfig.url, {
-      attribution: terrainConfig.attribution,
-    }).addTo(mapInstance);
-
-    if (terrainConfig.labelsUrl) {
-      labelsLayerRef.current = L.tileLayer(terrainConfig.labelsUrl, {
-        attribution: "",
+    try {
+      tileLayerRef.current = L.tileLayer(terrainConfig.url, {
+        attribution: terrainConfig.attribution,
       }).addTo(mapInstance);
+
+      if (terrainConfig.labelsUrl) {
+        labelsLayerRef.current = L.tileLayer(terrainConfig.labelsUrl, {
+          attribution: "",
+        }).addTo(mapInstance);
+      }
+    } catch (e) {
+      console.warn("Leaflet error adding tile layers:", e);
     }
 
-    if (indexLayerRef.current) {
-      indexLayerRef.current.bringToFront();
-    }
-    if (boundaryLayerRef.current) {
-      boundaryLayerRef.current.bringToFront();
-    }
+    try {
+      if (indexLayerRef.current) {
+        indexLayerRef.current.bringToFront();
+      }
+    } catch (e) {}
+
+    try {
+      if (boundaryLayerRef.current) {
+        boundaryLayerRef.current.bringToFront();
+      }
+    } catch (e) {}
   }, [mapInstance, terrain]);
 
   useEffect(() => {
-    if (!mapInstance) return;
+    if (!mapInstance || !mapInstance.getContainer() || !(mapInstance as any)._panes) return;
 
-    if (indexLayerRef.current) {
-      mapInstance.removeLayer(indexLayerRef.current);
-      indexLayerRef.current = null;
+    try {
+      if (indexLayerRef.current) {
+        mapInstance.removeLayer(indexLayerRef.current);
+        indexLayerRef.current = null;
+      }
+    } catch (e) {
+      console.warn("Leaflet error removing old index layer:", e);
     }
 
     if (selectedLayer === "none" || !indexData?.features?.length) return;
 
     const colors = layerConfig[selectedLayer].colors;
 
-    indexLayerRef.current = L.geoJSON(indexData as GeoJSON.GeoJsonObject, {
-      style: (feature) => {
-        const value = feature?.properties?.value || 0;
-        const colorIndex = Math.min(
-          Math.floor(value * colors.length),
-          colors.length - 1,
-        );
-        return {
-          color: colors[colorIndex],
-          weight: 0,
-          fillColor: colors[colorIndex],
-          fillOpacity: 0.75,
-        };
-      },
-    }).addTo(mapInstance);
+    try {
+      indexLayerRef.current = L.geoJSON(indexData as GeoJSON.GeoJsonObject, {
+        style: (feature) => {
+          const value = feature?.properties?.value || 0;
+          const colorIndex = Math.min(
+            Math.floor(value * colors.length),
+            colors.length - 1,
+          );
+          return {
+            color: colors[colorIndex],
+            weight: 0,
+            fillColor: colors[colorIndex],
+            fillOpacity: 0.75,
+          };
+        },
+      }).addTo(mapInstance);
+    } catch (e) {
+      console.warn("Leaflet error adding geoJSON index layer:", e);
+    }
 
     // Keep boundary on top
-    if (boundaryLayerRef.current) {
-      boundaryLayerRef.current.bringToFront();
-    }
+    try {
+      if (boundaryLayerRef.current) {
+        boundaryLayerRef.current.bringToFront();
+      }
+    } catch (e) {}
   }, [mapInstance, selectedLayer, indexData]);
 
   const currentLayerConfig = layerConfig[selectedLayer];

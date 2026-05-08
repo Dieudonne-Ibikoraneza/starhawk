@@ -61,13 +61,10 @@ interface Policy {
 interface PolicyDetailsViewProps {
   policy: Policy;
   onBack: () => void;
-  onEdit: (policy: Policy) => void;
-  onDelete: (policyId: string) => void;
 }
 
-export default function PolicyDetailsView({ policy, onBack, onEdit, onDelete }: PolicyDetailsViewProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedPolicy, setEditedPolicy] = useState<Policy>(policy);
+export default function PolicyDetailsView({ policy, onBack }: PolicyDetailsViewProps) {
+  const isEditing = false;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -98,17 +95,6 @@ export default function PolicyDetailsView({ policy, onBack, onEdit, onDelete }: 
     }
   };
 
-  const handleSave = () => {
-    // Here you would typically save the changes to your backend
-    setIsEditing(false);
-    onEdit(editedPolicy);
-  };
-
-  const handleCancel = () => {
-    setEditedPolicy(policy);
-    setIsEditing(false);
-  };
-
   // Claims and payments will be loaded from API in the future
   const mockClaims: any[] = [];
   const mockPayments: any[] = [];
@@ -132,31 +118,14 @@ export default function PolicyDetailsView({ policy, onBack, onEdit, onDelete }: 
             {getStatusIcon(policy.status)}
             <span className="ml-1 capitalize">{policy.status}</span>
           </Badge>
-          {!isEditing ? (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Policy
-              </Button>
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              <Button variant="outline">
-                <Share className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>
-                Save Changes
-              </Button>
-            </>
-          )}
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline">
+            <Share className="h-4 w-4 mr-2" />
+            Share
+          </Button>
         </div>
       </div>
 
@@ -506,24 +475,6 @@ export default function PolicyDetailsView({ policy, onBack, onEdit, onDelete }: 
         </TabsContent>
       </Tabs>
 
-      {/* Danger Zone */}
-      <Card className="border-red-200">
-        <CardHeader>
-          <CardTitle className="text-red-600">Danger Zone</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">Delete Policy</h3>
-              <p className="text-sm text-gray-500">Once deleted, this policy cannot be recovered.</p>
-            </div>
-            <Button variant="destructive" onClick={() => onDelete(policy.id)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Policy
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

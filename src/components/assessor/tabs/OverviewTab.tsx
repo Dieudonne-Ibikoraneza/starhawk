@@ -43,7 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { apiClient } from "@/lib/api";
+import assessmentsApiService from "@/services/assessmentsApi";
 
 interface OverviewTabProps {
   assessment: any;
@@ -111,19 +111,21 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
   const handleSubmitAssessment = async () => {
     setIsSubmitting(true);
     try {
-      await apiClient.updateAssessment(assessment._id, {
-        status: "COMPLETED",
+      // 1. Persist final risk score and comprehensive notes
+      await assessmentsApiService.updateAssessment(assessment._id, {
         riskScore: riskAssessment.score,
-        riskLevel: riskAssessment.level,
-        notes: notes || "",
-        completedAt: new Date().toISOString()
+        comprehensiveNotes: notes || "",
       });
+
+      // 2. Generate the official report which sets reportGenerated to true and transitions status to SUBMITTED
+      await assessmentsApiService.generateReport(assessment._id);
+
       toast.success("Assessment submitted successfully");
       setShowConfirmSubmit(false);
       if (onRefresh) onRefresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Submission failed:", error);
-      toast.error("Failed to submit assessment");
+      toast.error(error.message || "Failed to submit assessment");
     } finally {
       setIsSubmitting(false);
     }
@@ -210,12 +212,22 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   onChange={(e) => setComprehensiveNotes(e.target.value)}
                   placeholder="Write comprehensive feedback about the field assessment..."
                   className="min-h-[200px] text-sm text-slate-700 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500"
-                  disabled={assessment.status === 'COMPLETED'}
+                  disabled={
+                    assessment.status === "SUBMITTED" ||
+                    assessment.status === "APPROVED" ||
+                    assessment.status === "COMPLETED"
+                  }
                 />
                 <div className="flex justify-end">
                   <Button
                     onClick={saveNotes}
-                    disabled={isSaving || !hasChanges || assessment.status === 'COMPLETED'}
+                    disabled={
+                      isSaving ||
+                      !hasChanges ||
+                      assessment.status === "SUBMITTED" ||
+                      assessment.status === "APPROVED" ||
+                      assessment.status === "COMPLETED"
+                    }
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     {isSaving ? <Clock className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -267,9 +279,19 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
             </div>
             <div className="mt-6 text-center space-y-2">
               <p className="text-sm font-medium text-white/80">
-                Current assessment shows a <span className="font-bold text-white uppercase">{riskAssessment.level}</span> risk level.
+                {assessment.status === "SUBMITTED" ||
+                assessment.status === "APPROVED" ||
+                assessment.status === "COMPLETED" ? (
+                  <>
+                    Official report submitted with a <span className="font-bold text-white uppercase">{riskAssessment.level}</span> risk level.
+                  </>
+                ) : (
+                  <>
+                    Current assessment shows a <span className="font-bold text-white uppercase">{riskAssessment.level}</span> risk level.
+                  </>
+                )}
               </p>
-              <div className="pt-4 flex flex-wrap justify-center gap-2">
+              <div className="pt-4 flex flex-wrap justify-center items-center gap-2">
                 <Button 
                   size="sm" 
                   variant="secondary" 
@@ -280,7 +302,14 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   {isGenerating ? <Clock className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
                   PDF Dossier
                 </Button>
-                {assessment.status !== 'COMPLETED' && (
+                {assessment.status === "SUBMITTED" ||
+                assessment.status === "APPROVED" ||
+                assessment.status === "COMPLETED" ? (
+                  <div className="flex items-center gap-2 bg-emerald-950/40 text-white border border-white/20 h-9 px-4 rounded-full text-xs font-bold">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    Submitted to Insurer
+                  </div>
+                ) : (
                   <Button 
                     size="sm" 
                     className="bg-emerald-950/30 hover:bg-emerald-950/40 text-white border border-white/20 rounded-full font-bold h-9 px-4"

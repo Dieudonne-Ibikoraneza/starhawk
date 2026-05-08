@@ -77,10 +77,10 @@ import {
   Percent,
   Trash,
 } from "lucide-react";
-import OverviewTab from "./tabs/OverviewTab";
-import DroneTab from "./tabs/DroneTab";
-import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
-import { BasicInfoTab } from "./tabs/BasicInfoTab";
+import OverviewTab from "../assessor/tabs/OverviewTab";
+import DroneTab from "../assessor/tabs/DroneTab";
+import { WeatherAnalysisTab } from "../assessor/tabs/WeatherAnalysisTab";
+import { BasicInfoTab } from "../assessor/tabs/BasicInfoTab";
 import { useComprehensiveNotes } from "@/hooks/useComprehensiveNotes";
 import { calculateOverallRisk } from "@/utils/riskCalculation";
 
@@ -143,7 +143,7 @@ interface Assessment {
   reportGenerated: boolean;
 }
 
-export default function RiskAssessmentSystem(): JSX.Element {
+export default function InsurerRiskAssessmentSystem(): JSX.Element {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<"farmers" | "assessment">("farmers");
   const [farmers, setFarmers] = useState<Farmer[]>([]);

@@ -65,7 +65,9 @@ export default function ClaimsCarousel() {
         farmerName: claim.farmer?.firstName && claim.farmer?.lastName 
           ? `${claim.farmer.firstName} ${claim.farmer.lastName}` 
           : claim.farmer?.name || claim.farmerName || 'Unknown Farmer',
-        policyId: claim.policyId || claim.policy?._id || claim.policy?.id || '',
+        policyId: typeof claim.policyId === 'object' && claim.policyId !== null
+          ? (claim.policyId.policyNumber || claim.policyId._id || claim.policyId.id || '')
+          : (claim.policyId || claim.policy?._id || claim.policy?.id || ''),
         cropType: claim.cropType || claim.policy?.cropType || 'Unknown',
         claimAmount: claim.amount || claim.claimAmount || 0,
         status: claim.status || 'pending_review',

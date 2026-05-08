@@ -508,6 +508,7 @@ export const WeatherAnalysisTab = ({
         <CardContent className="pt-6">
           <div className="h-[400px] w-full">
             <ChartContainer
+              className="h-full w-full aspect-auto"
               config={{
                 maxTemp: { label: "Max Temp", color: "#ef4444" },
                 minTemp: { label: "Min Temp", color: "#3b82f6" },

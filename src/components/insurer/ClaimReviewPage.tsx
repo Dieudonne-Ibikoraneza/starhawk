@@ -296,7 +296,11 @@ export default function ClaimReviewPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label className="text-sm font-medium text-gray-700">Policy ID</Label>
-            <p className="text-lg font-semibold">{currentClaim?.policyId}</p>
+            <p className="text-lg font-semibold">
+              {typeof currentClaim?.policyId === 'object' && currentClaim?.policyId !== null 
+                ? (currentClaim?.policyId.policyNumber || currentClaim?.policyId._id || '—') 
+                : (currentClaim?.policyId || '—')}
+            </p>
           </div>
           <div>
             <Label className="text-sm font-medium text-gray-700">Crop Type</Label>

@@ -90,7 +90,15 @@ export const BasicInfoTab = ({
                 <p className="text-sm text-muted-foreground mb-1">
                   Sowing Date
                 </p>
-                <p className="font-medium">{sowingDate}</p>
+                <p className="font-medium">
+                  {!isNaN(new Date(sowingDate).getTime())
+                    ? new Date(sowingDate).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : sowingDate}
+                </p>
               </div>
             )}
             <div>

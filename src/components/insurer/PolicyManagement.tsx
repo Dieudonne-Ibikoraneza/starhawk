@@ -4,22 +4,14 @@ import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PolicyDetailsView from "./PolicyDetailsView";
-import { getPolicies, getPolicyById, updatePolicy as updatePolicyApi, deletePolicy as deletePolicyApi } from "@/services/policiesApi";
+import { getPolicies } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Plus,
   Search,
   Filter,
-  Edit,
-  Trash2,
   Eye,
-  Download,
-  Upload,
   Shield,
   User,
   MapPin,
@@ -49,10 +41,14 @@ interface Policy {
 }
 
 interface PolicyManagementProps {
-  onNavigateToCreate?: () => void;
+  selectedPolicyIdFromNav?: string | null;
+  onClearPolicyNav?: () => void;
 }
 
-export default function PolicyManagement({ onNavigateToCreate }: PolicyManagementProps = {}) {
+export default function PolicyManagement({ 
+  selectedPolicyIdFromNav, 
+  onClearPolicyNav 
+}: PolicyManagementProps = {}) {
   const { toast } = useToast();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,15 +57,25 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cropFilter, setCropFilter] = useState("all");
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null);
 
   // Load policies from API
   useEffect(() => {
     loadPolicies();
   }, []);
+
+  // Handle auto-linking from claims
+  useEffect(() => {
+    if (selectedPolicyIdFromNav && policies.length > 0) {
+      const found = policies.find(p => p.id === selectedPolicyIdFromNav);
+      if (found) {
+        setViewingPolicy(found);
+      }
+      if (onClearPolicyNav) {
+        onClearPolicyNav();
+      }
+    }
+  }, [selectedPolicyIdFromNav, policies]);
 
   const loadPolicies = async () => {
     setLoading(true);
@@ -87,17 +93,38 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
       // Map API response to Policy interface
       const mappedPolicies: Policy[] = policiesData.map((policy: any) => ({
         id: policy._id || policy.id || '',
-        farmerId: policy.farmerId || policy.farmer?._id || policy.farmer?.id || '',
-        farmerName: policy.farmer?.firstName && policy.farmer?.lastName 
-          ? `${policy.farmer.firstName} ${policy.farmer.lastName}` 
-          : policy.farmer?.name || policy.farmerName || 'Unknown Farmer',
+        farmerId: typeof policy.farmerId === 'object' && policy.farmerId
+          ? (policy.farmerId._id || policy.farmerId.id || '') 
+          : (policy.farmerId || policy.farmer?._id || policy.farmer?.id || ''),
+        farmerName: (() => {
+          const f = (typeof policy.farmerId === 'object' && policy.farmerId) || policy.farmer || {};
+          if (f.firstName && f.lastName) return `${f.firstName} ${f.lastName}`;
+          if (f.name) return f.name;
+          if (typeof policy.farmerName === 'string') return policy.farmerName;
+          return 'Unknown Farmer';
+        })(),
         cropType: policy.cropType || 'Unknown',
         coverageAmount: policy.coverageAmount || policy.coverage || 0,
         premiumAmount: policy.premiumAmount || policy.premium || 0,
         startDate: policy.startDate || policy.validityPeriod?.start || new Date().toISOString().split('T')[0],
-        endDate: policy.endDate || policy.validityPeriod?.end || policy.validityPeriod || new Date().toISOString().split('T')[0],
+        endDate: policy.endDate || 
+                 policy.validityPeriod?.end || 
+                 (typeof policy.validityPeriod === 'string' ? policy.validityPeriod : '') || 
+                 new Date().toISOString().split('T')[0],
         status: (policy.status || 'pending').toLowerCase() as "active" | "pending" | "expired" | "cancelled",
-        location: policy.location || policy.farm?.location || 'Unknown',
+        location: (() => {
+          const loc = policy.location || policy.farm?.location;
+          if (!loc) return 'Unknown';
+          if (typeof loc === 'string') return loc;
+          if (typeof loc === 'object') {
+            if (loc.coordinates && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+              return `GPS: [${Number(loc.coordinates[1])?.toFixed(4)}, ${Number(loc.coordinates[0])?.toFixed(4)}]`;
+            }
+            if (loc.type) return `GeoJSON: ${loc.type}`;
+            return JSON.stringify(loc);
+          }
+          return 'Unknown';
+        })(),
         farmSize: policy.farmSize || policy.farm?.size || 0,
         riskLevel: (policy.riskLevel || 'medium').toLowerCase() as "low" | "medium" | "high",
         deductible: policy.deductible || 0,
@@ -117,22 +144,6 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
       setLoading(false);
     }
   };
-
-
-  // Form state for edit
-  const [formData, setFormData] = useState({
-    farmerId: "",
-    farmerName: "",
-    cropType: "",
-    coverageAmount: "",
-    premiumAmount: "",
-    startDate: "",
-    endDate: "",
-    location: "",
-    farmSize: "",
-    riskLevel: "low",
-    deductible: ""
-  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -173,108 +184,6 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
     return matchesSearch && matchesStatus && matchesCrop;
   });
 
-
-  const handleEditPolicy = async () => {
-    if (!selectedPolicy) return;
-
-    try {
-      const updateData = {
-        coverageAmount: parseFloat(formData.coverageAmount),
-        premium: parseFloat(formData.premiumAmount),
-        endDate: formData.endDate,
-        status: selectedPolicy.status,
-        notes: formData.location ? `Location: ${formData.location}` : undefined,
-      };
-
-      await updatePolicyApi(selectedPolicy.id, updateData);
-      
-      toast({
-        title: "Success",
-        description: "Policy updated successfully",
-        variant: "default",
-      });
-      
-      // Reload policies
-      loadPolicies();
-      setIsEditDialogOpen(false);
-      setSelectedPolicy(null);
-      resetForm();
-    } catch (err: any) {
-      console.error('Failed to update policy:', err);
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to update policy',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeletePolicy = async (policyId: string) => {
-    if (!confirm('Are you sure you want to delete this policy?')) {
-      return;
-    }
-
-    try {
-      await deletePolicyApi(policyId);
-      
-      toast({
-        title: "Success",
-        description: "Policy deleted successfully",
-        variant: "default",
-      });
-      
-      // Reload policies
-      loadPolicies();
-    } catch (err: any) {
-      console.error('Failed to delete policy:', err);
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to delete policy',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateStatus = async (policyId: string, newStatus: Policy["status"]) => {
-    try {
-      await updatePolicyApi(policyId, { status: newStatus });
-      
-      toast({
-        title: "Success",
-        description: "Policy status updated successfully",
-        variant: "default",
-      });
-      
-      // Reload policies
-      loadPolicies();
-    } catch (err: any) {
-      console.error('Failed to update policy status:', err);
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to update policy status',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const openEditDialog = (policy: Policy) => {
-    setSelectedPolicy(policy);
-    setFormData({
-      farmerId: policy.farmerId,
-      farmerName: policy.farmerName,
-      cropType: policy.cropType,
-      coverageAmount: policy.coverageAmount.toString(),
-      premiumAmount: policy.premiumAmount.toString(),
-      startDate: policy.startDate,
-      endDate: policy.endDate,
-      location: policy.location,
-      farmSize: policy.farmSize.toString(),
-      riskLevel: policy.riskLevel,
-      deductible: policy.deductible.toString()
-    });
-    setIsEditDialogOpen(true);
-  };
-
   const handleViewPolicy = (policy: Policy) => {
     setViewingPolicy(policy);
   };
@@ -283,167 +192,27 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
     setViewingPolicy(null);
   };
 
-  const handleEditFromDetails = (updatedPolicy: Policy) => {
-    setPolicies(policies.map(policy => 
-      policy.id === updatedPolicy.id ? updatedPolicy : policy
-    ));
-  };
-
-  const handleCreateClick = () => {
-    if (onNavigateToCreate) {
-      onNavigateToCreate();
-    }
-  };
-
-  const renderEditPolicyForm = () => (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="edit-cropType">Crop Type</Label>
-          <Select value={formData.cropType} onValueChange={(value) => setFormData({...formData, cropType: value})}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select crop type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="maize">Maize</SelectItem>
-              <SelectItem value="rice">Rice</SelectItem>
-              <SelectItem value="potatoes">Potatoes</SelectItem>
-              <SelectItem value="beans">Beans</SelectItem>
-              <SelectItem value="wheat">Wheat</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-farmSize">Farm Size (hectares)</Label>
-          <Input
-            id="edit-farmSize"
-            type="number"
-            value={formData.farmSize}
-            onChange={(e) => setFormData({...formData, farmSize: e.target.value})}
-            placeholder="Enter farm size"
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="edit-coverageAmount">Coverage Amount (RWF)</Label>
-          <Input
-            id="edit-coverageAmount"
-            type="number"
-            value={formData.coverageAmount}
-            onChange={(e) => setFormData({...formData, coverageAmount: e.target.value})}
-            placeholder="Enter coverage amount"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-premiumAmount">Premium Amount (RWF)</Label>
-          <Input
-            id="edit-premiumAmount"
-            type="number"
-            value={formData.premiumAmount}
-            onChange={(e) => setFormData({...formData, premiumAmount: e.target.value})}
-            placeholder="Enter premium amount"
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="edit-startDate">Start Date</Label>
-          <Input
-            id="edit-startDate"
-            type="date"
-            value={formData.startDate}
-            onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-endDate">End Date</Label>
-          <Input
-            id="edit-endDate"
-            type="date"
-            value={formData.endDate}
-            onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="edit-location">Location</Label>
-          <Input
-            id="edit-location"
-            value={formData.location}
-            onChange={(e) => setFormData({...formData, location: e.target.value})}
-            placeholder="Enter location"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-riskLevel">Risk Level</Label>
-          <Select value={formData.riskLevel} onValueChange={(value) => setFormData({...formData, riskLevel: value})}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select risk level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low Risk</SelectItem>
-              <SelectItem value="medium">Medium Risk</SelectItem>
-              <SelectItem value="high">High Risk</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="edit-deductible">Deductible (RWF)</Label>
-        <Input
-          id="edit-deductible"
-          type="number"
-          value={formData.deductible}
-          onChange={(e) => setFormData({...formData, deductible: e.target.value})}
-          placeholder="Enter deductible amount"
-        />
-      </div>
-    </div>
-  );
-
   // If viewing a specific policy, show the details view
   if (viewingPolicy) {
     return (
       <PolicyDetailsView
         policy={viewingPolicy}
         onBack={handleBackToList}
-        onEdit={handleEditFromDetails}
-        onDelete={handleDeletePolicy}
       />
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Policy Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage insurance policies for farmers</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            onClick={() => setViewMode(viewMode === "table" ? "grid" : "table")}
-          >
-            {viewMode === "table" ? "Grid View" : "Table View"}
-          </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateClick}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Policy
-              </Button>
-        </div>
+      <div className="mb-4">
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Policy Management</h1>
+        <p className="text-sm text-gray-600 mt-1">Review active and historical crop insurance policies</p>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
+      <Card className="border border-gray-100 shadow-sm bg-white/70 backdrop-blur-md rounded-2xl">
+        <CardContent className="p-5">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -452,13 +221,13 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
                   placeholder="Search policies by farmer name, ID, or policy ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 border-gray-200 focus-visible:ring-blue-500 rounded-xl"
                 />
               </div>
             </div>
             <div className="flex gap-3">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 h-11 border-gray-200 rounded-xl">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -470,7 +239,7 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
                 </SelectContent>
               </Select>
               <Select value={cropFilter} onValueChange={setCropFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 h-11 border-gray-200 rounded-xl">
                   <SelectValue placeholder="Crop Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -488,81 +257,79 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
 
       {/* Error Message */}
       {error && (
-        <Card className="bg-red-900/20 border-red-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
-                <p className="text-red-400">{error}</p>
-              </div>
-              <Button
-                onClick={loadPolicies}
-                variant="outline"
-                size="sm"
-                className="border-gray-700 text-white hover:bg-gray-800"
-              >
-                Retry
-              </Button>
+        <Card className="bg-red-50 border-red-200 rounded-2xl">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <p className="text-red-700 font-medium">{error}</p>
             </div>
+            <Button
+              onClick={loadPolicies}
+              variant="outline"
+              size="sm"
+              className="border-red-200 text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </Button>
           </CardContent>
         </Card>
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
+      <div className="grid gap-5 grid-cols-2 md:grid-cols-4">
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-white/70">Total Policies</p>
-                <p className="text-2xl font-bold text-white">{policies.length}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Total Policies</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{policies.length}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Shield className="h-6 w-6 text-blue-600" />
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+                <Shield className="h-5 w-5 text-blue-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-white/70">Active Policies</p>
-                <p className="text-2xl font-bold text-white">{policies.filter(p => p.status === 'active').length}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Active Policies</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{policies.filter(p => p.status === 'active').length}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
+              <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center border border-green-100">
+                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-white/70">Pending Policies</p>
-                <p className="text-2xl font-bold text-white">{policies.filter(p => p.status === 'pending').length}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Pending Policies</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{policies.filter(p => p.status === 'pending').length}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
+              <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center border border-yellow-100">
+                <Clock className="h-5 w-5 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-white/70">Total Coverage</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-xs font-semibold text-gray-500 uppercase">Total Coverage</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
                   {(policies.reduce((sum, p) => sum + p.coverageAmount, 0) / 1000000).toFixed(1)}M RWF
                 </p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-purple-600" />
+              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center border border-purple-100">
+                <DollarSign className="h-5 w-5 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -570,23 +337,23 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
       </div>
 
       {/* Policies Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Policies ({filteredPolicies.length})</CardTitle>
+      <Card className="border border-gray-100 shadow-sm bg-white rounded-2xl">
+        <CardHeader className="pb-3 border-b border-gray-100">
+          <CardTitle className="text-lg font-bold text-gray-900">Policies ({filteredPolicies.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <div className="text-center">
-                <Clock className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
-                <p className="text-white/60">Loading policies...</p>
+                <Clock className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">Loading policies...</p>
               </div>
             </div>
           ) : filteredPolicies.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <div className="text-center">
-                <Shield className="h-12 w-12 mx-auto mb-4 text-white/40" />
-                <p className="text-white/60">No policies found</p>
+                <Shield className="h-10 w-10 mx-auto mb-3 text-gray-400" />
+                <p className="text-gray-500 text-sm">No policies found</p>
                 {searchTerm || statusFilter !== "all" || cropFilter !== "all" ? (
                   <Button
                     variant="outline"
@@ -595,7 +362,7 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
                       setStatusFilter("all");
                       setCropFilter("all");
                     }}
-                    className="mt-4"
+                    className="mt-3 rounded-xl border-gray-200"
                   >
                     Clear Filters
                   </Button>
@@ -604,83 +371,55 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm text-left">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-medium">Policy ID</th>
-                    <th className="text-left p-3 font-medium">Farmer</th>
-                    <th className="text-left p-3 font-medium">Crop</th>
-                    <th className="text-left p-3 font-medium">Coverage</th>
-                    <th className="text-left p-3 font-medium">Premium</th>
-                    <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-left p-3 font-medium">Risk</th>
-                    <th className="text-left p-3 font-medium">Actions</th>
+                  <tr className="border-b border-gray-100 bg-gray-50/70 text-gray-600 text-xs uppercase font-semibold">
+                    <th className="py-4 px-4">Policy ID</th>
+                    <th className="py-4 px-4">Farmer</th>
+                    <th className="py-4 px-4">Crop</th>
+                    <th className="py-4 px-4">Coverage</th>
+                    <th className="py-4 px-4">Premium</th>
+                    <th className="py-4 px-4">Status</th>
+                    <th className="py-4 px-4">Risk</th>
+                    <th className="py-4 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {filteredPolicies.map((policy) => (
-                  <tr key={policy.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-medium">{policy.id}</td>
-                    <td className="p-3">
-                      <div>
-                        <div className="font-medium">{policy.farmerName}</div>
-                        <div className="text-sm text-gray-500">{policy.farmerId}</div>
-                      </div>
-                    </td>
-                    <td className="p-3">{policy.cropType}</td>
-                    <td className="p-3">{policy.coverageAmount.toLocaleString()} RWF</td>
-                    <td className="p-3">{policy.premiumAmount.toLocaleString()} RWF</td>
-                    <td className="p-3">
-                      <Badge className={getStatusColor(policy.status)}>
-                        {getStatusIcon(policy.status)}
-                        <span className="ml-1 capitalize">{policy.status}</span>
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <Badge className={getRiskLevelColor(policy.riskLevel)}>
-                        {policy.riskLevel} risk
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center space-x-2">
+                    <tr key={policy.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-4 font-mono font-bold text-xs text-blue-600">{policy.id}</td>
+                      <td className="py-4 px-4">
+                        <div>
+                          <div className="font-semibold text-gray-900">{policy.farmerName}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                            <MapPin className="h-2.5 w-2.5" /> {policy.location}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 capitalize font-semibold text-gray-900">{policy.cropType}</td>
+                      <td className="py-4 px-4 font-bold text-gray-900">{policy.coverageAmount.toLocaleString()} RWF</td>
+                      <td className="py-4 px-4 font-semibold text-gray-700">{policy.premiumAmount.toLocaleString()} RWF</td>
+                      <td className="py-4 px-4">
+                        <Badge className={`${getStatusColor(policy.status)} border-0 text-[10px] font-bold shadow-none`}>
+                          <span className="capitalize">{policy.status}</span>
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4">
+                        <Badge className={`${getRiskLevelColor(policy.riskLevel)} border-0 text-[10px] font-bold shadow-none`}>
+                          <span>{policy.riskLevel} risk</span>
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4 text-center">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleViewPolicy(policy)}
+                          className="h-8 w-8 p-0 rounded-lg hover:bg-gray-100"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 text-gray-600" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(policy)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeletePolicy(policy.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Select
-                          value={policy.status}
-                          onValueChange={(value) => handleUpdateStatus(policy.id, value as Policy["status"])}
-                        >
-                          <SelectTrigger className="w-24 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -688,24 +427,6 @@ export default function PolicyManagement({ onNavigateToCreate }: PolicyManagemen
           )}
         </CardContent>
       </Card>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Policy - {selectedPolicy?.id}</DialogTitle>
-          </DialogHeader>
-          {renderEditPolicyForm()}
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditPolicy}>
-              Update Policy
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

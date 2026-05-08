@@ -28,10 +28,10 @@ import { getUserId } from "@/services/authAPI";
 import { getFarmById } from "@/services/farmsApi";
 import { useToast } from "@/hooks/use-toast";
 import LeafletMap from "@/components/common/LeafletMap";
-import { LossBasicInfoTab } from "./tabs/loss/LossBasicInfoTab";
-import { LossEvidenceTab } from "./tabs/loss/LossEvidenceTab";
-import { LossDetailsTab } from "./tabs/loss/LossDetailsTab";
-import { LossOverviewTab } from "./tabs/loss/LossOverviewTab";
+import { LossBasicInfoTab } from "../assessor/tabs/loss/LossBasicInfoTab";
+import { LossEvidenceTab } from "../assessor/tabs/loss/LossEvidenceTab";
+import { LossDetailsTab } from "../assessor/tabs/loss/LossDetailsTab";
+import { LossOverviewTab } from "../assessor/tabs/loss/LossOverviewTab";
 
 interface LossAssessment {
   id: string;
@@ -49,7 +49,7 @@ interface LossAssessment {
   status: string;
 }
 
-export default function LossAssessmentSystem() {
+export default function InsurerLossAssessmentSystem() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssessment, setSelectedAssessment] = useState<LossAssessment | null>(null);

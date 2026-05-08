@@ -144,29 +144,29 @@ export class ApiClient {
 
   // Assessor endpoints
   async getAssessorDashboard() {
-    return this.request("/assessor/dashboard");
+    return this.request("/assessments");
   }
 
   async getPendingAssessments() {
-    return this.request("/assessor/assessments/pending");
+    return this.request("/assessments");
   }
 
   async createAssessment(assessmentData: any) {
-    return this.request("/assessor/assessments", {
+    return this.request("/assessments", {
       method: "POST",
       body: JSON.stringify(assessmentData),
     });
   }
 
   async updateAssessment(assessmentId: string, updateData: any) {
-    return this.request(`/assessor/assessments/${assessmentId}`, {
+    return this.request(`/assessments/${assessmentId}`, {
       method: "PUT",
       body: JSON.stringify(updateData),
     });
   }
 
   async getAssessments() {
-    return this.request("/assessor/assessments");
+    return this.request("/assessments");
   }
 
   // Government endpoints

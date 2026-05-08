@@ -7,7 +7,8 @@ import ClaimsTable from "../insurer/ClaimsTable";
 import PolicyManagement from "../insurer/PolicyManagement";
 import CreatePolicyPage from "../insurer/CreatePolicyPage";
 import RiskReviewManagement from "../insurer/RiskReviewManagement";
-import RiskAssessmentSystem from "../assessor/RiskAssessmentSystem";
+import InsurerRiskAssessmentDetail from "../insurer/InsurerRiskAssessmentDetail";
+import InsurerCropMonitoringSystem from "../insurer/InsurerCropMonitoringSystem";
 import { getUserId, getPhoneNumber, getEmail, isAuthenticated, getToken } from "@/services/authAPI";
 import { getUserProfile, getAssessors } from "@/services/usersAPI";
 import { getPolicies } from "@/services/policiesApi";
@@ -29,6 +30,7 @@ import {
   Bell,
   Settings,
   Shield,
+  Activity,
   FileText,
   CheckCircle,
   AlertTriangle,
@@ -41,6 +43,8 @@ import {
 
 export default function InsurerDashboard() {
   const [activePage, setActivePage] = useState("dashboard");
+  const [selectedRiskAssessmentId, setSelectedRiskAssessmentId] = useState<string | null>(null);
+  const [selectedMonitoringId, setSelectedMonitoringId] = useState<string | null>(null);
   const { toast } = useToast();
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [claimsSummary, setClaimsSummary] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -503,6 +507,56 @@ export default function InsurerDashboard() {
     }
   };
 
+  const handleApproveAssessment = async () => {
+    if (!approveRejectDialog.assessment) return;
+    setProcessingApproval(true);
+    try {
+      const id = approveRejectDialog.assessment._id || approveRejectDialog.assessment.id;
+      await assessmentsApiService.approveAssessment(id);
+      toast({
+        title: "Success",
+        description: "Assessment approved successfully",
+      });
+      setApproveRejectDialog({ open: false, assessment: null, action: null });
+      await loadSubmittedAssessments();
+    } catch (err: any) {
+      console.error("Failed to approve assessment:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to approve assessment",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingApproval(false);
+    }
+  };
+
+  const handleRejectAssessment = async () => {
+    if (!approveRejectDialog.assessment || !rejectionReason.trim()) return;
+    setProcessingApproval(true);
+    try {
+      const id = approveRejectDialog.assessment._id || approveRejectDialog.assessment.id;
+      await assessmentsApiService.rejectAssessment(id, rejectionReason);
+      toast({
+        title: "Success",
+        description: "Assessment rejected successfully",
+      });
+      setApproveRejectDialog({ open: false, assessment: null, action: null });
+      setRejectionReason("");
+      await loadSubmittedAssessments();
+    } catch (err: any) {
+      console.error("Failed to reject assessment:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to reject assessment",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingApproval(false);
+    }
+  };
+
+
   const StatCard = ({ icon: Icon, title, value, delta, deltaPositive }: { icon: any, title: string, value: string | number, delta?: string, deltaPositive?: boolean }) => (
     <Card className="bg-white border-gray-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -555,7 +609,12 @@ export default function InsurerDashboard() {
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className="capitalize text-gray-700 border-gray-300">{(c.status || 'unknown').toLowerCase()}</Badge>
                       <div className="text-sm">
-                        <div className="font-medium text-gray-900">{c.policyNumber || c.policyId || '—'}</div>
+                        <div className="font-medium text-gray-900">
+                          {c.policyNumber || 
+                           (typeof c.policyId === 'object' && c.policyId !== null 
+                             ? (c.policyId.policyNumber || c.policyId._id || '—') 
+                             : (c.policyId || '—'))}
+                        </div>
                         <div className="text-xs text-gray-600">{c.lossEventType || 'Claim'}</div>
                       </div>
                     </div>
@@ -704,7 +763,21 @@ export default function InsurerDashboard() {
     </div>
   );
 
-  const renderSubmittedAssessments = () => (
+  const renderSubmittedAssessments = () => {
+    if (selectedRiskAssessmentId) {
+      return (
+        <InsurerRiskAssessmentDetail 
+          assessmentId={selectedRiskAssessmentId} 
+          onBack={() => setSelectedRiskAssessmentId(null)}
+          onActionComplete={() => {
+            setSelectedRiskAssessmentId(null);
+            loadSubmittedAssessments();
+          }}
+        />
+      );
+    }
+    
+    return (
     <div className="space-y-4">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
@@ -791,35 +864,14 @@ export default function InsurerDashboard() {
                             : "N/A"}
                         </td>
                         <td className="py-1 px-2">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setApproveRejectDialog({ open: true, assessment, action: 'approve' })}
-                              className="border-green-600 text-green-600 hover:bg-green-50 text-xs h-6 px-2"
-                            >
-                              <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setApproveRejectDialog({ open: true, assessment, action: 'reject' })}
-                              className="border-red-600 text-red-600 hover:bg-red-50 text-xs h-6 px-2"
-                            >
-                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-                              Reject
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setCreatePolicyDialog({ open: true, assessment })}
-                              className="border-blue-600 text-blue-600 hover:bg-blue-50 text-xs h-6 px-2"
-                            >
-                              <Shield className="h-2.5 w-2.5 mr-0.5" />
-                              Policy
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => setSelectedRiskAssessmentId(assessment._id || assessment.id)}
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-xl shadow-none text-xs font-bold px-4 h-6"
+                          >
+                            <Eye className="h-3 w-3 mr-1.5" />
+                            View Details
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -832,6 +884,7 @@ export default function InsurerDashboard() {
       )}
     </div>
   );
+};
 
   const [policyKey, setPolicyKey] = useState(0);
 
@@ -839,13 +892,12 @@ export default function InsurerDashboard() {
     switch (activePage) {
       case "dashboard": return renderDashboard();
       case "insurance-requests": return renderInsuranceRequests();
-      case "submitted-assessments": return renderSubmittedAssessments();
-      case "risk-reviews": return <RiskReviewManagement />;
+      case "risk-assessments": return renderSubmittedAssessments();
+      case "crop-monitoring": return <InsurerCropMonitoringSystem />;
       case "claim-reviews": return <ClaimsTable />;
       case "claim-review-detail": return <ClaimReviewPage />;
       case "policy-management": return <PolicyManagement key={policyKey} onNavigateToCreate={() => setActivePage('create-policy')} />;
       case "create-policy": return <CreatePolicyPage onBack={() => { setActivePage('policy-management'); setPolicyKey(prev => prev + 1); }} onSuccess={() => { setActivePage('policy-management'); setPolicyKey(prev => prev + 1); }} />;
-      case "risk-assessments": return <RiskAssessmentSystem />;
       case "notifications": return <InsurerNotifications />;
       case "profile-settings": return <InsurerProfileSettings />;
       default: return renderDashboard();
@@ -855,11 +907,10 @@ export default function InsurerDashboard() {
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "insurance-requests", label: "Insurance Requests", icon: Shield },
-    { id: "submitted-assessments", label: "Submitted Assessments", icon: CheckCircle },
-    { id: "risk-reviews", label: "Risk Reviews", icon: Shield },
+    { id: "risk-assessments", label: "Risk Assessments", icon: CheckCircle },
+    { id: "policy-management", label: "Policy Management", icon: Shield },
+    { id: "crop-monitoring", label: "Crop Monitoring", icon: Activity },
     { id: "claim-reviews", label: "Claim Reviews", icon: FileText },
-    { id: "policy-management", label: "Policy Management", icon: CheckCircle },
-    { id: "risk-assessments", label: "Risk Assessments", icon: AlertTriangle },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "profile-settings", label: "Profile Settings", icon: Settings }
   ];
@@ -889,7 +940,9 @@ export default function InsurerDashboard() {
         window.location.href = '/role-selection';
       }}
     >
-      {renderPage()}
+      <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+        {renderPage()}
+      </div>
 
       {/* Create Assessment Dialog */}
       <Dialog open={createAssessmentDialog.open} onOpenChange={(open) => {
