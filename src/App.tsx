@@ -27,6 +27,7 @@ import { EmailNotificationSystem } from "./components/notifications/EmailNotific
 import Services from "./pages/Services";
 import NotFound from "./pages/NotFound";
 import UserDetailsPage from "./pages/UserDetailsPage";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => {
               {/* Role Selection and Authentication Routes */}
               <Route path="/role-selection" element={<RoleSelection />} />
               <Route path="/farmer-register" element={<FarmerRegistration />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               
               {/* Dashboard Routes */}
               <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
