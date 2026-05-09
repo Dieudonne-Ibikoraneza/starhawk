@@ -50,7 +50,7 @@ import {
 import MyFarmsTab from "../farmer/tabs/MyFarmsTab";
 import InsurersTab from "../farmer/tabs/InsurersTab";
 import InsuranceTab from "../farmer/tabs/InsuranceTab";
-import ReportsTab from "../farmer/tabs/ReportsTab";
+import ClaimsTab from "../farmer/tabs/ClaimsTab";
 import MonitoringTab from "../farmer/tabs/MonitoringTab";
 import FarmDetailsTab from "../farmer/tabs/FarmDetailsTab";
 import PolicyDetailsTab from "../farmer/tabs/PolicyDetailsTab";
@@ -1015,8 +1015,8 @@ export default function FarmerDashboard() {
       });
       setUploadedFiles([]);
       
-      // Navigate to loss reports to see the new claim
-      setActivePage("loss-reports");
+      // Navigate to claims to see the new claim
+      setActivePage("claims");
       loadAllReports();
     } catch (err: any) {
       console.error('Failed to file claim:', err);
@@ -1907,7 +1907,7 @@ export default function FarmerDashboard() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setActivePage("loss-reports")}
+                onClick={() => setActivePage("claims")}
                 className="border-gray-300 text-gray-900 hover:bg-gray-50"
               >
                 Cancel
@@ -2190,7 +2190,12 @@ export default function FarmerDashboard() {
         );
       case "notifications": return <NotificationsTab />;
       case "file-claim": return renderFileClaim();
-      case "reports": return <ReportsTab />;
+      case "claims":
+        return (
+          <ClaimsTab 
+            onFileClaim={() => setActivePage("file-claim")} 
+          />
+        );
       case "farm-details": 
         const activePolicy = policies.find(p => {
           const pFarmId = typeof p.farmId === 'object' ? p.farmId?._id || p.farmId?.id : p.farmId;
@@ -2227,7 +2232,6 @@ export default function FarmerDashboard() {
             }}
           />
         );
-      case "loss-reports": return <ReportsTab />;
       case "profile": return renderProfileSettings();
       default: return renderDashboard();
     }
@@ -2240,7 +2244,7 @@ export default function FarmerDashboard() {
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "insurers", label: "Insurers", icon: Building2 },
     { id: "insurance", label: "Insurance", icon: Shield },
-    { id: "reports", label: "Reports", icon: FileText },
+    { id: "claims", label: "Claims", icon: FileText },
     { id: "file-claim", label: "File Claim", icon: AlertTriangle },
     { id: "profile", label: "Profile", icon: User }
   ];
