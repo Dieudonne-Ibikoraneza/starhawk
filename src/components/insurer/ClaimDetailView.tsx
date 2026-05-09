@@ -311,7 +311,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
               <CardTitle className="text-base font-semibold text-gray-900">Review Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {claim.status === "pending_review" && !showApprovalForm && !showRejectionForm && (
+              {!["approved", "rejected"].includes(claim.status?.toLowerCase()) && !showApprovalForm && !showRejectionForm && (
                 <>
                   <Button 
                     onClick={() => setShowApprovalForm(true)}
@@ -404,7 +404,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
                 </div>
               )}
 
-              {claim.status !== "pending_review" && (
+              {["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
                 <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 border border-gray-100 rounded-lg text-center">
                   <CheckCircle className="h-8 w-8 text-green-600" />
                   <p className="text-sm font-semibold text-gray-900">Review Completed</p>
