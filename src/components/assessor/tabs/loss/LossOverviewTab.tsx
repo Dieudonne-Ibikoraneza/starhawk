@@ -31,7 +31,7 @@ import {
 import { ClaimReportGenerator } from "@/utils/claimReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAssessmentById } from "@/lib/api/hooks/useClaims";
+import { useAssessmentById, useClaimPdfs } from "@/lib/api/hooks/useClaims";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +70,8 @@ export const LossOverviewTab = ({
 
   const { data: fetchedAssessment, isLoading: isAssessmentLoading } =
     useAssessmentById(assessmentId);
+
+  const { data: dronePdfs = [] } = useClaimPdfs(claim._id);
 
   const assessment = fetchedAssessment || assessmentFromClaim;
 
@@ -166,7 +168,7 @@ export const LossOverviewTab = ({
   const canSubmit =
     observations.length > 0 &&
     reportText.trim().length > 0 &&
-    (assessment?.droneAnalysisPdfs?.length || 0) > 0;
+    (dronePdfs.length > 0 || (assessment?.droneAnalysisPdfs?.length || 0) > 0);
 
   const handleExport = async () => {
     if (!assessment) return;
@@ -187,7 +189,7 @@ export const LossOverviewTab = ({
       await generator.generate(
         claim,
         currentData,
-        assessment.droneAnalysisPdfs || [],
+        dronePdfs.length > 0 ? dronePdfs : (assessment?.droneAnalysisPdfs || []),
       );
       toast({
         title: "Report Exported",
