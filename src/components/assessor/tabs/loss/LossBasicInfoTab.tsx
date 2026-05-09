@@ -34,6 +34,14 @@ export const LossBasicInfoTab = ({
       ? ([locationCoords[1], locationCoords[0]] as [number, number])
       : undefined;
 
+  const dateFiled = claim.filedAt || claim.filedDate || claim.createdAt;
+  const lossEventDate = claim.lossEventDate || claim.incidentDate;
+  const lossDescription = claim.lossDescription || claim.description;
+  const estimatedLoss = claim.estimatedLoss !== undefined && claim.estimatedLoss !== null 
+    ? claim.estimatedLoss 
+    : (claim.claimAmount || claim.amount || undefined);
+  const damagePhotos = claim.damagePhotos || (claim as any).photos || [];
+
   const formatSowingDate = (sowingDate?: string): string => {
     if (!sowingDate) return "N/A";
     try {
@@ -183,12 +191,12 @@ export const LossBasicInfoTab = ({
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Date Filed</p>
-                  <p className="font-medium">{new Date(claim.filedAt).toLocaleDateString()}</p>
+                  <p className="font-medium">{dateFiled ? new Date(dateFiled).toLocaleDateString() : "N/A"}</p>
                 </div>
-                {claim.lossEventDate && (
+                {lossEventDate && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Incident Date</p>
-                    <p className="font-medium">{new Date(claim.lossEventDate).toLocaleDateString()}</p>
+                    <p className="font-medium">{new Date(lossEventDate).toLocaleDateString()}</p>
                   </div>
                 )}
                 <div>
@@ -205,28 +213,28 @@ export const LossBasicInfoTab = ({
                     {claim.status.replace("_", " ")}
                   </Badge>
                 </div>
-                {claim.estimatedLoss !== undefined && claim.estimatedLoss !== null && (
+                {estimatedLoss !== undefined && estimatedLoss !== null && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Estimated Loss</p>
-                    <p className="font-black text-xl text-amber-600">{claim.estimatedLoss.toLocaleString()} RWF</p>
+                    <p className="font-black text-xl text-amber-600">{estimatedLoss.toLocaleString()} RWF</p>
                   </div>
                 )}
               </div>
 
-              {claim.lossDescription && (
+              {lossDescription && (
                 <div className="col-span-2 pt-4 border-t border-gray-100">
                   <p className="text-sm text-muted-foreground mb-1.5">Loss Description</p>
                   <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700 leading-relaxed italic">
-                    "{claim.lossDescription}"
+                    "{lossDescription}"
                   </div>
                 </div>
               )}
 
-              {claim.damagePhotos && claim.damagePhotos.length > 0 && (
+              {damagePhotos && damagePhotos.length > 0 && (
                 <div className="col-span-2 pt-4 border-t border-gray-100">
-                  <p className="text-sm text-muted-foreground mb-2">Damage Evidence Photos ({claim.damagePhotos.length})</p>
+                  <p className="text-sm text-muted-foreground mb-2">Damage Evidence Photos ({damagePhotos.length})</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {claim.damagePhotos.map((photo, index) => (
+                    {damagePhotos.map((photo, index) => (
                       <div key={index} className="relative aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group hover:shadow-md transition-all">
                         <img 
                           src={photo} 

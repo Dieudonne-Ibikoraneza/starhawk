@@ -219,7 +219,7 @@ export const LossOverviewTab = ({
       .map((p, i) => (
         <p
           key={i}
-          className={`mb-4 leading-relaxed text-base ${isInsurer ? "text-white/80" : "text-slate-700"}`}
+          className="mb-4 leading-relaxed text-base text-slate-700"
         >
           {p.trim()}
         </p>
