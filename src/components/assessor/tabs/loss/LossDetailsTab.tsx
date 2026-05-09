@@ -65,25 +65,28 @@ export const LossDetailsTab = ({ claim, isInsurer = false }: LossDetailsTabProps
   useEffect(() => {
     if (assessment) {
       const savedNdviBefore =
-        assessment.ndviBefore != null ? String(assessment.ndviBefore) : "";
+        assessment.ndviBefore != null && assessment.ndviBefore !== 0 ? String(assessment.ndviBefore) : "";
       const savedNdviAfter =
-        assessment.ndviAfter != null ? String(assessment.ndviAfter) : "";
+        assessment.ndviAfter != null && assessment.ndviAfter !== 0 ? String(assessment.ndviAfter) : "";
       const savedDamageArea =
-        assessment.damageArea != null ? String(assessment.damageArea) : "";
+        assessment.damageArea != null && assessment.damageArea !== 0 ? String(assessment.damageArea) : "";
       const savedYieldImpact =
-        assessment.yieldImpact != null ? String(assessment.yieldImpact) : "";
-
-      setNdviBefore(savedNdviBefore);
-      setNdviAfter(savedNdviAfter);
+        assessment.yieldImpact != null && assessment.yieldImpact !== 0 ? String(assessment.yieldImpact) : "";
 
       // Auto-extraction from drone reports if saved values are empty
       let extractedArea = "";
       let extractedYield = "";
+      let defaultNdviBefore = "";
+      let defaultNdviAfter = "";
 
       if (
         assessment.droneAnalysisPdfs &&
         assessment.droneAnalysisPdfs.length > 0
       ) {
+        // Drone report is uploaded, provide default NDVI values of 0.70 and 0.45
+        defaultNdviBefore = "0.70";
+        defaultNdviAfter = "0.45";
+
         for (const pdf of assessment.droneAnalysisPdfs) {
           const data = pdf.droneAnalysisData;
           if (!data) continue;
@@ -98,11 +101,13 @@ export const LossDetailsTab = ({ claim, isInsurer = false }: LossDetailsTabProps
         }
       }
 
+      setNdviBefore(savedNdviBefore || defaultNdviBefore);
+      setNdviAfter(savedNdviAfter || defaultNdviAfter);
       setDamageArea(savedDamageArea || extractedArea);
       setYieldImpact(savedYieldImpact || extractedYield);
 
       // If NDVI is missing, try automated satellite analysis (only for Assessor)
-      if (!isInsurer && (!savedNdviBefore || !savedNdviAfter)) {
+      if (!isInsurer && (!savedNdviBefore && !defaultNdviBefore || !savedNdviAfter && !defaultNdviAfter)) {
         void runDamageAnalysisFetch();
       }
     }
@@ -349,21 +354,20 @@ export const LossDetailsTab = ({ claim, isInsurer = false }: LossDetailsTabProps
         </Card>
       </div>
 
-      {isAlertVisible && (ndviBefore === "" || damageArea === "") &&
-      assessment?.droneAnalysisPdfs?.length ? (
+      {isAlertVisible && !isInsurer && assessment?.droneAnalysisPdfs?.length ? (
         <div 
-          className={`p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between transition-all duration-500 ease-in-out ${
+          className={`p-4 bg-emerald-50 border border-emerald-200/60 rounded-xl flex items-center justify-between transition-all duration-500 ease-in-out ${
             isDismissing ? "opacity-0 -translate-y-4 scale-95 max-h-0 py-0 overflow-hidden border-transparent" : "opacity-100 translate-y-0 scale-100"
-          } animate-in fade-in slide-in-from-top-4`}
+          } animate-in fade-in slide-in-from-top-4 shadow-sm`}
         >
           <div className="flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Sparkles className="h-5 w-5 text-emerald-600 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-primary-900">
-                Drone data is available. Fields have been auto-populated from your reports.
+              <span className="text-sm font-bold text-emerald-900">
+                Drone Report Metrics Auto-Filled!
               </span>
-              <span className="text-xs text-primary-700/80">
-                Important: Review the values below and click "Save Metrics" to finalize.
+              <span className="text-xs text-emerald-800/80 mt-0.5">
+                The fields below have been auto-populated from your uploaded drone PDF analysis report (including Default NDVI indices of 0.70 and 0.45). Review the values, edit any metric if needed, and hit the <strong className="font-semibold text-emerald-900">Save Metrics</strong> button to persist your assessment.
               </span>
             </div>
           </div>
@@ -371,8 +375,9 @@ export const LossDetailsTab = ({ claim, isInsurer = false }: LossDetailsTabProps
             variant="ghost"
             size="sm"
             onClick={handleDismiss}
+            className="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 hover:text-emerald-950 rounded-lg text-xs font-bold px-3 py-1.5 h-auto transition-all cursor-pointer shrink-0"
           >
-            Dismiss
+            Got It
           </Button>
         </div>
       ) : null}
