@@ -185,6 +185,12 @@ export const LossBasicInfoTab = ({
                   <p className="text-sm text-muted-foreground mb-1">Date Filed</p>
                   <p className="font-medium">{new Date(claim.filedAt).toLocaleDateString()}</p>
                 </div>
+                {claim.lossEventDate && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Incident Date</p>
+                    <p className="font-medium">{new Date(claim.lossEventDate).toLocaleDateString()}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Loss Event</p>
                   <p className="font-medium text-lg text-destructive">
@@ -195,11 +201,46 @@ export const LossBasicInfoTab = ({
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Claim Status</p>
-                  <Badge variant="secondary" className="font-medium">
+                  <Badge variant="secondary" className="font-medium capitalize">
                     {claim.status.replace("_", " ")}
                   </Badge>
                 </div>
+                {claim.estimatedLoss !== undefined && claim.estimatedLoss !== null && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Estimated Loss</p>
+                    <p className="font-black text-xl text-amber-600">{claim.estimatedLoss.toLocaleString()} RWF</p>
+                  </div>
+                )}
               </div>
+
+              {claim.lossDescription && (
+                <div className="col-span-2 pt-4 border-t border-gray-100">
+                  <p className="text-sm text-muted-foreground mb-1.5">Loss Description</p>
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700 leading-relaxed italic">
+                    "{claim.lossDescription}"
+                  </div>
+                </div>
+              )}
+
+              {claim.damagePhotos && claim.damagePhotos.length > 0 && (
+                <div className="col-span-2 pt-4 border-t border-gray-100">
+                  <p className="text-sm text-muted-foreground mb-2">Damage Evidence Photos ({claim.damagePhotos.length})</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {claim.damagePhotos.map((photo, index) => (
+                      <div key={index} className="relative aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group hover:shadow-md transition-all">
+                        <img 
+                          src={photo} 
+                          alt={`Damage Photo ${index + 1}`} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
+                          <span className="text-white text-xs font-semibold px-2.5 py-1 bg-black/60 rounded-lg">Photo {index + 1}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t h-[400px]">

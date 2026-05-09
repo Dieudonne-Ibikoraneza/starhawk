@@ -51,6 +51,8 @@ export interface Claim {
   claimType?: "FARMER_REPORTED_LOSS" | "HARVEST_AUTO_SUBMISSION";
   lossDescription?: string;
   damagePhotos: string[];
+  lossEventDate?: string;
+  estimatedLoss?: number;
   status: string;
   filedAt: string;
   payoutAmount?: number;
