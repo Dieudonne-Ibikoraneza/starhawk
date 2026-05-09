@@ -48,12 +48,14 @@ interface LossOverviewTabProps {
   claim: Claim;
   fieldName: string;
   isInsurer?: boolean;
+  onSubmitSuccess?: () => void;
 }
 
 export const LossOverviewTab = ({
   claim,
   fieldName,
   isInsurer = false,
+  onSubmitSuccess,
 }: LossOverviewTabProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -111,6 +113,7 @@ export const LossOverviewTab = ({
         title: "Progress Saved",
         description: "Assessment notes and observations updated.",
       });
+      onSubmitSuccess?.();
     },
     onError: (err: any) => {
       toast({
@@ -135,6 +138,7 @@ export const LossOverviewTab = ({
         title: "Assessment Submitted",
         description: "The claim is now pending insurer approval.",
       });
+      onSubmitSuccess?.();
     },
     onError: (err: any) => {
       toast({

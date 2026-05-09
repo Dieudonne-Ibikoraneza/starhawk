@@ -131,13 +131,15 @@ export default function LossAssessmentSystem() {
           const fieldId = String(farmId || claim.claimNumber || claimId);
           let crop = claim.cropType || claim.crop || "Unknown";
           let area = "0 ha";
+          let actualFarmHectares = 0;
           let location = "";
 
           const claimFarm = claim.farm || claim.farmId;
           if (claimFarm && typeof claimFarm === "object") {
             crop = claimFarm.cropType || claimFarm.crop || crop;
             if (claimFarm.area || claimFarm.size) {
-              area = `${claimFarm.area || claimFarm.size} ha`;
+              actualFarmHectares = parseFloat(String(claimFarm.area || claimFarm.size)) || 0;
+              area = `${actualFarmHectares} ha`;
             }
             if (claimFarm.locationName && typeof claimFarm.locationName === "string") {
               location = claimFarm.locationName;
@@ -156,7 +158,8 @@ export default function LossAssessmentSystem() {
               if (farm) {
                 crop = farm.cropType || farm.crop || crop;
                 if (farm.area || farm.size) {
-                  area = `${farm.area || farm.size} ha`;
+                  actualFarmHectares = parseFloat(String(farm.area || farm.size)) || 0;
+                  area = `${actualFarmHectares} ha`;
                 }
                 if (farm.location) {
                   if (typeof farm.location === 'string') {
@@ -190,24 +193,34 @@ export default function LossAssessmentSystem() {
             ? assessmentReport.yieldImpact
             : null;
 
+          let affectedHectares = 0;
           let affectedAreaStr = "N/A";
           if (reportDamageArea != null && reportDamageArea > 0) {
-            affectedAreaStr = `${reportDamageArea} ha`;
+            affectedHectares = parseFloat(String(reportDamageArea)) || 0;
+            affectedAreaStr = `${affectedHectares} ha`;
           } else if (reportDamageArea === 0) {
+            affectedHectares = 0;
             affectedAreaStr = "0 ha";
           } else if (claim.affectedArea != null && parseFloat(String(claim.affectedArea)) > 0) {
-            const rawArea = parseFloat(String(claim.affectedArea));
-            affectedAreaStr = `${rawArea} ha`;
+            affectedHectares = parseFloat(String(claim.affectedArea)) || 0;
+            affectedAreaStr = `${affectedHectares} ha`;
           } else if (claim.damagedArea != null && parseFloat(String(claim.damagedArea)) > 0) {
-            const rawArea = parseFloat(String(claim.damagedArea));
-            affectedAreaStr = `${rawArea} ha`;
+            affectedHectares = parseFloat(String(claim.damagedArea)) || 0;
+            affectedAreaStr = `${affectedHectares} ha`;
           } else if (claim.affectedArea === 0 || claim.damagedArea === 0 || claim.affectedArea === "0 ha" || claim.damagedArea === "0 ha") {
+            affectedHectares = 0;
             affectedAreaStr = "0 ha";
           }
 
-          const affectedPercentage = reportYieldImpact != null
-            ? Number(reportYieldImpact)
-            : Number(claim.affectedPercentage || claim.damagePercentage || 0);
+          let affectedPercentage = 0;
+          if (actualFarmHectares > 0 && affectedHectares > 0) {
+            affectedPercentage = Math.round((affectedHectares / actualFarmHectares) * 100);
+            if (affectedPercentage > 100) affectedPercentage = 100;
+          } else {
+            affectedPercentage = reportYieldImpact != null
+              ? Number(reportYieldImpact)
+              : Number(claim.affectedPercentage || claim.damagePercentage || 0);
+          }
 
           return {
             id: claimId,
@@ -548,20 +561,20 @@ export default function LossAssessmentSystem() {
                               {assessment.severity}
                             </span>
                           </td>
-                          <td className="py-3.5 px-6 whitespace-nowrap">
+                           <td className="py-3.5 px-6 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {assessment.affectedArea} ({assessment.affectedPercentage}%)
+                              {assessment.affectedArea === "N/A" ? "N/A" : `${assessment.affectedArea} (${assessment.affectedPercentage}%)`}
                             </div>
                           </td>
                           <td className="py-3.5 px-6 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${
                               assessment.status?.toLowerCase() === "approved"
                                 ? "bg-green-50 text-green-700 border border-green-200"
-                                : assessment.status?.toLowerCase() === "under review" || assessment.status?.toLowerCase() === "review"
+                                : assessment.status?.toLowerCase() === "under review" || assessment.status?.toLowerCase() === "review" || assessment.status?.toLowerCase() === "in_progress"
                                 ? "bg-blue-50 text-blue-700 border border-blue-200"
                                 : "bg-yellow-50 text-yellow-700 border border-yellow-200"
                             }`}>
-                              {assessment.status}
+                              {assessment.status?.replace('_', ' ')}
                             </span>
                           </td>
                         </tr>
@@ -654,7 +667,14 @@ export default function LossAssessmentSystem() {
               </TabsContent>
 
               <TabsContent value="overview">
-                <LossOverviewTab claim={currentClaim} fieldName={currentFarm?.name || selectedAssessment.fieldId} />
+                <LossOverviewTab 
+                  claim={currentClaim} 
+                  fieldName={currentFarm?.name || selectedAssessment.fieldId} 
+                  onSubmitSuccess={() => {
+                    loadAssessmentDetail(selectedAssessment.id);
+                    loadLossAssessments();
+                  }}
+                />
               </TabsContent>
             </div>
           </Tabs>
