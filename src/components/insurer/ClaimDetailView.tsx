@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getClaimById } from "@/services/claimsApi";
 import { getFarmById } from "@/services/farmsApi";
 import { LossBasicInfoTab } from "../assessor/tabs/loss/LossBasicInfoTab";
@@ -53,8 +54,8 @@ interface Claim {
 interface ClaimDetailViewProps {
   claim: Claim;
   onBack: () => void;
-  onApprove: (claimId: string, approvedAmount?: number, notes?: string) => void;
-  onReject: (claimId: string, reason: string) => void;
+  onApprove: (claimId: string, approvedAmount?: number, notes?: string) => void | Promise<void>;
+  onReject: (claimId: string, reason: string) => void | Promise<void>;
   onViewPolicy?: (policyId: string) => void;
 }
 
@@ -65,7 +66,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("basic-info");
   
-  const [approvalNotes, setApprovalNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [approvedAmount, setApprovedAmount] = useState<string>(claim.claimAmount.toString());
   const [showApprovalForm, setShowApprovalForm] = useState(false);
@@ -116,17 +117,30 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
     }
   };
 
-  const handleApprove = () => {
-    const amount = approvedAmount ? parseFloat(approvedAmount) : undefined;
-    onApprove(claim.id, amount, approvalNotes);
-    setShowApprovalForm(false);
-    setApprovalNotes("");
+  const handleApprove = async () => {
+    setIsSubmitting(true);
+    try {
+      const amount = approvedAmount ? parseFloat(approvedAmount) : undefined;
+      await onApprove(claim.id, amount, undefined); // notes removed as requested!
+      setShowApprovalForm(false);
+    } catch (err) {
+      console.error("Approve failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleReject = () => {
-    onReject(claim.id, rejectionReason);
-    setShowRejectionForm(false);
-    setRejectionReason("");
+  const handleReject = async () => {
+    setIsSubmitting(true);
+    try {
+      await onReject(claim.id, rejectionReason);
+      setShowRejectionForm(false);
+      setRejectionReason("");
+    } catch (err) {
+      console.error("Reject failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleViewPolicy = () => {
@@ -306,108 +320,35 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
           </Card>
 
           {/* Action Buttons */}
-          <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-gray-900">Review Actions</CardTitle>
+          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b border-gray-50 bg-slate-50/50">
+              <CardTitle className="text-sm font-bold text-gray-900 uppercase tracking-wider">Review Actions</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {!["approved", "rejected"].includes(claim.status?.toLowerCase()) && !showApprovalForm && !showRejectionForm && (
-                <>
+            <CardContent className="p-5 space-y-4">
+              {!["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
+                <div className="flex flex-col gap-3">
                   <Button 
                     onClick={() => setShowApprovalForm(true)}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <ThumbsUp className="h-4 w-4 mr-2" />
-                    Approve Claim
+                    <ThumbsUp className="h-4 w-4" />
+                    Approve & Payout
                   </Button>
                   <Button 
                     onClick={() => setShowRejectionForm(true)}
                     variant="outline"
-                    className="w-full border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700"
+                    className="w-full border-rose-200 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold rounded-xl h-11 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <ThumbsDown className="h-4 w-4 mr-2" />
+                    <ThumbsDown className="h-4 w-4" />
                     Reject Claim
                   </Button>
-                </>
-              )}
-
-              {showApprovalForm && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="approved-amount" className="text-sm font-medium text-gray-700">Approved Payout (RWF)</Label>
-                    <Input
-                      id="approved-amount"
-                      type="number"
-                      value={approvedAmount}
-                      onChange={(e) => setApprovedAmount(e.target.value)}
-                      placeholder="Enter approved payout amount"
-                      className="border-gray-200"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="approval-notes" className="text-sm font-medium text-gray-700">Approval Notes</Label>
-                    <Textarea
-                      id="approval-notes"
-                      placeholder="Add notes for the farmer and assessor..."
-                      value={approvalNotes}
-                      onChange={(e) => setApprovalNotes(e.target.value)}
-                      className="border-gray-200"
-                    />
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      onClick={handleApprove}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Confirm
-                    </Button>
-                    <Button 
-                      onClick={() => setShowApprovalForm(false)}
-                      variant="outline"
-                      className="border-gray-200"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {showRejectionForm && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="rejection-reason" className="text-sm font-medium text-gray-700">Rejection Reason</Label>
-                    <Textarea
-                      id="rejection-reason"
-                      placeholder="Provide detailed reason for rejection..."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      className="border-gray-200"
-                    />
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      onClick={handleReject}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      Reject
-                    </Button>
-                    <Button 
-                      onClick={() => setShowRejectionForm(false)}
-                      variant="outline"
-                      className="border-gray-200"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
                 </div>
               )}
 
               {["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
-                <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 border border-gray-100 rounded-lg text-center">
+                <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
                   <CheckCircle className="h-8 w-8 text-green-600" />
-                  <p className="text-sm font-semibold text-gray-900">Review Completed</p>
+                  <p className="text-sm font-bold text-gray-900">Review Completed</p>
                   <p className="text-xs text-gray-500">
                     This claim was marked as <strong className="capitalize">{claim.status.replace('_', ' ')}</strong> on {claim.filedDate}.
                   </p>
@@ -415,6 +356,133 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
               )}
             </CardContent>
           </Card>
+
+          {/* Approve & Payout Dialog */}
+          <Dialog open={showApprovalForm} onOpenChange={(open) => !isSubmitting && setShowApprovalForm(open)}>
+            <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl p-6 border border-gray-100">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <CheckCircle className="h-6 w-6 text-emerald-600" />
+                  Approve Payout
+                </DialogTitle>
+                <DialogDescription className="text-sm text-gray-500 mt-1">
+                  Specify the final payout amount to settle this claim. This will notify the farmer.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5 py-4">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Original Claim Amount</p>
+                    <p className="text-lg font-bold text-slate-800 mt-0.5">${claim.claimAmount.toLocaleString()}</p>
+                  </div>
+                  <DollarSign className="h-8 w-8 text-emerald-600 opacity-20" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="approved-amount" className="text-sm font-semibold text-gray-700">Payout Amount ($)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">$</span>
+                    <Input
+                      id="approved-amount"
+                      type="number"
+                      disabled={isSubmitting}
+                      value={approvedAmount}
+                      onChange={(e) => setApprovedAmount(e.target.value)}
+                      placeholder="Enter payout amount"
+                      className="pl-8 h-12 border-gray-200 rounded-xl focus-visible:ring-emerald-500 font-semibold text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2 border-t border-gray-50">
+                <Button
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => setShowApprovalForm(false)}
+                  className="border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl px-4 h-11"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isSubmitting || !approvedAmount}
+                  onClick={handleApprove}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl px-5 h-11"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="h-4 w-4 mr-2" />
+                      Approve & Pay
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Reject Claim Dialog */}
+          <Dialog open={showRejectionForm} onOpenChange={(open) => !isSubmitting && setShowRejectionForm(open)}>
+            <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl p-6 border border-gray-100">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="h-6 w-6 text-rose-600" />
+                  Reject Claim
+                </DialogTitle>
+                <DialogDescription className="text-sm text-gray-500 mt-1">
+                  Provide a clear, detailed reason for declining this claim.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rejection-reason" className="text-sm font-semibold text-gray-700">Reason for Rejection *</Label>
+                  <Textarea
+                    id="rejection-reason"
+                    disabled={isSubmitting}
+                    placeholder="Describe why this claim is being rejected (e.g., Insufficient weather threshold met)..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="min-h-[120px] border-gray-200 rounded-xl focus-visible:ring-rose-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2 border-t border-gray-50">
+                <Button
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => setShowRejectionForm(false)}
+                  className="border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl px-4 h-11"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isSubmitting || !rejectionReason.trim()}
+                  onClick={handleReject}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl px-5 h-11"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Declining...
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsDown className="h-4 w-4 mr-2" />
+                      Decline Claim
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

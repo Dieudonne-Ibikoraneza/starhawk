@@ -46,6 +46,7 @@ export default function InsurerDashboard() {
   const [activePage, setActivePage] = useState("dashboard");
   const [selectedRiskAssessmentId, setSelectedRiskAssessmentId] = useState<string | null>(null);
   const [selectedMonitoringId, setSelectedMonitoringId] = useState<string | null>(null);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
   const { toast } = useToast();
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [claimsSummary, setClaimsSummary] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -1001,9 +1002,25 @@ export default function InsurerDashboard() {
       case "insurance-requests": return renderInsuranceRequests();
       case "risk-assessments": return renderSubmittedAssessments();
       case "crop-monitoring": return <InsurerCropMonitoringSystem />;
-      case "claim-reviews": return <ClaimsTable />;
+      case "claim-reviews": 
+        return (
+          <ClaimsTable 
+            onViewPolicy={(policyId) => {
+              setSelectedPolicyId(policyId);
+              setActivePage('policy-management');
+            }} 
+          />
+        );
       case "claim-review-detail": return <ClaimReviewPage />;
-      case "policy-management": return <PolicyManagement key={policyKey} onNavigateToCreate={() => setActivePage('create-policy')} />;
+      case "policy-management": 
+        return (
+          <PolicyManagement 
+            key={policyKey} 
+            selectedPolicyIdFromNav={selectedPolicyId}
+            onClearPolicyNav={() => setSelectedPolicyId(null)}
+            onNavigateToCreate={() => setActivePage('create-policy')} 
+          />
+        );
       case "create-policy": return <CreatePolicyPage onBack={() => { setActivePage('policy-management'); setPolicyKey(prev => prev + 1); }} onSuccess={() => { setActivePage('policy-management'); setPolicyKey(prev => prev + 1); }} />;
       case "notifications": return <InsurerNotifications />;
       case "profile-settings": return <InsurerProfileSettings />;
