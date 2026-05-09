@@ -235,6 +235,7 @@ export default function FarmerDashboard() {
     loadAllReports();
     loadFarmerProfile();
     fetchInsurers();
+    loadPolicies();
   }, []);
 
   const fetchInsurers = async () => {
@@ -1741,11 +1742,16 @@ export default function FarmerDashboard() {
                     <SelectValue placeholder="Select a policy" />
                   </SelectTrigger>
                   <SelectContent>
-                    {policies.map((policy) => (
-                      <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
-                        {policy.cropType || 'Policy'} - {policy.coverageAmount ? `RWF ${policy.coverageAmount.toLocaleString()}` : 'Active'}
-                      </SelectItem>
-                    ))}
+                    {policies.map((policy) => {
+                      const farmName = typeof policy.farmId === 'object' && policy.farmId?.name
+                        ? policy.farmId.name
+                        : (policy.cropType ? `${policy.cropType} Field` : 'Unnamed Farm');
+                      return (
+                        <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
+                          {policy.policyNumber || 'Policy'} - {farmName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -2186,6 +2192,10 @@ export default function FarmerDashboard() {
       case "file-claim": return renderFileClaim();
       case "reports": return <ReportsTab />;
       case "farm-details": 
+        const activePolicy = policies.find(p => {
+          const pFarmId = typeof p.farmId === 'object' ? p.farmId?._id || p.farmId?.id : p.farmId;
+          return pFarmId === selectedFarmId;
+        });
         return (
           <FarmDetailsTab 
             farmId={selectedFarmId!} 
@@ -2195,9 +2205,15 @@ export default function FarmerDashboard() {
               setActivePage("policy-details");
             }}
             onFileClaim={(id) => {
-              setSelectedPolicyId(id);
+              const targetPolicyId = id || (activePolicy?._id || activePolicy?.id || "");
+              setSelectedPolicyId(targetPolicyId);
+              setClaimFormData(prev => ({
+                ...prev,
+                policyId: targetPolicyId
+              }));
               setActivePage("file-claim");
             }}
+            activePolicy={activePolicy}
           />
         );
       case "policy-details":

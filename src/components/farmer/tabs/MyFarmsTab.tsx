@@ -140,10 +140,13 @@ export default function MyFarmsTab({
                             {toDisplayText(farm.cropType || farm.crop, "N/A")}
                           </div>
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                            <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                            {formatLocation(farm)}
+                        <td className="py-4 px-6 max-w-[200px] md:max-w-[280px]">
+                          <div 
+                            className="flex items-center gap-1.5 text-sm text-gray-500 truncate"
+                            title={formatLocation(farm)}
+                          >
+                            <MapPin className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+                            <span className="truncate">{formatLocation(farm)}</span>
                           </div>
                         </td>
                         <td className="py-4 px-6">
@@ -162,10 +165,10 @@ export default function MyFarmsTab({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => onRequestInsurance(farm)}
-                                className="h-8 border-green-600 text-green-600 hover:bg-green-50"
+                                className="h-8 border-green-600 text-green-600 hover:bg-green-50 transition-all active:scale-[0.98]"
                               >
                                 <Shield className="h-3.5 w-3.5 mr-1" />
-                                Get Insured
+                                Request Insurance
                               </Button>
                             )}
                             <Button

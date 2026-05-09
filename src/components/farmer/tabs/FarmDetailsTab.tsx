@@ -20,9 +20,10 @@ interface FarmDetailsTabProps {
   onBack: () => void;
   onViewPolicy: (policyId: string) => void;
   onFileClaim: (policyId: string) => void;
+  activePolicy?: any;
 }
 
-export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileClaim }: FarmDetailsTabProps) {
+export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileClaim, activePolicy }: FarmDetailsTabProps) {
   const { toast } = useToast();
   const [farm, setFarm] = useState<any>(null);
   const [monitoring, setMonitoring] = useState<any>(null);
@@ -409,48 +410,62 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
 
         {/* Right Column: Details & Records */}
         <div className="space-y-8">
-          <Card className="border-gray-200 shadow-sm bg-white">
-            <CardHeader className="border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-gray-700" />
+          <Card className="border-gray-200 shadow-xl shadow-gray-100/40 bg-white">
+            <CardHeader className="border-b border-gray-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
+                <ClipboardList className="h-5 w-5 text-green-600" />
                 Farm Registry
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <DetailItem label="Crop Type" value={farm.cropType || "N/A"} icon={<Sprout className="h-4 w-4" />} />
-              <DetailItem label="Area Size" value={`${farm.area || "N/A"} Hectares`} icon={<Activity className="h-4 w-4" />} />
-              <DetailItem label="Sowing Date" value={farm.sowingDate ? format(new Date(farm.sowingDate), "PPP") : "N/A"} icon={<Hash className="h-4 w-4" />} />
-              <Separator className="my-2" />
-              <DetailItem label="Location" value={farm.locationName || "Rwanda"} icon={<MapPin className="h-4 w-4" />} />
-              {farm.eosdaFieldId && (
-                <DetailItem label="Field ID" value={farm.eosdaFieldId} icon={<Satellite className="h-4 w-4" />} mono />
-              )}
+              <DetailItem label="Crop Type" value={farm.cropType || "N/A"} icon={<Sprout className="h-4.5 w-4.5 text-green-600" />} />
+              <DetailItem 
+                label="Area Size" 
+                value={typeof farm.area === 'number' 
+                  ? `${farm.area.toFixed(2)} Hectares` 
+                  : !isNaN(parseFloat(farm.area)) 
+                    ? `${parseFloat(farm.area).toFixed(2)} Hectares` 
+                    : `${farm.area || "N/A"} Hectares`
+                } 
+                icon={<Activity className="h-4.5 w-4.5 text-green-600" />} 
+              />
+              <DetailItem label="Sowing Date" value={farm.sowingDate ? format(new Date(farm.sowingDate), "PPP") : "N/A"} icon={<Hash className="h-4.5 w-4.5 text-green-600" />} />
+              <DetailItem label="Location" value={farm.locationName || "Rwanda"} icon={<MapPin className="h-4.5 w-4.5 text-green-600" />} vertical />
             </CardContent>
           </Card>
 
           {/* Insurance Overview Card */}
-          <Card className={`border-none shadow-xl ${farm.status === 'INSURED' ? 'bg-[rgba(20,40,75,1)] text-white' : 'bg-gray-100 text-gray-900'}`}>
+          <Card className={`border-none shadow-xl ${farm.status === 'INSURED' || activePolicy ? 'bg-[rgba(20,40,75,1)] text-white' : 'bg-gray-100 text-gray-900'}`}>
             <CardContent className="p-6 space-y-6">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-lg font-bold">Insurance Status</h3>
-                  <p className={`text-sm ${farm.status === 'INSURED' ? 'text-blue-100' : 'text-gray-500'}`}>
-                    {farm.status === 'INSURED' ? 'Protected by Starhawk' : 'No active coverage'}
+                  <p className={`text-sm ${farm.status === 'INSURED' || activePolicy ? 'text-blue-100' : 'text-gray-500'}`}>
+                    {farm.status === 'INSURED' || activePolicy ? 'Protected by Starhawk' : 'No active coverage'}
                   </p>
                 </div>
-                <Shield className={`h-8 w-8 ${farm.status === 'INSURED' ? 'text-blue-400' : 'text-gray-400'}`} />
+                <Shield className={`h-8 w-8 ${farm.status === 'INSURED' || activePolicy ? 'text-blue-400' : 'text-gray-400'}`} />
               </div>
 
-              {farm.status === 'INSURED' ? (
+              {farm.status === 'INSURED' || activePolicy ? (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10">
+                  <div 
+                    className="p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
+                    onClick={() => activePolicy && onViewPolicy(activePolicy._id || activePolicy.id)}
+                  >
                     <div className="text-xs opacity-70 mb-1 font-medium">Active Policy</div>
                     <div className="font-bold flex items-center justify-between">
-                      SH-88291-RW
+                      {activePolicy?.policyNumber || "SH-88291-RW"}
                       <ChevronRight className="h-4 w-4" />
                     </div>
                   </div>
-                  <Button variant="secondary" className="w-full bg-white text-[rgba(20,40,75,1)] hover:bg-blue-50 font-bold">
+                  <Button 
+                    variant="secondary" 
+                    className="w-full bg-white text-[rgba(20,40,75,1)] hover:bg-blue-50 font-bold transition-transform active:scale-[0.98]"
+                    onClick={() => {
+                      onFileClaim(activePolicy?._id || activePolicy?.id || "");
+                    }}
+                  >
                     File a Claim
                   </Button>
                 </div>
@@ -473,16 +488,30 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
   );
 }
 
-function DetailItem({ label, value, icon, mono }: { label: string; value: string; icon: any; mono?: boolean }) {
+function DetailItem({ label, value, icon, vertical }: { label: string; value: string; icon: any; vertical?: boolean }) {
+  if (vertical) {
+    return (
+      <div className="flex flex-col gap-2 p-4 rounded-xl bg-gray-50/70 border border-gray-100 transition-colors hover:bg-gray-50">
+        <div className="flex items-center gap-2.5 text-gray-500">
+          <div className="h-7 w-7 rounded-lg bg-white flex items-center justify-center border shadow-xs">
+            {icon}
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+        </div>
+        <span className="text-sm font-bold text-gray-950 pl-9.5 leading-relaxed break-words">{value}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-between group">
+    <div className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 transition-colors hover:bg-gray-50 group">
       <div className="flex items-center gap-3 text-gray-500">
-        <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center group-hover:bg-green-50 transition-colors">
+        <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center group-hover:bg-green-50 border shadow-xs transition-colors">
           {icon}
         </div>
         <span className="text-sm font-medium">{label}</span>
       </div>
-      <span className={`text-sm font-bold text-gray-900 ${mono ? 'font-mono bg-gray-50 px-2 py-0.5 rounded' : ''}`}>{value}</span>
+      <span className="text-sm font-bold text-gray-950 max-w-[55%] text-right truncate">{value}</span>
     </div>
   );
 }
