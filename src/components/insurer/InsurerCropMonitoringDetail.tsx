@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Clock, MapPin, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getMonitoringById, getMonitoringHistory } from "@/services/cropMonitoringApi";
@@ -14,14 +15,17 @@ import { MonitoringWeatherTab } from "../assessor/tabs/MonitoringWeatherTab";
 import { MonitoringBasicInfoTab } from "../assessor/tabs/MonitoringBasicInfoTab";
 
 export default function InsurerCropMonitoringDetail({ 
-  monitoringId, 
+  monitoringId: propMonitoringId, 
   onBack, 
   onActionComplete 
 }: { 
-  monitoringId: string; 
+  monitoringId?: string; 
   onBack: () => void;
   onActionComplete: () => void;
 }) {
+  const { monitoringId: urlMonitoringId } = useParams<{ monitoringId: string }>();
+  const monitoringId = propMonitoringId || urlMonitoringId || "";
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [record, setRecord] = useState<any>(null);
   const [allCycles, setAllCycles] = useState<any[]>([]);
@@ -165,12 +169,22 @@ export default function InsurerCropMonitoringDetail({
           </p>
         </div>
         {record.policyId && (
-          <Badge
-            variant="outline"
-            className="text-sm px-4 py-1.5 border-green-200 bg-green-50 text-green-700 font-semibold"
+          <button
+            onClick={() => {
+              const pId = record.policyId?._id || record.policyId;
+              if (pId) {
+                navigate(`/insurer/policies/${pId}`);
+              }
+            }}
+            className="group"
           >
-            Active Policy: {policyDisplayId}
-          </Badge>
+            <Badge
+              variant="outline"
+              className="text-sm px-4 py-1.5 border-green-200 bg-green-50 text-green-700 font-semibold cursor-pointer group-hover:bg-green-100 transition-colors"
+            >
+              Active Policy: {policyDisplayId}
+            </Badge>
+          </button>
         )}
       </div>
 

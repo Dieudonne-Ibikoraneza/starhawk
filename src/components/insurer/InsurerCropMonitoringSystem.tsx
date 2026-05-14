@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +134,7 @@ interface WeatherData {
 
 export default function InsurerCropMonitoringSystem() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [assessorId, setAssessorId] = useState<string | null>(null);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [monitoringHistory, setMonitoringHistory] = useState<MonitoringData[]>([]);
@@ -142,7 +144,6 @@ export default function InsurerCropMonitoringSystem() {
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("basic-info");
-  const [viewMode, setViewMode] = useState<any>("monitoring");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -1783,8 +1784,10 @@ export default function InsurerCropMonitoringSystem() {
                           <tr 
                             key={group.policyId} 
                             onClick={() => {
-                              setSelectedMonitoring(monitoring);
-                              setViewMode('fieldDetail'); // Directly launch the premium detail tabs
+                              const monitoringId = group.latestCycle?._id || group.latestCycle?.id;
+                              if (monitoringId) {
+                                navigate(`/insurer/monitoring/${monitoringId}`);
+                              }
                             }}
                             className="border-b border-gray-50 hover:bg-slate-50/40 cursor-pointer group transition-all duration-200"
                           >
@@ -1962,21 +1965,6 @@ export default function InsurerCropMonitoringSystem() {
       </div>
     );
   };
-
-  // Render view based on mode
-  if (viewMode === "detail" || viewMode === "fieldDetail") {
-    return (
-      <InsurerCropMonitoringDetail
-        monitoringId={selectedMonitoring?._id}
-        onBack={() => setViewMode("monitoring")}
-        onActionComplete={loadMonitoringHistory}
-      />
-    );
-  }
-
-  if (viewMode === "fieldSelection") {
-    return renderFieldSelection();
-  }
 
   return renderMonitoringHistory();
 }
