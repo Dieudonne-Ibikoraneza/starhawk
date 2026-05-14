@@ -132,3 +132,28 @@ export async function getInsight(contextId: string, type: 'FARMER_ADVICE' | 'RIS
     return null;
   }
 }
+
+/**
+ * Fetch portfolio-level AI insight for the insurer dashboard
+ */
+export async function getPortfolioInsight(forceRefresh = false, insurerId?: string) {
+  try {
+    let url = `${API_BASE_URL}/ai-insights/portfolio-insight`;
+    const params = new URLSearchParams();
+    
+    if (forceRefresh) params.append('refresh', 'true');
+    if (insurerId) params.append('insurerId', insurerId);
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const result = await response.json();
+    return unwrap(result);
+  } catch (error) {
+    console.error('Failed to fetch portfolio insight:', error);
+    return null;
+  }
+}

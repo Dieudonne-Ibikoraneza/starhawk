@@ -9,6 +9,7 @@ import CreatePolicyPage from "../insurer/CreatePolicyPage";
 import RiskReviewManagement from "../insurer/RiskReviewManagement";
 import InsurerRiskAssessmentDetail from "../insurer/InsurerRiskAssessmentDetail";
 import InsurerCropMonitoringSystem from "../insurer/InsurerCropMonitoringSystem";
+import InsurerDashboardOverview from "../insurer/InsurerDashboardOverview";
 import { getUserId, getPhoneNumber, getEmail, isAuthenticated, getToken } from "@/services/authAPI";
 import { getUserProfile, getAssessors } from "@/services/usersAPI";
 import { getPolicies } from "@/services/policiesApi";
@@ -39,7 +40,11 @@ import {
   TrendingDown,
   Eye,
   ArrowRight,
-  Clock
+  Clock,
+  Leaf,
+  Wallet,
+  ClipboardCheck,
+  FileBadge
 } from "lucide-react";
 
 export default function InsurerDashboard() {
@@ -47,6 +52,7 @@ export default function InsurerDashboard() {
   const [selectedRiskAssessmentId, setSelectedRiskAssessmentId] = useState<string | null>(null);
   const [selectedMonitoringId, setSelectedMonitoringId] = useState<string | null>(null);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const { toast } = useToast();
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [claimsSummary, setClaimsSummary] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -153,7 +159,7 @@ export default function InsurerDashboard() {
           const approved = safeClaims.filter((c: any) => (c.status || '').toLowerCase() === 'approved').length;
           const rejected = safeClaims.filter((c: any) => (c.status || '').toLowerCase() === 'rejected').length;
           setClaimsSummary({ total, pending, approved, rejected });
-          setRecentClaims(safeClaims.slice(0, 5));
+          setRecentClaims(safeClaims);
         } else {
           toast({ title: 'Failed to load claims', description: String(claimsResp.reason), variant: 'destructive' });
         }
@@ -166,7 +172,7 @@ export default function InsurerDashboard() {
           const active = safePolicies.filter((p: any) => (p.status || '').toLowerCase() === 'active').length;
           const expired = safePolicies.filter((p: any) => (p.status || '').toLowerCase() === 'expired').length;
           setPoliciesSummary({ total, active, expired });
-          setRecentPolicies(safePolicies.slice(0, 5));
+          setRecentPolicies(safePolicies);
         } else {
           toast({ title: 'Failed to load policies', description: String(policiesResp.reason), variant: 'destructive' });
         }
@@ -568,101 +574,20 @@ export default function InsurerDashboard() {
   };
 
 
-  const StatCard = ({ icon: Icon, title, value, delta, deltaPositive }: { icon: any, title: string, value: string | number, delta?: string, deltaPositive?: boolean }) => (
-    <Card className="bg-white border-gray-200">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-gray-600" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
-        {delta && (
-          <p className={`text-xs mt-1 ${deltaPositive ? 'text-green-600' : 'text-red-600'}`}>{delta}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   const renderDashboard = () => (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-600 mt-1">Overview of claims, policies, and assessments</p>
-      </div>
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FileText} title="Total Claims" value={claimsSummary.total} />
-        <StatCard icon={AlertTriangle} title="Pending" value={claimsSummary.pending} />
-        <StatCard icon={CheckCircle} title="Approved" value={claimsSummary.approved} />
-        <StatCard icon={TrendingDown} title="Rejected" value={claimsSummary.rejected} />
-      </div>
-
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card className="md:col-span-2 bg-white border-gray-200">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-gray-900">Recent Claims</CardTitle>
-            <Button variant="secondary" size="sm" onClick={() => setActivePage('claim-reviews')} className="text-gray-700">
-              View All
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {loadingSummary ? (
-              <div className="flex items-center justify-center py-4">
-                <img src="/loading.gif" alt="Loading" className="w-12 h-12" />
-              </div>
-            ) : recentClaims.length === 0 ? (
-              <div className="text-sm text-gray-600">No claims available.</div>
-            ) : (
-              <div className="space-y-3">
-                {recentClaims.map((c: any) => (
-                  <div key={c.id || c._id} className="flex items-center justify-between border-b border-gray-200 pb-2">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="capitalize text-gray-700 border-gray-300">{(c.status || 'unknown').toLowerCase()}</Badge>
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900">
-                          {c.policyNumber || 
-                           (typeof c.policyId === 'object' && c.policyId !== null 
-                             ? (c.policyId.policyNumber || c.policyId._id || '—') 
-                             : (c.policyId || '—'))}
-                        </div>
-                        <div className="text-xs text-gray-600">{c.lossEventType || 'Claim'}</div>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => setActivePage('claim-reviews')} className="text-gray-700 hover:text-gray-900">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-gray-900">Policies</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Total</div>
-              <div className="font-semibold text-gray-900">{policiesSummary.total}</div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Active</div>
-              <div className="font-semibold text-green-600">{policiesSummary.active}</div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Expired</div>
-              <div className="font-semibold text-red-600">{policiesSummary.expired}</div>
-            </div>
-            <div className="pt-2">
-              <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => setActivePage('policy-management')}>Manage Policies</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <InsurerDashboardOverview
+      claimsSummary={claimsSummary}
+      policiesSummary={policiesSummary}
+      recentClaims={recentClaims}
+      recentPolicies={recentPolicies}
+      loadingSummary={loadingSummary}
+      onNavigate={setActivePage}
+      onSelectClaim={(claimId) => {
+        setSelectedClaimId(claimId);
+        setActivePage('claim-reviews');
+      }}
+      insurerId={insurerId}
+    />
   );
 
 
@@ -1005,9 +930,11 @@ export default function InsurerDashboard() {
       case "claim-reviews": 
         return (
           <ClaimsTable 
+            initialClaimId={selectedClaimId}
             onViewPolicy={(policyId) => {
               setSelectedPolicyId(policyId);
               setActivePage('policy-management');
+              setSelectedClaimId(null);
             }} 
           />
         );
@@ -1029,14 +956,14 @@ export default function InsurerDashboard() {
   };
 
   const navigationItems = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "insurance-requests", label: "Insurance Requests", icon: Shield },
-    { id: "risk-assessments", label: "Risk Assessments", icon: CheckCircle },
-    { id: "policy-management", label: "Policy Management", icon: Shield },
-    { id: "crop-monitoring", label: "Crop Monitoring", icon: Activity },
-    { id: "claim-reviews", label: "Claim Reviews", icon: FileText },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "profile-settings", label: "Profile Settings", icon: Settings }
+    { id: "dashboard", label: "Overview", icon: BarChart3 },
+    { id: "insurance-requests", label: "Requests", icon: FileBadge },
+    { id: "risk-assessments", label: "Assessments", icon: ClipboardCheck },
+    { id: "policy-management", label: "Policies", icon: Shield },
+    { id: "crop-monitoring", label: "Monitoring", icon: Leaf },
+    { id: "claim-reviews", label: "Claims", icon: Wallet },
+    { id: "notifications", label: "Alerts", icon: Bell },
+    { id: "profile-settings", label: "Settings", icon: Settings }
   ];
 
   // Get display name from profile if available

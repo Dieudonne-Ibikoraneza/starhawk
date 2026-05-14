@@ -7,7 +7,8 @@ import {
   Bot, 
   ChevronRight,
   MessageSquare,
-  Activity
+  Activity,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,9 +45,15 @@ export const AiChatInterface = ({
   const [insight, setInsight] = useState(initialInsight);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const conversation = insight?.conversation || [];
+  const rawConversation = insight?.conversation || [];
+  // Hide the initial system prompt (first 'user' message with raw data) from the UI
+  const conversation = rawConversation.filter((msg: any, i: number) => 
+    !(i === 0 && msg.role === 'user' && msg.content?.trim().startsWith('You are'))
+  );
   const insightId = insight?._id || insight?.id;
 
   // Auto-scroll to bottom
@@ -61,16 +68,16 @@ export const AiChatInterface = ({
 
     setIsSending(true);
     setInput("");
+    setErrorMessage(null);
+    setLastFailedMessage(message);
     try {
       const updatedInsight = await followUpChat(insightId, message);
       setInsight(updatedInsight);
+      setLastFailedMessage(null);
     } catch (error: any) {
       console.error("AI Chat Error:", error);
-      toast({
-        title: "AI Error",
-        description: error.message || "Failed to get response from AI.",
-        variant: "destructive",
-      });
+      const msg = error?.message || 'Failed to get response from AI.';
+      setErrorMessage(msg);
     } finally {
       setIsSending(false);
     }
@@ -244,6 +251,25 @@ export const AiChatInterface = ({
               <Send className="h-4 w-4 text-white" />
             </Button>
           </form>
+
+          {/* Inline Error Message */}
+          {errorMessage && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-red-700">AI Error</p>
+                <p className="text-xs text-red-600 mt-0.5 leading-relaxed">{errorMessage}</p>
+              </div>
+              {lastFailedMessage && (
+                <button
+                  onClick={() => handleSend(lastFailedMessage)}
+                  className="text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-100 hover:bg-red-200 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </>

@@ -34,9 +34,10 @@ interface Claim {
 
 interface ClaimsTableProps {
   onViewPolicy?: (policyId: string) => void;
+  initialClaimId?: string | null;
 }
 
-export default function ClaimsTable({ onViewPolicy }: ClaimsTableProps = {}) {
+export default function ClaimsTable({ onViewPolicy, initialClaimId }: ClaimsTableProps = {}) {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -49,6 +50,14 @@ export default function ClaimsTable({ onViewPolicy }: ClaimsTableProps = {}) {
   useEffect(() => {
     loadClaims();
   }, []);
+
+  // Auto-select claim when initialClaimId is provided and claims are loaded
+  useEffect(() => {
+    if (initialClaimId && claims.length > 0 && !selectedClaim) {
+      const match = claims.find(c => c.id === initialClaimId);
+      if (match) setSelectedClaim(match);
+    }
+  }, [initialClaimId, claims]);
 
   const loadClaims = async () => {
     setLoading(true);
