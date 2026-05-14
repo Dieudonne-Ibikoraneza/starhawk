@@ -12,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { getFarmById, getVegetationStats, getWeatherForecast } from "@/services/farmsApi";
-import { getFarmerSuggestions, getMonitoringCycle } from "@/services/aiApi";
+import { getFarmerSuggestions, getMonitoringCycle, getInsight } from "@/services/aiApi";
 import { useToast } from "@/hooks/use-toast";
+import { AiChatInterface } from "@/components/common/AiChatInterface";
 
 interface FarmDetailsTabProps {
   farmId: string;
@@ -62,6 +63,15 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
       setFarm(farmRes?.data || farmRes);
       setMonitoring(monitoringRes?.data || monitoringRes);
       setWeather(weatherRes?.data || weatherRes || []);
+
+      // Auto-fetch existing AI insights
+      const [advice, cycle] = await Promise.all([
+        getInsight(farmId, 'FARMER_ADVICE'),
+        getInsight(farmId, 'MONITORING_CYCLE')
+      ]);
+
+      if (advice) setAiInsights(advice);
+      if (cycle) setCycleAnalysis(cycle);
     } catch (err: any) {
       console.error('Failed to load farm details:', err);
       toast({
@@ -84,8 +94,12 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
       } else {
         toast({ title: "AI Error", description: "Could not generate insights.", variant: "destructive" });
       }
-    } catch (err) {
-      toast({ title: "AI Error", description: "Failed to connect to AI engine.", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "AI Error",
+        description: error.message || "Failed to connect to AI engine.",
+        variant: "destructive",
+      });
     } finally {
       setAiLoading(false);
     }
@@ -108,11 +122,11 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
           description: "Our AI has generated a detailed monitoring report for your farm.",
         });
       }
-    } catch (err) {
+    } catch (error: any) {
       toast({
-        title: "Analysis Failed",
-        description: "Could not generate cycle analysis at this time.",
-        variant: "destructive"
+        title: "AI Analysis Error",
+        description: error.message || "Failed to analyze monitoring cycle.",
+        variant: "destructive",
       });
     } finally {
       setCycleLoading(false);
@@ -258,23 +272,23 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
             </CardHeader>
             <CardContent className="pt-6">
               {aiLoading ? (
-                <div className="flex flex-col items-center justify-center py-6 space-y-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-                  <p className="text-sm text-green-700 animate-pulse">Analyzing satellite and weather data...</p>
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+                  <p className="text-sm text-green-700 animate-pulse font-medium">Starhawk AI is analyzing your field...</p>
                 </div>
               ) : aiInsights ? (
-                <div className="prose prose-sm prose-green max-w-none text-gray-700">
-                  {/* Cleanly render the bullet points from the LLM */}
-                  {(typeof aiInsights === 'string' ? aiInsights : (aiInsights.data || JSON.stringify(aiInsights)))
-                    .split('\n')
-                    .filter((line: string) => line.trim().length > 0)
-                    .map((line: string, i: number) => (
-                    <p key={i} className="flex items-start gap-3 mb-3 leading-relaxed">
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 shrink-0" />
-                      <span>{line.replace(/^[-*•]\s*/, '').replace(/\"/g, '')}</span>
-                    </p>
-                  ))}
-                </div>
+                <AiChatInterface 
+                  initialInsight={aiInsights}
+                  title="Farmer Crop Advisor"
+                  role="FARMER"
+                  borderless={true}
+                  suggestedQuestions={[
+                    "How can I improve my yield?",
+                    "What pests should I look out for?",
+                    "Is my irrigation sufficient?",
+                    "When is the best time to apply fertilizer?"
+                  ]}
+                />
               ) : (
                 <div className="text-center py-6">
                   <p className="text-sm text-gray-500 mb-4">

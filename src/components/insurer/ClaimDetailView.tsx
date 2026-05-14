@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getClaimById } from "@/services/claimsApi";
 import { getFarmById } from "@/services/farmsApi";
+import { getRiskAnalysis, getInsight } from "@/services/aiApi";
+import { useToast } from "@/hooks/use-toast";
+import { AiChatInterface } from "../common/AiChatInterface";
 import { LossBasicInfoTab } from "../assessor/tabs/loss/LossBasicInfoTab";
 import { LossEvidenceTab } from "../assessor/tabs/loss/LossEvidenceTab";
 import { LossDetailsTab } from "../assessor/tabs/loss/LossDetailsTab";
@@ -31,7 +34,8 @@ import {
   Building2,
   Crop,
   ExternalLink,
-  Loader2
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 
 interface Claim {
@@ -61,6 +65,7 @@ interface ClaimDetailViewProps {
 
 export default function ClaimDetailView({ claim, onBack, onApprove, onReject, onViewPolicy }: ClaimDetailViewProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentClaim, setCurrentClaim] = useState<any | null>(null);
   const [currentFarm, setCurrentFarm] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +76,33 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
   const [approvedAmount, setApprovedAmount] = useState<string>(claim.claimAmount.toString());
   const [showApprovalForm, setShowApprovalForm] = useState(false);
   const [showRejectionForm, setShowRejectionForm] = useState(false);
+
+  // AI States
+  const [aiRiskAnalysis, setAiRiskAnalysis] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleFetchAiInsights = async () => {
+    if (!currentClaim) return;
+    setAiLoading(true);
+    try {
+      const analysis = await getRiskAnalysis(currentClaim, currentFarm || {}, {});
+      if (analysis) {
+        setAiRiskAnalysis(analysis);
+        toast({
+          title: "AI Analysis Complete",
+          description: "Starhawk AI has completed the claim risk evaluation.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "AI Error",
+        description: err.message || "Failed to connect to AI risk engine.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function loadClaimAndFarmData() {
@@ -88,6 +120,12 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
             const farmRes = await getFarmById(farmId);
             setCurrentFarm(farmRes?.data || farmRes);
           }
+        }
+
+        // Auto-fetch existing AI analysis
+        const existingAnalysis = await getInsight(claim.id, 'RISK_ANALYSIS');
+        if (existingAnalysis) {
+          setAiRiskAnalysis(existingAnalysis);
         }
       } catch (err) {
         console.error("Failed to fetch full claim or farm details:", err);
@@ -202,6 +240,60 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Claim Details with correct Assessor Tabs */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Starhawk AI Insights Card */}
+          <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+              <Sparkles className="h-24 w-24 text-green-600" />
+            </div>
+            <CardHeader className="border-b border-green-100/50 pb-4">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span className="text-green-900 font-bold">Starhawk AI Decision Support</span>
+                </div>
+                {!aiRiskAnalysis && !aiLoading && (
+                  <Button 
+                    size="sm" 
+                    onClick={handleFetchAiInsights}
+                    className="bg-green-600 hover:bg-green-700 text-white shadow-sm gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Verify with AI
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {aiLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+                  <p className="text-sm text-green-700 animate-pulse font-medium">Starhawk AI is validating claim parameters...</p>
+                </div>
+              ) : aiRiskAnalysis ? (
+                <AiChatInterface 
+                  initialInsight={aiRiskAnalysis}
+                  title="Starhawk AI Decision Support"
+                  role="INSURER"
+                  borderless={true}
+                  suggestedQuestions={[
+                    "Why is this claim High Risk?",
+                    "Are the drone reports valid?",
+                    "What are the specific red flags?",
+                    "How does the NDVI compare?"
+                  ]}
+                />
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500 italic">
+                    Utilize Starhawk AI to cross-reference this claim against satellite vegetation indices and weather reports.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
             <CardContent className="p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -104,13 +104,46 @@ export const LoginPage = ({ role }: LoginPageProps) => {
     setIsLoading(true);
     setError("");
     
-    // Simulate loading for demo purposes
+    try {
+      // 1. Try real login first if user credentials are provided
+      const success = await login(email, password, role);
+      if (success) {
+        // Retrieve fresh session state from localStorage to verify firstLoginRequired
+        const storedUserStr = localStorage.getItem("user");
+        if (storedUserStr) {
+          const storedUser = JSON.parse(storedUserStr);
+          if (role === "insurer" && (storedUser.firstLoginRequired || storedUser.profile?.firstLoginRequired)) {
+            navigate("/onboarding");
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // standard dashboards
+        if (role === "farmer") navigate("/farmer-dashboard");
+        else if (role === "insurer") navigate("/insurer-dashboard");
+        else if (role === "government") navigate("/government-dashboard");
+        else if (role === "assessor") navigate("/assessor-dashboard");
+        else if (role === "admin") navigate("/admin-dashboard");
+        
+        setIsLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      console.warn("Real login attempt did not succeed, executing preview simulation fallback:", err);
+    }
+
+    // 2. Fallback Preview / Simulation mode
     setTimeout(() => {
-      // Navigate directly to dashboard (no authentication required)
       if (role === "farmer") {
         navigate("/farmer-dashboard");
       } else if (role === "insurer") {
-        navigate("/insurer-dashboard");
+        // In simulation mode, if email has "new" in it or matches "new@insurer.com", direct to onboarding!
+        if (email.toLowerCase().includes("new") || email.trim() === "") {
+          navigate("/onboarding");
+        } else {
+          navigate("/insurer-dashboard");
+        }
       } else if (role === "government") {
         navigate("/government-dashboard");
       } else if (role === "assessor") {
@@ -127,13 +160,37 @@ export const LoginPage = ({ role }: LoginPageProps) => {
     setIsLoading(true);
     setError("");
     
-    // Simulate loading for demo purposes
+    try {
+      // 1. Try real database registration
+      const payload = {
+        email,
+        password,
+        role: role.toUpperCase(),
+        ...registerData
+      };
+      const success = await register(payload);
+      if (success) {
+        if (role === "insurer") {
+          navigate("/onboarding");
+        } else if (role === "farmer") {
+          navigate("/farmer-dashboard");
+        } else if (role === "assessor") {
+          navigate("/assessor-dashboard");
+        }
+        setIsLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      console.warn("Real registration attempt did not succeed, executing preview simulation fallback:", err);
+    }
+
+    // 2. Fallback Preview / Simulation mode
     setTimeout(() => {
-      // Navigate directly to dashboard (no authentication required)
-      if (role === "farmer") {
+      if (role === "insurer") {
+        // Newly registered insurers must always start by completing their profile onboarding
+        navigate("/onboarding");
+      } else if (role === "farmer") {
         navigate("/farmer-dashboard");
-      } else if (role === "insurer") {
-        navigate("/insurer-dashboard");
       } else if (role === "assessor") {
         navigate("/assessor-dashboard");
       }

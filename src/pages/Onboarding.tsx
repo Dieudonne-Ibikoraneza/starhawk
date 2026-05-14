@@ -80,6 +80,20 @@ const Onboarding = () => {
         profilePictureUrl: profile.profilePictureUrl || profile.profilePhotoUrl || "",
         profilePhotoUrl: profile.profilePhotoUrl || "",
       }));
+    } else {
+      // Provide robust demo mock fallbacks for simulation/preview mode testing
+      setFormData(prev => ({
+        ...prev,
+        bio: "Senior Agricultural Underwriting Director at AgriSure Ltd. Specializing in high-yield grain and crop indices.",
+        companyName: "AgriSure Ltd",
+        contactPerson: "Sarah Johnson",
+        website: "https://www.agrisure.com",
+        address: "Kigali Heights, Kigali, Rwanda",
+        companyDescription: "AgriSure Ltd specializes in satellite-driven agricultural index insurance, climate resilience schemes, and smallholder farmer protection programs.",
+        licenseNumber: "LIC-2026-9042",
+        officialEmail: "contact@agrisure.com",
+        officialPhone: "+250 788 123 456",
+      }));
     }
   }, [profile]);
 

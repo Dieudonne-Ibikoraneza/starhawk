@@ -22,7 +22,9 @@ import {
   Send,
   Download,
   Activity,
+  Sparkles,
 } from "lucide-react";
+import { getRiskAnalysis, getInsight } from "@/services/aiApi";
 import {
   Claim,
   ClaimAssessment,
@@ -43,6 +45,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AiChatInterface } from "@/components/common/AiChatInterface";
 
 interface LossOverviewTabProps {
   claim: Claim;
@@ -83,6 +86,8 @@ export const LossOverviewTab = ({
   const [weatherImpactAnalysis, setWeatherImpactAnalysis] = useState("");
   const [notes, setNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [aiRiskAnalysis, setAiRiskAnalysis] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (assessment) {
@@ -92,6 +97,19 @@ export const LossOverviewTab = ({
       setNotes(assessment.notes || "");
     }
   }, [assessment]);
+
+  useEffect(() => {
+    if (claim?._id) {
+      loadExistingAiInsights();
+    }
+  }, [claim?._id]);
+
+  const loadExistingAiInsights = async () => {
+    const existing = await getInsight(claim._id, 'RISK_ANALYSIS');
+    if (existing) {
+      setAiRiskAnalysis(existing);
+    }
+  };
 
   const isCompleted = [
     "SUBMITTED",
@@ -158,6 +176,31 @@ export const LossOverviewTab = ({
 
   const removeObservation = (index: number) => {
     setObservations((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFetchAiInsights = async () => {
+    if (!claim) return;
+    setAiLoading(true);
+    try {
+      // In a real scenario, we would also pass weather and satellite data here
+      // For now we pass the claim and basic farm info
+      const analysis = await getRiskAnalysis(claim, assessment?.farmId || {}, {});
+      if (analysis) {
+        setAiRiskAnalysis(analysis);
+        toast({
+          title: "AI Analysis Complete",
+          description: "Starhawk AI has analyzed the claim risk factors.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "AI Error",
+        description: err.message || "Failed to connect to AI risk engine.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSave = () => {
@@ -263,7 +306,61 @@ export const LossOverviewTab = ({
           </div>
         </div>
 
-        {/* Observations Section */}
+      {/* Starhawk AI Insights Card */}
+      <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+          <Sparkles className="h-24 w-24 text-green-600" />
+        </div>
+        <CardHeader className="border-b border-green-100/50 pb-4">
+          <CardTitle className="text-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-green-600" />
+              </div>
+              <span className="text-green-900 font-bold">Starhawk AI Risk Insights</span>
+            </div>
+            {!aiRiskAnalysis && !aiLoading && (
+              <Button 
+                size="sm" 
+                onClick={handleFetchAiInsights}
+                className="bg-green-600 hover:bg-green-700 text-white shadow-sm gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                Analyze Risk
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {aiLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+              <p className="text-sm text-green-700 animate-pulse font-medium">Starhawk AI is cross-referencing satellite and claim data...</p>
+            </div>
+          ) : aiRiskAnalysis ? (
+            <AiChatInterface 
+              initialInsight={aiRiskAnalysis}
+              title="Starhawk AI Risk Insights"
+              role="ASSESSOR"
+              borderless={true}
+              suggestedQuestions={[
+                "Can you detail the red flags?",
+                "How can I verify the damage?",
+                "What is the confidence score based on?",
+                "Are there any weather anomalies?"
+              ]}
+            />
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 italic">
+                Request an AI risk assessment to verify claim validity against satellite and historical data.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Observations Section */}
         <Card className="overflow-hidden border border-gray-100 shadow-sm">
           <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center gap-2.5">
             <FileText className="h-5 w-5 text-gray-500" />
@@ -361,6 +458,60 @@ export const LossOverviewTab = ({
           Export Report
         </Button>
       </div>
+ 
+      {/* Starhawk AI Insights Card */}
+      <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+          <Sparkles className="h-24 w-24 text-green-600" />
+        </div>
+        <CardHeader className="border-b border-green-100/50 pb-4">
+          <CardTitle className="text-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-green-600" />
+              </div>
+              <span className="text-green-900 font-bold">Starhawk AI Risk Insights</span>
+            </div>
+            {!aiRiskAnalysis && !aiLoading && (
+              <Button 
+                size="sm" 
+                onClick={handleFetchAiInsights}
+                className="bg-green-600 hover:bg-green-700 text-white shadow-sm gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                Analyze Risk
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {aiLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+              <p className="text-sm text-green-700 animate-pulse font-medium">Starhawk AI is cross-referencing satellite and claim data...</p>
+            </div>
+          ) : aiRiskAnalysis ? (
+            <AiChatInterface 
+              initialInsight={aiRiskAnalysis}
+              title="Starhawk AI Risk Insights"
+              role="ASSESSOR"
+              borderless={true}
+              suggestedQuestions={[
+                "Can you detail the red flags?",
+                "How can I verify the damage?",
+                "What is the confidence score based on?",
+                "Are there any weather anomalies?"
+              ]}
+            />
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 italic">
+                Request an AI risk assessment to verify claim validity against satellite and historical data.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Observations Section */}
