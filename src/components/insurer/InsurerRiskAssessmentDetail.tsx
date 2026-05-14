@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, CheckCircle, AlertTriangle, MapPin, Download, Shield, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useParams } from "react-router-dom";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { createPolicyFromAssessment } from "@/services/policiesApi";
 import OverviewTab from "../assessor/tabs/OverviewTab";
@@ -18,15 +19,17 @@ import { WeatherAnalysisTab } from "../assessor/tabs/WeatherAnalysisTab";
 import { BasicInfoTab } from "../assessor/tabs/BasicInfoTab";
 
 export default function InsurerRiskAssessmentDetail({ 
-  assessmentId, 
+  assessmentId: propAssessmentId, 
   onBack, 
   onActionComplete 
 }: { 
-  assessmentId: string; 
-  onBack: () => void;
-  onActionComplete: () => void;
+  assessmentId?: string; 
+  onBack?: () => void;
+  onActionComplete?: () => void;
 }) {
   const { toast } = useToast();
+  const { assessmentId: paramAssessmentId } = useParams();
+  const assessmentId = propAssessmentId || paramAssessmentId || "";
   const [assessment, setAssessment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
@@ -149,7 +152,7 @@ export default function InsurerRiskAssessmentDetail({
       {/* Insurer Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div>
-          <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 text-gray-600 hover:text-gray-900">
+          <Button variant="ghost" onClick={onBack || (() => window.history.back())} className="mb-2 -ml-2 text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Risk Assessment Review</h1>
