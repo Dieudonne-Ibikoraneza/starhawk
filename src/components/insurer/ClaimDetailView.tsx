@@ -85,7 +85,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
     if (!currentClaim) return;
     setAiLoading(true);
     try {
-      const analysis = await getRiskAnalysis(currentClaim, currentFarm || {}, {});
+      const analysis = await getRiskAnalysis(currentClaim, currentFarm || {}, {}, 'INSURER');
       if (analysis) {
         setAiRiskAnalysis(analysis);
         toast({
@@ -123,7 +123,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
         }
 
         // Auto-fetch existing AI analysis
-        const existingAnalysis = await getInsight(claim.id, 'RISK_ANALYSIS');
+        const existingAnalysis = await getInsight(claim.id, 'RISK_ANALYSIS', 'INSURER');
         if (existingAnalysis) {
           setAiRiskAnalysis(existingAnalysis);
         }

@@ -105,7 +105,8 @@ export const LossOverviewTab = ({
   }, [claim?._id]);
 
   const loadExistingAiInsights = async () => {
-    const existing = await getInsight(claim._id, 'RISK_ANALYSIS');
+    const role = isInsurer ? 'INSURER' : 'ASSESSOR';
+    const existing = await getInsight(claim._id, 'RISK_ANALYSIS', role);
     if (existing) {
       setAiRiskAnalysis(existing);
     }
@@ -184,7 +185,8 @@ export const LossOverviewTab = ({
     try {
       // In a real scenario, we would also pass weather and satellite data here
       // For now we pass the claim and basic farm info
-      const analysis = await getRiskAnalysis(claim, assessment?.farmId || {}, {});
+      const role = isInsurer ? 'INSURER' : 'ASSESSOR';
+      const analysis = await getRiskAnalysis(claim, assessment?.farmId || {}, {}, role);
       if (analysis) {
         setAiRiskAnalysis(analysis);
         toast({

@@ -43,7 +43,7 @@ export async function getFarmerSuggestions(farmData: any, weatherData: any, ndvi
 /**
  * Get AI risk analysis for a claim
  */
-export async function getRiskAnalysis(claimData: any, farmData: any, satelliteData: any) {
+export async function getRiskAnalysis(claimData: any, farmData: any, satelliteData: any, role?: string) {
   const response = await fetch(`${API_BASE_URL}/ai-insights/risk-analysis`, {
     method: 'POST',
     headers: {
@@ -53,6 +53,7 @@ export async function getRiskAnalysis(claimData: any, farmData: any, satelliteDa
       claimData,
       farmData,
       satelliteData,
+      role
     }),
   });
 
@@ -117,9 +118,12 @@ export async function followUpChat(insightId: string, message: string) {
 /**
  * Fetch an existing AI insight if it exists
  */
-export async function getInsight(contextId: string, type: 'FARMER_ADVICE' | 'RISK_ANALYSIS' | 'MONITORING_CYCLE') {
+export async function getInsight(contextId: string, type: 'FARMER_ADVICE' | 'RISK_ANALYSIS' | 'MONITORING_CYCLE', role?: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/ai-insights/${contextId}/${type}`);
+    const url = role 
+      ? `${API_BASE_URL}/ai-insights/${contextId}/${type}?role=${role}`
+      : `${API_BASE_URL}/ai-insights/${contextId}/${type}`;
+    const response = await fetch(url);
     if (!response.ok) return null;
     const result = await response.json();
     return unwrap(result);
