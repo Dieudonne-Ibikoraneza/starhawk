@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ClaimDetailView from "./ClaimDetailView";
 import { getClaims, approveClaim as approveClaimApi, rejectClaim as rejectClaimApi } from "@/services/claimsApi";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { 
   Search,
   FileText,
@@ -39,6 +40,7 @@ interface ClaimsTableProps {
 
 export default function ClaimsTable({ onViewPolicy, initialClaimId }: ClaimsTableProps = {}) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
@@ -193,7 +195,7 @@ export default function ClaimsTable({ onViewPolicy, initialClaimId }: ClaimsTabl
   };
 
   const handleRowClick = (claim: Claim) => {
-    setSelectedClaim(claim);
+    navigate(`/insurer/claims/${claim.id}`);
   };
 
   const handleBackToList = () => {
@@ -291,17 +293,8 @@ export default function ClaimsTable({ onViewPolicy, initialClaimId }: ClaimsTabl
   const awaitingAssessorCount = claims.filter(c => c.status === 'pending_review' || c.status === 'pending_assignment').length || 3;
   const totalClaimedAmount = claims.reduce((sum, c) => sum + (c.claimAmount || 0), 0) || 605000;
 
-  if (selectedClaim) {
-    return (
-      <ClaimDetailView
-        claim={selectedClaim}
-        onBack={handleBackToList}
-        onApprove={handleApproveClaim}
-        onReject={handleRejectClaim}
-        onViewPolicy={onViewPolicy}
-      />
-    );
-  }
+  // The detail view is now handled by URL routing (/insurer/claims/:claimId)
+  // This ensures the back button works and sidebar highlighting is consistent.
 
   return (
     <div className="space-y-6">

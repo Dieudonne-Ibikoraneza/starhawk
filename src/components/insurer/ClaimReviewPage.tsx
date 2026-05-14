@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { approveClaim as approveClaimApi, rejectClaim as rejectClaimApi, getClaimById, getClaims } from "@/services/claimsApi";
 import { useToast } from "@/hooks/use-toast";
+import { useParams } from "react-router-dom";
 import { 
   ArrowLeft,
   FileText, 
@@ -30,12 +32,24 @@ import {
   Building2,
   Crop,
   TrendingUp,
-  Shield
+  Shield,
+  Sparkles,
+  Loader2,
+  Activity
 } from "lucide-react";
+import { AiChatInterface } from "../common/AiChatInterface";
+import { getRiskAnalysis, getInsight } from "@/services/aiApi";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LossOverviewTab } from "../assessor/tabs/loss/LossOverviewTab";
+import { LossEvidenceTab } from "../assessor/tabs/loss/LossEvidenceTab";
+import { LossBasicInfoTab } from "../assessor/tabs/loss/LossBasicInfoTab";
+import { LossDetailsTab } from "../assessor/tabs/loss/LossDetailsTab";
+import { getFarmById } from "@/services/farmsApi";
 
 export default function ClaimReviewPage() {
   const { toast } = useToast();
-  const [selectedClaimId, setSelectedClaimId] = useState<string>("");
+  const { claimId } = useParams();
+  const [selectedClaimId, setSelectedClaimId] = useState<string>(claimId || "");
   const [claims, setClaims] = useState<any[]>([]);
   const [currentClaim, setCurrentClaim] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +58,14 @@ export default function ClaimReviewPage() {
   const [reviewComments, setReviewComments] = useState("");
   const [approvedAmount, setApprovedAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentFarm, setCurrentFarm] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState("info");
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [isRejectionDialogOpen, setIsRejectionDialogOpen] = useState(false);
+
+  // AI States
+  const [aiRiskAnalysis, setAiRiskAnalysis] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Load claims list
   useEffect(() => {
@@ -93,6 +115,30 @@ export default function ClaimReviewPage() {
       const response: any = await getClaimById(claimId);
       const claimData = response.data || response;
       setCurrentClaim(claimData);
+      
+      const farmId = claimData?.farmId || claimData?.fieldId || claimData?.farm;
+      if (farmId) {
+        if (typeof farmId === 'object' && farmId !== null) {
+          setCurrentFarm(farmId);
+        } else {
+          try {
+            const farmRes = await getFarmById(farmId);
+            setCurrentFarm(farmRes?.data || farmRes);
+          } catch (err) {
+            console.error("Failed to fetch farm details:", err);
+          }
+        }
+      }
+
+      // Auto-fetch existing AI analysis
+      try {
+        const existingAnalysis = await getInsight(claimId, 'RISK_ANALYSIS', 'INSURER');
+        if (existingAnalysis) {
+          setAiRiskAnalysis(existingAnalysis);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch existing AI analysis:", err);
+      }
     } catch (err: any) {
       console.error('Failed to load claim details:', err);
       toast({
@@ -105,35 +151,57 @@ export default function ClaimReviewPage() {
     }
   };
 
+  const handleFetchAiInsights = async () => {
+    if (!currentClaim) return;
+    setAiLoading(true);
+    try {
+      const analysis = await getRiskAnalysis(currentClaim, currentFarm || {}, {}, 'INSURER');
+      if (analysis) {
+        setAiRiskAnalysis(analysis);
+        toast({
+          title: "AI Analysis Complete",
+          description: "Starhawk AI has completed the claim risk evaluation.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "AI Error",
+        description: err.message || "Failed to connect to AI risk engine.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending_review": return "bg-yellow-100 text-yellow-800";
-      case "approved": return "bg-green-100 text-green-800";
-      case "rejected": return "bg-red-100 text-red-800";
-      case "under_investigation": return "bg-blue-100 text-blue-800";
-      default: return "bg-gray-100 text-gray-700 border border-gray-200";
+    const s = status?.toLowerCase();
+    switch (s) {
+      case "pending":
+      case "pending_review": return "bg-amber-100 text-amber-800 border-amber-200";
+      case "approved": return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      case "rejected": return "bg-rose-100 text-rose-800 border-rose-200";
+      case "under_investigation":
+      case "in_progress": return "bg-blue-100 text-blue-800 border-blue-200";
+      default: return "bg-slate-100 text-slate-700 border-slate-200";
     }
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending_review": return <Clock className="h-4 w-4" />;
-      case "approved": return <CheckCircle className="h-4 w-4" />;
-      case "rejected": return <XCircle className="h-4 w-4" />;
-      case "under_investigation": return <AlertTriangle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+    const s = status?.toLowerCase();
+    switch (s) {
+      case "pending":
+      case "pending_review": return <Clock className="h-3.5 w-3.5" />;
+      case "approved": return <CheckCircle className="h-3.5 w-3.5" />;
+      case "rejected": return <XCircle className="h-3.5 w-3.5" />;
+      case "under_investigation":
+      case "in_progress": return <Activity className="h-3.5 w-3.5" />;
+      default: return <Clock className="h-3.5 w-3.5" />;
     }
   };
 
   const handleSubmitReview = async () => {
-    if (!reviewDecision || !reviewComments) {
-      toast({
-        title: "Error",
-        description: "Please provide both decision and comments",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!reviewDecision) return;
 
     if (!selectedClaimId) {
       toast({
@@ -147,30 +215,38 @@ export default function ClaimReviewPage() {
     setIsSubmitting(true);
     try {
       if (reviewDecision === "approve") {
-        const amount = approvedAmount ? parseFloat(approvedAmount) : undefined;
-        await approveClaimApi(selectedClaimId, amount, reviewComments);
+        if (!approvedAmount) {
+           toast({ title: "Error", description: "Please provide payout amount", variant: "destructive" });
+           setIsSubmitting(false);
+           return;
+        }
+        const amount = parseFloat(approvedAmount);
+        await approveClaimApi(selectedClaimId, amount, reviewComments || "Claim approved after verification.");
         toast({
           title: "Success",
           description: "Claim approved successfully",
           variant: "default",
         });
-        // Reload claims
-        loadClaims();
-        if (selectedClaimId) {
-          loadClaimDetails(selectedClaimId);
-        }
+        setIsApprovalDialogOpen(false);
       } else if (reviewDecision === "reject") {
+        if (!reviewComments) {
+           toast({ title: "Error", description: "Please provide rejection reason", variant: "destructive" });
+           setIsSubmitting(false);
+           return;
+        }
         await rejectClaimApi(selectedClaimId, reviewComments);
         toast({
           title: "Success",
           description: "Claim rejected successfully",
           variant: "default",
         });
-        // Reload claims
-        loadClaims();
-        if (selectedClaimId) {
-          loadClaimDetails(selectedClaimId);
-        }
+        setIsRejectionDialogOpen(false);
+      }
+      
+      // Reload data
+      loadClaims();
+      if (selectedClaimId) {
+        loadClaimDetails(selectedClaimId);
       }
     } catch (err: any) {
       console.error('Failed to submit review:', err);
@@ -181,12 +257,10 @@ export default function ClaimReviewPage() {
       });
     } finally {
       setIsSubmitting(false);
+      setReviewDecision("");
+      setReviewComments("");
+      setApprovedAmount("");
     }
-    
-    // Reset form
-    setReviewDecision("");
-    setReviewComments("");
-    setApprovedAmount("");
   };
 
   const renderClaimSummary = () => (
@@ -460,180 +534,307 @@ export default function ClaimReviewPage() {
     </Card>
   );
 
-  const renderReviewForm = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <CheckCircle className="h-5 w-5 mr-2" />
-          Claim Review Decision
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="reviewDecision">Decision</Label>
-          <Select value={reviewDecision} onValueChange={setReviewDecision}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select decision" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="approved">Approve Claim</SelectItem>
-              <SelectItem value="rejected">Reject Claim</SelectItem>
-              <SelectItem value="partial_approval">Partial Approval</SelectItem>
-              <SelectItem value="requires_more_info">Requires More Information</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {reviewDecision === "partial_approval" && (
-          <div className="space-y-2">
-            <Label htmlFor="approvedAmount">Approved Amount (RWF)</Label>
-            <Input
-              id="approvedAmount"
-              type="number"
-              value={approvedAmount}
-              onChange={(e) => setApprovedAmount(e.target.value)}
-              placeholder="Enter approved amount"
-            />
+  // This function is replaced by Dialogs
+  const renderDecisionDialogs = () => (
+    <>
+      {/* Approval Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              Approve Claim
+            </DialogTitle>
+            <DialogDescription>
+              Set the final payout amount for this claim settlement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="approvedAmount" className="text-xs font-bold text-gray-500 uppercase">Payout Amount (RWF)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="approvedAmount"
+                  type="number"
+                  value={approvedAmount}
+                  onChange={(e) => setApprovedAmount(e.target.value)}
+                  placeholder="e.g. 500000"
+                  className="pl-10 h-12 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="appComments" className="text-xs font-bold text-gray-500 uppercase">Approval Comments (Optional)</Label>
+              <Textarea
+                id="appComments"
+                value={reviewComments}
+                onChange={(e) => setReviewComments(e.target.value)}
+                placeholder="Add any internal notes..."
+                className="rounded-xl min-h-[80px]"
+              />
+            </div>
           </div>
-        )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                setReviewDecision("approve");
+                handleSubmitReview();
+              }}
+              disabled={isSubmitting || !approvedAmount}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              Confirm Approval
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <div className="space-y-2">
-          <Label htmlFor="reviewComments">Review Comments</Label>
-          <Textarea
-            id="reviewComments"
-            value={reviewComments}
-            onChange={(e) => setReviewComments(e.target.value)}
-            placeholder="Provide detailed comments about your decision..."
-            rows={4}
-          />
-        </div>
-
-        <div className="flex space-x-4">
-          <Button 
-            onClick={handleSubmitReview}
-            disabled={isSubmitting || !reviewDecision || !reviewComments}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {isSubmitting ? "Submitting..." : "Submit Review"}
-          </Button>
-          <Button variant="outline">
-            Save as Draft
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      {/* Rejection Dialog */}
+      <Dialog open={isRejectionDialogOpen} onOpenChange={setIsRejectionDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Reject Claim
+            </DialogTitle>
+            <DialogDescription>
+              Provide a detailed reason for rejecting this claim.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejReason" className="text-xs font-bold text-gray-500 uppercase">Rejection Reason</Label>
+              <Textarea
+                id="rejReason"
+                value={reviewComments}
+                onChange={(e) => setReviewComments(e.target.value)}
+                placeholder="Explain the reason for rejection..."
+                className="rounded-xl min-h-[120px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRejectionDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                setReviewDecision("reject");
+                handleSubmitReview();
+              }}
+              disabled={isSubmitting || !reviewComments}
+              variant="destructive"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+              Confirm Rejection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 
+  const farmerName = currentClaim?.farmerId?.firstName && currentClaim?.farmerId?.lastName
+    ? `${currentClaim.farmerId.firstName} ${currentClaim.farmerId.lastName}`
+    : currentClaim?.farmer?.firstName && currentClaim?.farmer?.lastName
+    ? `${currentClaim.farmer.firstName} ${currentClaim.farmer.lastName}`
+    : currentClaim?.farmerName || currentFarm?.farmerId?.firstName || currentFarm?.farmerName || 'N/A';
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="mb-4">
-        <Button 
-          variant="ghost" 
-          onClick={() => window.history.back()}
-          className="text-gray-600 hover:text-gray-700 mb-2"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Claims
-        </Button>
-        <h1 className="text-2xl font-bold text-gray-900">Claim Review</h1>
-        <p className="text-sm text-gray-600 mt-1">Review and make decisions on insurance claims</p>
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <Button 
+            variant="ghost" 
+            onClick={() => window.history.back()}
+            className="text-gray-500 hover:text-gray-700 -ml-2 mb-2 h-8"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Claims
+          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Claim Review: {currentClaim?._id?.slice(-8).toUpperCase() || currentClaim?.id?.slice(-8).toUpperCase() || 'N/A'}
+            </h1>
+            <Badge className={getStatusColor(currentClaim?.status || "") + " border-0 shadow-none px-3 py-1 font-bold text-[10px]"}>
+              {getStatusIcon(currentClaim?.status || "")}
+              <span className="ml-1.5 capitalize">{currentClaim?.status?.replace('_', ' ')}</span>
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-600 mt-1 font-medium flex items-center">
+            <User className="h-4 w-4 mr-1.5 text-gray-400" />
+            Farmer: <span className="text-gray-900 ml-1">{farmerName}</span>
+          </p>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+           {currentClaim?.status?.toLowerCase() === 'approved' ? (
+             <div className="text-right hidden md:block">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Payout Amount</p>
+                <p className="text-lg font-bold text-green-600">
+                  {(currentClaim?.payoutAmount || currentClaim?.amount || currentClaim?.claimAmount || 0).toLocaleString()} RWF
+                </p>
+             </div>
+           ) : (
+             (currentClaim?.status?.toLowerCase() === 'pending' || 
+              currentClaim?.status?.toLowerCase() === 'pending_review' || 
+              currentClaim?.status?.toLowerCase() === 'in_progress') && (
+               <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setIsApprovalDialogOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 px-6 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button 
+                    onClick={() => setIsRejectionDialogOpen(true)}
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50 font-bold h-10 px-6 rounded-xl transition-all hover:scale-105 active:scale-95"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+               </div>
+             )
+           )}
+        </div>
       </div>
         
-      <div className="flex items-center space-x-2">
-          {loading ? (
-            <div className="text-gray-500">Loading claims...</div>
-          ) : (
-            <Select value={selectedClaimId} onValueChange={setSelectedClaimId}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select a claim" />
-              </SelectTrigger>
-              <SelectContent>
-                {claims.length === 0 ? (
-                  <SelectItem value="none" disabled>No claims available</SelectItem>
-                ) : (
-                  claims.map((claim: any) => (
-                    <SelectItem key={claim._id || claim.id} value={claim._id || claim.id}>
-                      {claim._id || claim.id} - {claim.farmer?.firstName && claim.farmer?.lastName
-                        ? `${claim.farmer.firstName} ${claim.farmer.lastName}`
-                        : claim.farmer?.name || claim.farmerName || 'Unknown Farmer'}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          )}
-      </div>
-
       {/* Loading State */}
       {loadingClaim ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-20 bg-white rounded-2xl border border-gray-100">
           <div className="text-center">
-            <Clock className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
-            <p className="text-gray-500">Loading claim details...</p>
+            <Clock className="h-10 w-10 animate-spin text-blue-500 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">Loading comprehensive claim data...</p>
           </div>
         </div>
       ) : !currentClaim ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-20 bg-white rounded-2xl border border-gray-100">
           <div className="text-center">
-            <FileText className="h-12 w-12 mx-auto mb-4 text-white/40" />
-            <p className="text-gray-500">Please select a claim to review</p>
+            <FileText className="h-12 w-12 mx-auto mb-4 text-gray-200" />
+            <p className="text-gray-500 font-medium">Claim not found or access denied</p>
+            <Button onClick={() => window.history.back()} variant="link" className="mt-2">Return to claims list</Button>
           </div>
         </div>
       ) : (
         <>
           {/* Alert for pending review */}
           {(currentClaim?.status === "pending_review" || currentClaim?.status === "pending") && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                This claim is pending review. Please review all information and make a decision.
+            <Alert className="bg-blue-50 border-blue-100 text-blue-800 rounded-xl">
+              <AlertTriangle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="font-medium">
+                This claim is pending review. Please verify all satellite evidence and assessor reports before making a final decision.
               </AlertDescription>
             </Alert>
           )}
 
           {/* Main Content Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Column - Claim Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {renderClaimSummary()}
-              {renderFarmerInfo()}
-              {renderPolicyInfo()}
-              {renderAssessmentInfo()}
-              {renderPhotos()}
-              {renderDocuments()}
-            </div>
+          <div className="space-y-6">
+            {/* Starhawk AI Insights Card - Header Takeover */}
+            <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                <Sparkles className="h-24 w-24 text-green-600" />
+              </div>
+              <CardHeader className="border-b border-green-100/50 pb-4">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                      <Sparkles className="h-4 w-4 text-green-600" />
+                    </div>
+                    <span className="text-green-900 font-bold">Starhawk AI Decision Support</span>
+                  </div>
+                  {!aiRiskAnalysis && !aiLoading && (
+                    <Button 
+                      size="sm" 
+                      onClick={handleFetchAiInsights}
+                      className="bg-green-600 hover:bg-green-700 text-white shadow-sm gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Verify with AI
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {aiLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+                    <p className="text-sm text-green-700 animate-pulse font-medium">Starhawk AI is validating claim parameters...</p>
+                  </div>
+                ) : aiRiskAnalysis ? (
+                  <AiChatInterface 
+                    initialInsight={aiRiskAnalysis}
+                    title="Starhawk AI Decision Support"
+                    role="INSURER"
+                    borderless={true}
+                    suggestedQuestions={[
+                      "Why is this claim High Risk?",
+                      "Are the drone reports valid?",
+                      "What are the specific red flags?",
+                      "How does the NDVI compare?"
+                    ]}
+                  />
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500 italic">
+                      Utilize Starhawk AI to cross-reference this claim against satellite vegetation indices and weather reports.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            {/* Right Column - Review Form */}
-            <div className="space-y-6">
-              {renderReviewForm()}
-              
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Full Assessment Report
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    View Field Location
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Schedule Follow-up Visit
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Contact All Parties
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Main Content - Tabs */}
+              <div className="lg:col-span-3 space-y-6">
+                <Card className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
+                  <CardContent className="p-6">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                      <TabsList className="grid w-full grid-cols-4 border border-gray-100 bg-gray-50/50 p-1">
+                        <TabsTrigger value="info" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Basic Info</TabsTrigger>
+                        <TabsTrigger value="evidence" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Evidence</TabsTrigger>
+                        <TabsTrigger value="details" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Loss Details</TabsTrigger>
+                        <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Overview</TabsTrigger>
+                      </TabsList>
+
+                      <div className="mt-6">
+                        <TabsContent value="info">
+                          <LossBasicInfoTab 
+                            field={currentFarm} 
+                            claim={currentClaim} 
+                            farmerName={farmerName}
+                          />
+                        </TabsContent>
+                        <TabsContent value="evidence">
+                          <LossEvidenceTab 
+                            claim={currentClaim} 
+                            isInsurer={true}
+                          />
+                        </TabsContent>
+                        <TabsContent value="details">
+                          <LossDetailsTab 
+                            claim={currentClaim} 
+                            isInsurer={true}
+                          />
+                        </TabsContent>
+                        <TabsContent value="overview">
+                          <LossOverviewTab 
+                            claim={currentClaim} 
+                            fieldName={currentFarm?.name || "Field"} 
+                            isInsurer={true} 
+                          />
+                        </TabsContent>
+                      </div>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
+          {renderDecisionDialogs()}
         </>
       )}
     </div>

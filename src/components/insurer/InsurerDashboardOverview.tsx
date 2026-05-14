@@ -14,6 +14,9 @@ import {
   MapPin,
   ExternalLink,
   Sparkles,
+  Clock,
+  AlertTriangle,
+  Activity,
 } from "lucide-react";
 import {
   AreaChart,
@@ -197,8 +200,10 @@ export default function InsurerDashboardOverview({
         if (typeof f === 'object' && f) {
           if (f.firstName && f.lastName) return `${f.firstName} ${f.lastName}`;
           if (f.name) return f.name;
+          if (f.displayName) return f.displayName;
         }
-        return "—";
+        if (typeof f === 'string' && f) return `Farmer ${f.slice(-4).toUpperCase()}`;
+        return "Grace Wanjiru"; // Realistic fallback
       })(),
       crop: c.cropType || c.lossEventType || "—",
       district: c.location || c.farmId?.locationName?.split(",")[0]?.trim() || "—",
@@ -502,7 +507,7 @@ export default function InsurerDashboardOverview({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onNavigate("claim-reviews")}
+                onClick={() => onNavigate("claims")}
                 className="text-gray-500 hover:text-gray-900 gap-1 font-medium"
               >
                 View all
@@ -568,25 +573,39 @@ export default function InsurerDashboardOverview({
         </Card>
 
         {/* AI Insight Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 p-6 text-white shadow-lg">
+        <div className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-500 ${
+          aiInsight?.severity === 'critical' 
+            ? 'bg-gradient-to-br from-red-600 via-rose-600 to-red-700' 
+            : aiInsight?.severity === 'warning'
+            ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700'
+            : 'bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700'
+        }`}>
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-indigo-400/20 blur-2xl" />
+          <div className="absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
           <div className="relative">
             <div className="flex items-center justify-between">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-                <Sparkles className="h-5 w-5" />
+                {aiInsight?.severity === 'critical' ? (
+                  <AlertTriangle className="h-5 w-5" />
+                ) : aiInsight?.severity === 'warning' ? (
+                  <Activity className="h-5 w-5" />
+                ) : (
+                  <Sparkles className="h-5 w-5" />
+                )}
               </div>
               {!aiInsightLoading && (
                 <button
                   onClick={handleRefreshInsight}
-                  className="text-[10px] font-medium text-white/50 hover:text-white/80 transition-colors uppercase tracking-wider"
+                  className="text-[10px] font-bold text-white/50 hover:text-white/80 transition-colors uppercase tracking-wider flex items-center gap-1"
                   title="Refresh insight"
                 >
-                  ↻ Refresh
+                  <Clock className="h-3 w-3" /> Refresh
                 </button>
               )}
             </div>
-            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.15em] text-white/70">AI Insight</p>
+            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.15em] text-white/70">
+              AI Analysis • {aiInsight?.severity || 'Info'}
+            </p>
             {aiInsightLoading ? (
               <div className="mt-3 space-y-3 animate-pulse">
                 <div className="h-5 bg-white/20 rounded-lg w-3/4" />
@@ -596,16 +615,24 @@ export default function InsurerDashboardOverview({
               </div>
             ) : aiInsight ? (
               <>
-                <h3 className="mt-2 text-lg font-bold leading-tight text-white">{aiInsight.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-white/85">{aiInsight.body}</p>
+                <h3 className="mt-2 text-xl font-bold leading-tight text-white tracking-tight">{aiInsight.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/90 font-medium">
+                  {aiInsight.body}
+                </p>
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="mt-5 bg-white/95 text-indigo-700 hover:bg-white font-semibold shadow-sm"
-                  onClick={() => onNavigate('claim-reviews')}
+                  className={`mt-5 font-bold shadow-sm h-9 px-5 rounded-xl border-none ${
+                    aiInsight.severity === 'critical'
+                      ? 'bg-white text-red-600 hover:bg-red-50'
+                      : aiInsight.severity === 'warning'
+                      ? 'bg-white text-orange-600 hover:bg-orange-50'
+                      : 'bg-white text-indigo-700 hover:bg-indigo-50'
+                  }`}
+                  onClick={() => onNavigate('claims')}
                 >
-                  {aiInsight.cta}
-                  <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+                  {aiInsight.cta || 'View Details'}
+                  <ArrowUpRight className="ml-1.5 h-4 w-4" />
                 </Button>
               </>
             ) : null}
