@@ -370,12 +370,12 @@ export default function PolicyDetailsPage() {
       navigationItems={navigationItems}
       activePage="policies"
       onPageChange={(page) => {
-        if (page === "dashboard") navigate("/insurer-dashboard");
-        else if (page === "claims") navigate("/insurer-dashboard?tab=claims");
-        else if (page === "policies") navigate("/insurer-dashboard?tab=policies");
-        else if (page === "assessments") navigate("/insurer-dashboard?tab=assessments");
-        else if (page === "notifications") navigate("/insurer-dashboard?tab=notifications");
-        else if (page === "profile") navigate("/insurer-dashboard?tab=profile");
+        if (page === "dashboard") navigate("/insurer/dashboard");
+        else if (page === "claims") navigate("/insurer/claims");
+        else if (page === "policies") navigate("/insurer/policies");
+        else if (page === "assessments") navigate("/insurer/assessments");
+        else if (page === "notifications") navigate("/insurer/alerts");
+        else if (page === "profile") navigate("/insurer/settings");
       }}
       onLogout={() => {
         localStorage.removeItem("userToken");

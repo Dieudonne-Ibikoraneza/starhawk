@@ -114,7 +114,7 @@ const Onboarding = () => {
       toast.success("Onboarding complete! Welcome to Starhawk.");
       
       // Navigate based on role
-      if (profile?.role === "INSURER") navigate("/insurer-dashboard");
+      if (profile?.role === "INSURER") navigate("/insurer/dashboard");
       else if (profile?.role === "ASSESSOR") navigate("/assessor-dashboard");
       else if (profile?.role === "FARMER") navigate("/farmer-dashboard");
       else navigate("/");

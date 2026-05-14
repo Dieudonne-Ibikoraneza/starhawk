@@ -22,9 +22,10 @@ interface FarmDetailsTabProps {
   onViewPolicy: (policyId: string) => void;
   onFileClaim: (policyId: string) => void;
   activePolicy?: any;
+  hideAiCard?: boolean;
 }
 
-export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileClaim, activePolicy }: FarmDetailsTabProps) {
+export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileClaim, activePolicy, hideAiCard = false }: FarmDetailsTabProps) {
   const { toast } = useToast();
   const [farm, setFarm] = useState<any>(null);
   const [monitoring, setMonitoring] = useState<any>(null);
@@ -246,7 +247,8 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
           </Card>
 
           {/* AI Insights Card */}
-          <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
+          {!hideAiCard && (
+            <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <Sparkles className="h-24 w-24 text-green-600" />
             </div>
@@ -298,6 +300,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
               )}
             </CardContent>
           </Card>
+        )}
 
           {/* AI Monitoring Cycle & Marketability Card */}
           <Card className="border-blue-200 shadow-md bg-gradient-to-br from-white to-blue-50 overflow-hidden">

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Team from "./pages/Team";
@@ -31,6 +31,12 @@ import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
+// Helper for legacy redirects
+const NavigateToNewPath = () => {
+  const { section, '*': subpath } = useParams();
+  return <Navigate to={`/insurer/${section}${subpath ? `/${subpath}` : ''}`} replace />;
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -52,7 +58,14 @@ const App = () => {
               {/* Dashboard Routes */}
               <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
               <Route path="/assessor-dashboard" element={<AssessorDashboard />} />
-              <Route path="/insurer-dashboard" element={<InsurerDashboard />} />
+              <Route path="/insurer/*" element={<InsurerDashboard />} />
+              
+              {/* Legacy Redirects - Improved to handle sub-paths */}
+              <Route path="/insurer-dashboard" element={<Navigate to="/insurer/dashboard" replace />} />
+              <Route 
+                path="/insurer-dashboard/:section/*" 
+                element={<NavigateToNewPath />} 
+              />
               <Route path="/admin-dashboard" element={<AdminDashboard />} />
               
               {/* User Details Route */}

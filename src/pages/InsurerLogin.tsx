@@ -45,7 +45,7 @@ export default function InsurerLogin() {
         description: `Welcome Insurer ${data.email || data.phoneNumber}`,
       });
       // Redirect to insurer dashboard
-      navigate('/insurer-dashboard');
+      navigate('/insurer/dashboard');
     } catch (err: any) {
       console.error("Login error:", err);
       const errorMessage = err.message || "Invalid credentials. Please check your phone number and password.";

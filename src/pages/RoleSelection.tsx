@@ -22,7 +22,7 @@ const DEMO_CREDENTIALS: Record<string, { password: string; role: string; name: s
 
 const DEMO_CARD_LIST = [
   { icon: Wheat,     label: "Farmer",     phone: "0791998365", password: "farmer@123",  route: "/farmer-dashboard" },
-  { icon: Building2, label: "Insurer",    phone: "0781000001", password: "insurer@123", route: "/insurer-dashboard" },
+  { icon: Building2, label: "Insurer",    phone: "0781000001", password: "insurer@123", route: "/insurer/dashboard" },
   { icon: MapPin,    label: "Assessor",   phone: "0781000002", password: "assess@123",  route: "/assessor-dashboard" },
   { icon: BarChart3, label: "Government", phone: "0781000003", password: "gov@123",     route: "/government-dashboard" },
   { icon: Settings,  label: "Admin",      phone: "0781000004", password: "admin@123",   route: "/admin-dashboard" },
@@ -74,7 +74,7 @@ export default function RoleSelection() {
     const map: Record<string, string> = {
       FARMER: "/farmer-dashboard",
       ASSESSOR: "/assessor-dashboard",
-      INSURER: "/insurer-dashboard",
+      INSURER: "/insurer/dashboard",
       GOVERNMENT: "/government-dashboard",
       ADMIN: "/admin-dashboard",
     };

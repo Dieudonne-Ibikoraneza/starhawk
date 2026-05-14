@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PolicyDetailsView from "./PolicyDetailsView";
 import { getPolicies } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate, useParams } from "react-router-dom";
 import { 
   Search,
   Filter,
@@ -23,36 +24,15 @@ import {
   X
 } from "lucide-react";
 
-interface Policy {
-  id: string;
-  policyNumber: string;
-  farmerId: string;
-  farmerName: string;
-  cropType: string;
-  coverageAmount: number;
-  premiumAmount: number;
-  startDate: string;
-  endDate: string;
-  status: "active" | "pending" | "expired" | "cancelled";
-  location: string;
-  farmSize: number;
-  farmName: string;
-  riskLevel: "low" | "medium" | "high";
-  deductible: number;
-  createdAt: string;
-  coverageLevel: string;
-}
-
-interface PolicyManagementProps {
-  selectedPolicyIdFromNav?: string | null;
-  onClearPolicyNav?: () => void;
-}
+// ... (interface Policy and PolicyManagementProps remain same)
 
 export default function PolicyManagement({ 
   selectedPolicyIdFromNav, 
   onClearPolicyNav 
 }: PolicyManagementProps = {}) {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { policyId: paramPolicyId } = useParams();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,20 +47,22 @@ export default function PolicyManagement({
     loadPolicies();
   }, []);
 
-  // Handle auto-linking from claims
+  // Handle URL param and auto-linking
   useEffect(() => {
-    if (selectedPolicyIdFromNav && policies.length > 0) {
-      const found = policies.find(p => p.id === selectedPolicyIdFromNav);
+    const targetId = paramPolicyId || selectedPolicyIdFromNav;
+    if (targetId && policies.length > 0) {
+      const found = policies.find(p => p.id === targetId);
       if (found) {
         setViewingPolicy(found);
       }
-      if (onClearPolicyNav) {
+      if (selectedPolicyIdFromNav && onClearPolicyNav) {
         onClearPolicyNav();
       }
     }
-  }, [selectedPolicyIdFromNav, policies]);
+  }, [paramPolicyId, selectedPolicyIdFromNav, policies]);
 
   const loadPolicies = async () => {
+    // ... (rest of loadPolicies remains same)
     setLoading(true);
     setError(null);
     try {
@@ -198,10 +180,11 @@ export default function PolicyManagement({
   });
 
   const handleViewPolicy = (policy: Policy) => {
-    setViewingPolicy(policy);
+    navigate(`/insurer/policies/${policy.id}`);
   };
 
   const handleBackToList = () => {
+    navigate('/insurer/policies');
     setViewingPolicy(null);
   };
 
