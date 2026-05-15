@@ -19,8 +19,11 @@ import {
   Shield,
   Building2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search
 } from "lucide-react";
+import { Topbar } from "./Topbar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -36,6 +39,7 @@ interface DashboardLayoutProps {
   activePage: string;
   onPageChange: (page: string) => void;
   onLogout: () => void;
+  userEmail?: string;
 }
 
 export default function DashboardLayout({
@@ -46,7 +50,8 @@ export default function DashboardLayout({
   navigationItems,
   activePage,
   onPageChange,
-  onLogout
+  onLogout,
+  userEmail
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -153,6 +158,7 @@ export default function DashboardLayout({
   };
 
   return (
+    <TooltipProvider delayDuration={0}>
      <div className="dashboard-layout min-h-screen bg-gray-50 flex relative">
       
       {/* Mobile sidebar overlay */}
@@ -168,64 +174,24 @@ export default function DashboardLayout({
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64`}>
         <div className="flex flex-col h-full">
-          {/* Mobile Close Button & Desktop Toggle */}
-          <div className={`flex items-center border-b border-gray-200 ${sidebarCollapsed ? 'justify-center p-4' : 'justify-between p-4'}`}>
-            {!sidebarCollapsed && (
-              <div className="flex-1 min-w-0 lg:block hidden">
-                <div className="flex items-center space-x-3 p-3 rounded-xl">
-                  {userType === "assessor" ? (
-                    <img src="/assessor.webp" alt="Assessor" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <div className={`w-10 h-10 ${getUserColor()} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                      <div className="text-white">
-                        {getUserIcon()}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
-                    <p className="text-xs text-gray-600 truncate">{getUserLabel()}</p>
-                  </div>
+          {/* Sidebar Header */}
+          <div className={`flex items-center border-b border-gray-200 p-4 min-h-[72px] ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+            {!sidebarCollapsed ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">Starhawk</h1>
+                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">Insurer Console</p>
                 </div>
               </div>
-            )}
-            {sidebarCollapsed && (
-              <div className="flex items-center justify-center gap-2 w-full lg:block hidden">
-                {userType === "assessor" ? (
-                  <img src="/assessor.webp" alt="Assessor" className="w-10 h-10 rounded-full object-cover" />
-                ) : (
-                  <div className={`w-10 h-10 ${getUserColor()} rounded-full flex items-center justify-center overflow-hidden`}>
-                    <div className="text-white">
-                      {getUserIcon()}
-                    </div>
-                  </div>
-                )}
-                {/* Desktop Toggle Button - Next to icon when collapsed */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hover:bg-gray-100 text-gray-700 p-1 h-auto"
-                  onClick={toggleSidebar}
-                  title="Expand sidebar"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+            ) : (
+              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                <Shield className="h-6 w-6 text-white" />
               </div>
             )}
-            {!sidebarCollapsed && (
-              <div className="flex items-center gap-2 lg:block hidden">
-                {/* Desktop Toggle Button - Right side when expanded */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hover:bg-gray-100 text-gray-700"
-                  onClick={toggleSidebar}
-                  title="Collapse sidebar"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            
             {/* Mobile Close Button */}
             <Button
               variant="ghost"
@@ -237,24 +203,6 @@ export default function DashboardLayout({
             </Button>
           </div>
 
-          {/* User Info - Mobile Only */}
-          <div className="p-4 border-b border-gray-200 lg:hidden">
-            <div className="flex items-center space-x-3 p-3 rounded-xl">
-              {userType === "assessor" ? (
-                <img src="/assessor.webp" alt="Assessor" className="w-10 h-10 rounded-full object-cover" />
-              ) : (
-                <div className={`w-10 h-10 ${getUserColor()} rounded-full flex items-center justify-center overflow-hidden`}>
-                  <div className="text-white">
-                    {getUserIcon()}
-                  </div>
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
-                <p className="text-xs text-gray-600 truncate">{getUserLabel()}</p>
-              </div>
-            </div>
-          </div>
 
 
           {/* Navigation */}
@@ -267,7 +215,7 @@ export default function DashboardLayout({
               const isActive = activePage === item.id;
               const colors = getNavigationColors(index);
               
-              return (
+              const navButton = (
                 <button
                   key={item.id}
                   onClick={() => {
@@ -279,7 +227,6 @@ export default function DashboardLayout({
                       ? `${colors.activeBg} ${colors.activeText} shadow-sm ${colors.activeBorder}`
                       : `text-gray-700 ${colors.hover}`
                   }`}
-                  title={sidebarCollapsed ? item.label : undefined}
                 >
                   {sidebarCollapsed ? (
                     // Collapsed: Only icon
@@ -309,6 +256,21 @@ export default function DashboardLayout({
                   )}
                 </button>
               );
+
+              if (sidebarCollapsed) {
+                return (
+                  <Tooltip key={item.id}>
+                    <TooltipTrigger asChild>
+                      {navButton}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-slate-900 text-white border-none font-bold">
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return navButton;
             })}
             </div>
           </nav>
@@ -350,22 +312,24 @@ export default function DashboardLayout({
           </div>
         </div>
       </div>
-
       {/* Main Content */}
       <div className={`flex-1 flex flex-col min-w-0 bg-gray-50 transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'
       }`}>
-        {/* Mobile Menu Button */}
-        <div className="lg:hidden fixed top-4 left-4 z-40">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="bg-white backdrop-blur-sm hover:bg-gray-100 shadow-lg rounded-2xl border border-gray-200"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-5 w-5 text-gray-700" />
-          </Button>
-        </div>
+        {/* Top Header */}
+        <Topbar 
+          onToggleSidebar={() => {
+            if (window.innerWidth >= 1024) {
+              toggleSidebar();
+            } else {
+              setSidebarOpen(!sidebarOpen);
+            }
+          }}
+          sidebarCollapsed={sidebarCollapsed}
+          userName={userName}
+          userEmail={userEmail}
+          userRole={getUserLabel()}
+        />
 
          {/* Page Content */}
          <main className="flex-1 overflow-auto bg-gray-50">
@@ -375,5 +339,6 @@ export default function DashboardLayout({
          </main>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
