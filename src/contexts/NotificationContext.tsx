@@ -98,7 +98,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
                 timestamp: date,
                 read: false,
                 status: "unread",
-                href: "/assessor/risk-assessments",
+                href: `/assessor/risk-assessments/${aId}`,
                 farmerName,
                 location,
                 assessmentId: aId
@@ -160,7 +160,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
                 timestamp: date,
                 read: false,
                 status: "unread",
-                href: "/assessor/loss-assessments",
+                href: `/assessor/loss-assessments/${cId}`,
                 farmerName,
                 location,
                 claimId: cId

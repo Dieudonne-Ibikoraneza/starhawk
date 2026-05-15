@@ -19,6 +19,9 @@ import AssessorNotifications from "../assessor/AssessorNotifications";
 import AssessorProfileSettings from "../assessor/AssessorProfileSettings";
 import RiskAssessmentSystem from "../assessor/RiskAssessmentSystem";
 import LossAssessmentSystem from "../assessor/LossAssessmentSystem";
+import RiskAssessmentDetail from "../assessor/RiskAssessmentDetail";
+import LossAssessmentDetail from "../assessor/LossAssessmentDetail";
+import CropMonitoringDetail from "../assessor/CropMonitoringDetail";
 import LeafletMap from "../common/LeafletMap";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Textarea } from "@/components/ui/textarea";
@@ -7981,11 +7984,14 @@ export default function AssessorDashboard() {
               />
             } />
             <Route path="/risk-assessments" element={<RiskAssessmentSystem />} />
+            <Route path="/risk-assessments/:id" element={<RiskAssessmentDetail />} />
             <Route path="/loss-assessments" element={<LossAssessmentSystem />} />
+            <Route path="/loss-assessments/:id" element={<LossAssessmentDetail />} />
             <Route path="/farmers" element={
                farmerViewMode === "detail" ? renderFarmerDetail() : renderFarmersPage()
             } />
-            <Route path="/crop-monitoring/*" element={renderCropMonitoring()} />
+            <Route path="/crop-monitoring" element={renderCropMonitoring()} />
+            <Route path="/crop-monitoring/:id" element={<CropMonitoringDetail />} />
             <Route path="/notifications" element={<AssessorNotifications />} />
             <Route path="/settings" element={<AssessorProfileSettings />} />
           </Routes>
