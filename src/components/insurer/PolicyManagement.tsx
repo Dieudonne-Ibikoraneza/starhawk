@@ -366,49 +366,117 @@ export default function PolicyManagement({
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+            <div className="overflow-x-auto p-2">
+              <table className="w-full border-separate border-spacing-y-2">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/70 text-gray-600 text-xs uppercase font-semibold">
-                    <th className="py-4 px-4">Policy Number</th>
-                    <th className="py-4 px-4">Farmer</th>
-                    <th className="py-4 px-4">Crop</th>
-                    <th className="py-4 px-4">Premium</th>
-                    <th className="py-4 px-4">Status</th>
-                    <th className="py-4 px-4 text-center">Actions</th>
+                  <tr className="text-gray-400 text-[11px] font-bold uppercase tracking-wider">
+                    <th className="py-3 px-6 text-left">Policy</th>
+                    <th className="py-3 px-6 text-left">Farmer</th>
+                    <th className="py-3 px-6 text-left">Farm</th>
+                    <th className="py-3 px-6 text-left">District</th>
+                    <th className="py-3 px-6 text-left">Crop · Area</th>
+                    <th className="py-3 px-6 text-left">Premium</th>
+                    <th className="py-3 px-6 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredPolicies.map((policy) => (
-                    <tr key={policy.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-4 px-4 font-mono font-bold text-xs text-blue-600">{policy.policyNumber}</td>
-                      <td className="py-4 px-4">
-                        <div>
-                          <div className="font-semibold text-gray-900">{policy.farmerName}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
-                            <MapPin className="h-2.5 w-2.5" /> {policy.location}
+                <tbody className="space-y-4">
+                  {filteredPolicies.map((policy) => {
+                    const farmerInitials = policy.farmerName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+
+                    const statusLower = policy.status.toLowerCase();
+
+                    return (
+                      <tr 
+                        key={policy.id} 
+                        className="bg-white border border-gray-100 shadow-sm rounded-2xl hover:shadow-md transition-all cursor-pointer group"
+                        onClick={() => handleViewPolicy(policy)}
+                      >
+                        {/* Policy Number */}
+                        <td className="py-5 px-6">
+                          <span className="text-xs font-bold text-gray-400 uppercase">
+                            {policy.policyNumber}
+                          </span>
+                        </td>
+
+                        {/* Farmer */}
+                        <td className="py-5 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
+                              {farmerInitials}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                {policy.farmerName}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 capitalize font-semibold text-gray-900">{policy.cropType}</td>
-                      <td className="py-4 px-4 font-semibold text-gray-700">{policy.premiumAmount.toLocaleString()} RWF</td>
-                      <td className="py-4 px-4">
-                        <Badge className={`${getStatusColor(policy.status)} border-0 text-[10px] font-bold shadow-none`}>
-                          <span className="capitalize">{policy.status}</span>
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewPolicy(policy)}
-                          className="h-8 w-8 p-0 rounded-lg hover:bg-gray-100"
-                        >
-                          <Eye className="h-4 w-4 text-gray-600" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+
+                        {/* Farm */}
+                        <td className="py-5 px-6">
+                          <p className="text-sm font-bold text-gray-700">
+                            {policy.farmName || "Unknown Farm"}
+                          </p>
+                        </td>
+
+                        {/* District */}
+                        <td className="py-5 px-6">
+                          <div className="flex items-center gap-1.5 text-gray-500">
+                            <MapPin className="h-3.5 w-3.5 text-rose-500" />
+                            <span className="text-xs font-bold tracking-tight">
+                              {policy.location.split(",")[0] || "N/A"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Crop · Area */}
+                        <td className="py-5 px-6">
+                          <p className="text-sm text-gray-900 font-bold">
+                            {policy.cropType || "Crop"}{" "}
+                            <span className="text-gray-400 font-medium">
+                              · {policy.farmSize} ha
+                            </span>
+                          </p>
+                        </td>
+
+                        {/* Premium */}
+                        <td className="py-5 px-6">
+                          <p className="text-sm font-bold text-gray-700">
+                            {policy.premiumAmount.toLocaleString()} <span className="text-[10px] text-gray-400">RWF</span>
+                          </p>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-5 px-6 text-center">
+                          <Badge
+                            className={`shadow-none border-0 rounded-full px-4 py-1 gap-2 font-bold capitalize ${
+                              statusLower === "active"
+                                ? "bg-emerald-100/50 text-emerald-700"
+                                : statusLower === "expired"
+                                  ? "bg-rose-100/50 text-rose-700"
+                                  : "bg-amber-100/50 text-amber-700"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                statusLower === "active"
+                                  ? "bg-emerald-500"
+                                  : statusLower === "expired"
+                                    ? "bg-rose-500"
+                                    : "bg-amber-500"
+                              }`}
+                            />
+                            {statusLower}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
