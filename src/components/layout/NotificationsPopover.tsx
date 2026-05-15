@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Bell, Check, CheckCheck, AlertTriangle, FileText, Wallet, ClipboardCheck, Satellite, Trash2 } from "lucide-react";
-import { initialNotifications, Notification } from "@/lib/mock-data";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useNotifications, NotificationItem } from "@/contexts/NotificationContext";
 
 const categoryIcon = {
   claim: Wallet,
@@ -23,19 +23,22 @@ const categoryColor = {
 } as const;
 
 export function NotificationsPopover() {
-  const [items, setItems] = useState<Notification[]>(initialNotifications);
+  const { 
+    notifications: items, 
+    unreadCount: unread, 
+    loading, 
+    markAsRead: markRead, 
+    markAllAsRead: markAll, 
+    clearAll: clear 
+  } = useNotifications();
+  
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const navigate = useNavigate();
 
-  const unread = items.filter((n) => !n.read).length;
   const visible = filter === "unread" ? items.filter((n) => !n.read) : items;
 
-  const markRead = (id: string) => setItems((p) => p.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  const markAll = () => setItems((p) => p.map((n) => ({ ...n, read: true })));
-  const clear = () => setItems([]);
-
-  const openItem = (n: Notification) => {
+  const openItem = (n: NotificationItem) => {
     markRead(n.id);
     if (n.href) {
       setOpen(false);
@@ -88,7 +91,12 @@ export function NotificationsPopover() {
         </div>
 
         <div className="max-h-[420px] overflow-y-auto">
-          {visible.length === 0 ? (
+          {loading && items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+              <div className="animate-spin mb-2 h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+              <p className="text-xs text-muted-foreground">Updating feed...</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                 <Bell className="h-4 w-4 text-muted-foreground" />

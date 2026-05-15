@@ -183,7 +183,9 @@ export default function DashboardLayout({
                 </div>
                 <div>
                   <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">Starhawk</h1>
-                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">Insurer Console</p>
+                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
+                    {userType.charAt(0).toUpperCase() + userType.slice(1)} Console
+                  </p>
                 </div>
               </div>
             ) : (

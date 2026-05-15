@@ -1,14 +1,20 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { dashboardTheme } from "@/utils/dashboardTheme";
-import { StatsGridSkeleton, TableSkeleton, CardSkeleton, CardListSkeleton } from "@/components/ui/skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { StatsGridSkeleton, TableSkeleton, CardSkeleton, CardListSkeleton } from "@/components/ui/skeletons";
+import { dashboardTheme } from "@/utils/dashboardTheme";
 import DashboardLayout from "../layout/DashboardLayout";
+import { Topbar } from "../layout/Topbar";
+import { GlobalSearch } from "../layout/GlobalSearch";
+import AssessorDashboardOverview from "../assessor/AssessorDashboardOverview";
 import AssessorNotifications from "../assessor/AssessorNotifications";
 import AssessorProfileSettings from "../assessor/AssessorProfileSettings";
 import RiskAssessmentSystem from "../assessor/RiskAssessmentSystem";
@@ -73,8 +79,6 @@ import {
   Monitor,
   Settings
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface AssessmentSummary {
   id: string;
@@ -7901,83 +7905,137 @@ export default function AssessorDashboard() {
     );
   };
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const navigationItems = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "risk-assessments", label: "Risk Assessment", icon: Shield },
-    { id: "loss-assessments", label: "Loss Assessment", icon: AlertCircle },
-    { id: "farmers", label: "Farmers", icon: Users },
-    { id: "crop-monitoring", label: "Crop Monitoring", icon: Monitor },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "profile-settings", label: "Profile Settings", icon: User }
+    { id: "dashboard", label: "Overview", icon: BarChart3, path: "/assessor/dashboard" },
+    { id: "risk-assessments", label: "Risk Assessments", icon: Shield, path: "/assessor/risk-assessments" },
+    { id: "loss-assessments", label: "Loss Assessments", icon: FileText, path: "/assessor/loss-assessments" },
+    { id: "farmers", label: "Farmers Management", icon: Users, path: "/assessor/farmers" },
+    { id: "crop-monitoring", label: "Crop Monitoring", icon: Activity, path: "/assessor/crop-monitoring" },
+    { id: "notifications", label: "Notifications", icon: Bell, path: "/assessor/notifications", badge: assessments.filter(a => a.status === 'Pending').length },
+    { id: "profile-settings", label: "Settings", icon: Settings, path: "/assessor/settings" }
   ];
 
-  // Get display name from profile if available
-  const displayName = assessorProfile 
-    ? (assessorProfile.firstName && assessorProfile.lastName 
-        ? `${assessorProfile.firstName} ${assessorProfile.lastName}`.trim()
-        : assessorProfile.name || assessorProfile.firstName || assessorProfile.lastName || assessorName)
+  const currentPath = location.pathname;
+  const activePageId = navigationItems.find(item => currentPath.startsWith(item.path))?.id || "dashboard";
+
+  const userDisplayName = assessorProfile?.firstName 
+    ? `${assessorProfile.firstName} ${assessorProfile.lastName}` 
     : assessorName;
 
   return (
     <DashboardLayout
       userType="assessor"
       userId={assessorId}
-      userName={displayName}
+      userName={userDisplayName}
+      userEmail={assessorEmail}
       navigationItems={navigationItems}
-      activePage={activePage} 
-      onPageChange={handlePageChange}
+      activePage={activePageId}
+      onPageChange={(pageId) => {
+        const item = navigationItems.find(i => i.id === pageId);
+        if (item) navigate(item.path);
+      }}
       onLogout={() => {
-        // Clear localStorage and redirect to login
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('phoneNumber');
-        localStorage.removeItem('email');
-        window.location.href = '/role-selection';
+        localStorage.clear();
+        navigate("/login");
       }}
     >
-      {renderPage()}
+      <div className="flex flex-col h-full">
+        <main className="flex-1 overflow-auto bg-gray-50/50 p-4 md:p-6">
+          <Routes>
+            <Route path="/" element={<Navigate to="dashboard" replace />} />
+            <Route path="/dashboard" element={
+              <AssessorDashboardOverview
+                totalFarmers={totalFarmers}
+                totalFields={totalFields}
+                totalArea={totalArea}
+                activeAssessments={activeAssessments}
+                activeView={activeView}
+                setActiveView={setActiveView}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                setFilterDialogOpen={setFilterDialogOpen}
+                setShowDrawField={setShowDrawField}
+                error={error}
+                farmsError={farmsError}
+                loadAssessments={loadAssessments}
+                loadFarms={loadFarms}
+                loading={loading}
+                farmsLoading={farmsLoading}
+                exportToCSV={exportToCSV}
+                exportToPDF={exportToPDF}
+                farmers={farmers}
+                expandedFarmers={expandedFarmers}
+                farmerFields={farmerFields}
+                loadingFields={loadingFields}
+                onFarmerRowClick={handleFarmerRowClick}
+                onViewFarmerFields={handleViewFarmerFields}
+                onToggleFarmerExpansion={toggleFarmerExpansion}
+                onViewFarmerDetail={(farmer) => {
+                  setSelectedFarmerDetail(farmer);
+                  setFarmerViewMode("detail");
+                  navigate("/assessor/farmers");
+                }}
+              />
+            } />
+            <Route path="/risk-assessments" element={<RiskAssessmentSystem />} />
+            <Route path="/loss-assessments" element={<LossAssessmentSystem />} />
+            <Route path="/farmers" element={
+               farmerViewMode === "detail" ? renderFarmerDetail() : renderFarmersPage()
+            } />
+            <Route path="/crop-monitoring/*" element={renderCropMonitoring()} />
+            <Route path="/notifications" element={<AssessorNotifications />} />
+            <Route path="/settings" element={<AssessorProfileSettings />} />
+          </Routes>
+        </main>
+      </div>
+
+      <GlobalSearch 
+        onSelect={(item) => {
+          if (item.type === 'farmer') {
+            setSelectedFarmerDetail(item.data);
+            setFarmerViewMode("detail");
+            navigate("/assessor/farmers");
+          }
+        }}
+      />
 
       {/* Upload KML Modal */}
       {showUploadModal && selectedFieldForUpload && (
         <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl rounded-2xl">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-xl font-bold">
                 {selectedFieldsForProcessing.size > 0 
-                  ? `Upload Field Contours (${selectedFieldsForProcessing.size} field${selectedFieldsForProcessing.size > 1 ? 's' : ''})`
+                  ? `Upload Field Contours (${selectedFieldsForProcessing.size} fields)`
                   : "Upload Field Contours"}
               </DialogTitle>
               <DialogDescription>
-                {selectedFieldsForProcessing.size > 0
-                  ? `Upload KML or KMZ files for ${selectedFieldsForProcessing.size} selected field${selectedFieldsForProcessing.size > 1 ? 's' : ''}. Files will be processed simultaneously.`
-                  : `Upload KML or KMZ file with field boundaries for ${selectedFieldForUpload?.cropType || "this field"}`}
+                Upload KML or KMZ file with field boundaries.
               </DialogDescription>
             </DialogHeader>
             <div className="mt-4 space-y-4">
               <div>
-                <Label htmlFor="farmName" className="text-gray-900">Farm Name *</Label>
+                <Label htmlFor="farmName" className="text-gray-700 font-medium">Farm Name *</Label>
                 <Input
                   id="farmName"
                   type="text"
                   value={kmlUploadName}
                   onChange={(e) => setKmlUploadName(e.target.value)}
                   placeholder="Enter farm name"
-                  className="mt-1 bg-gray-50 border-gray-300 text-gray-900"
+                  className="mt-1 rounded-xl border-gray-200"
                   disabled={uploadingFile}
                 />
               </div>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-700 mb-2 font-medium">
-                  {selectedFieldsForProcessing.size > 0 
-                    ? `Drag-and-drop here or select ${selectedFieldsForProcessing.size} file${selectedFieldsForProcessing.size > 1 ? 's' : ''}`
-                    : "Drag-and-drop here or select files"}
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center hover:border-green-400 hover:bg-green-50/30 transition-all cursor-pointer group">
+                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-300 group-hover:text-green-500 transition-colors" />
+                <p className="text-gray-700 mb-2 font-bold">
+                  Click to upload or drag and drop
                 </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  {selectedFieldsForProcessing.size > 0
-                    ? `with field contours for ${selectedFieldsForProcessing.size} selected field${selectedFieldsForProcessing.size > 1 ? 's' : ''}. Files will be processed simultaneously.`
-                    : "with the field contours for the upload to start"}
+                <p className="text-sm text-gray-500 mb-6">
+                  KML or KMZ files only (Max 1MB)
                 </p>
                 <input
                   type="file"
@@ -7991,31 +8049,25 @@ export default function AssessorDashboard() {
                 <Button
                   onClick={() => document.getElementById('kml-upload')?.click()}
                   disabled={uploadingFile || processingFields.size > 0}
-                  className="bg-green-600 hover:bg-green-700 text-white !rounded-none"
+                  className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-8"
                 >
                   {uploadingFile || processingFields.size > 0 ? (
-                    <img src="/loading.gif" alt="Loading" className="w-4 h-4" />
+                    <RefreshCw className="h-4 w-4 animate-spin" />
                   ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      {selectedFieldsForProcessing.size > 0 ? `SELECT FILES (${selectedFieldsForProcessing.size} field${selectedFieldsForProcessing.size > 1 ? 's' : ''})` : 'SELECT FILES'}
-                    </>
+                    "Select Files"
                   )}
                 </Button>
-                <p className="text-xs text-gray-500 mt-4">
-                  Supported formats: .kml, .kmz (Max size: 1MB)
-                </p>
               </div>
             </div>
             <DialogFooter>
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   setShowUploadModal(false);
                   setSelectedFieldForUpload(null);
                 }}
                 disabled={uploadingFile}
-                className="!rounded-none"
+                className="rounded-xl"
               >
                 Cancel
               </Button>
@@ -8027,34 +8079,33 @@ export default function AssessorDashboard() {
       {/* KML Viewer Dialog */}
       {showKMLViewer && kmlViewerFarm && (
         <Dialog open={showKMLViewer} onOpenChange={setShowKMLViewer}>
-          <DialogContent className="max-w-6xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Field Boundary Map (KML)</DialogTitle>
+          <DialogContent className="max-w-6xl max-h-[90vh] rounded-3xl overflow-hidden p-0">
+            <div className="p-6 border-b border-gray-100 bg-white">
+              <DialogTitle className="text-xl font-bold">Field Boundary Map</DialogTitle>
               <DialogDescription>
-                Viewing field boundary for {kmlViewerFarm.name || "Field"}
+                Viewing boundary for {kmlViewerFarm.name || "Field"}
               </DialogDescription>
-            </DialogHeader>
-            <div className="mt-4">
+            </div>
+            <div className="relative h-[600px]">
               <LeafletMap
                 center={(() => {
                   if (kmlViewerFarm?.location?.coordinates) {
                     const coords = kmlViewerFarm.location.coordinates;
-                    return [coords[1], coords[0]]; // [lat, lng] from [lng, lat]
+                    return [coords[1], coords[0]]; 
                   }
                   return [-1.9441, 30.0619];
                 })()}
                 zoom={15}
-                height="600px"
+                height="100%"
                 tileLayer="satellite"
                 showControls={true}
-                className="w-full"
+                className="w-full h-full"
                 boundary={kmlViewerFarm?.boundary || null}
               />
             </div>
           </DialogContent>
         </Dialog>
       )}
-
     </DashboardLayout>
   );
 }

@@ -124,6 +124,9 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
     navigate(path);
   };
 
+  const role = localStorage.getItem('role') || 'insurer';
+  const isAssessor = role.toLowerCase() === 'assessor';
+
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[750px] md:max-w-[850px]">
       <CommandInput placeholder="Search farmers, farms, policies, claims, fields…" className="h-14 text-lg border-none focus:ring-0" />
@@ -146,13 +149,24 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
             </CommandEmpty>
 
             <CommandGroup heading="Platform Navigation">
-              <CommandItem onSelect={() => go("/insurer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-indigo-500" />Overview Dashboard</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/requests")} className="py-3 px-4 rounded-xl cursor-pointer"><FileBadge className="mr-3 h-4 w-4 text-amber-500" />Insurance Requests</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><ClipboardCheck className="mr-3 h-4 w-4 text-emerald-500" />Risk Assessments</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/policies")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-blue-500" />Policy Management</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/monitoring")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-rose-500" />Crop Monitoring</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-slate-500" />Claims Processing</CommandItem>
-              <CommandItem onSelect={() => go("/insurer/settings")} className="py-3 px-4 rounded-xl cursor-pointer"><Settings className="mr-3 h-4 w-4 text-gray-500" />System Settings</CommandItem>
+              {isAssessor ? (
+                <>
+                  <CommandItem onSelect={() => go("/assessor/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-green-500" />Overview Dashboard</CommandItem>
+                  <CommandItem onSelect={() => go("/assessor/risk-assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-emerald-500" />Risk Assessments</CommandItem>
+                  <CommandItem onSelect={() => go("/assessor/loss-assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><FileText className="mr-3 h-4 w-4 text-amber-500" />Loss Assessments</CommandItem>
+                  <CommandItem onSelect={() => go("/assessor/farmers")} className="py-3 px-4 rounded-xl cursor-pointer"><User className="mr-3 h-4 w-4 text-blue-500" />Farmers Management</CommandItem>
+                  <CommandItem onSelect={() => go("/assessor/crop-monitoring")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-rose-500" />Field Monitoring</CommandItem>
+                </>
+              ) : (
+                <>
+                  <CommandItem onSelect={() => go("/insurer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-indigo-500" />Overview Dashboard</CommandItem>
+                  <CommandItem onSelect={() => go("/insurer/requests")} className="py-3 px-4 rounded-xl cursor-pointer"><FileBadge className="mr-3 h-4 w-4 text-amber-500" />Insurance Requests</CommandItem>
+                  <CommandItem onSelect={() => go("/insurer/assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><ClipboardCheck className="mr-3 h-4 w-4 text-emerald-500" />Risk Assessments</CommandItem>
+                  <CommandItem onSelect={() => go("/insurer/policies")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-blue-500" />Policy Management</CommandItem>
+                  <CommandItem onSelect={() => go("/insurer/monitoring")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-rose-500" />Crop Monitoring</CommandItem>
+                  <CommandItem onSelect={() => go("/insurer/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-slate-500" />Claims Processing</CommandItem>
+                </>
+              )}
             </CommandGroup>
 
             <CommandSeparator className="my-2 opacity-50" />

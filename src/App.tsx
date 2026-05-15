@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import Index from "./pages/Index";
 import Team from "./pages/Team";
 import { LoginPage } from "./pages/LoginPage";
@@ -41,6 +42,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <NotificationProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -57,10 +59,11 @@ const App = () => {
               
               {/* Dashboard Routes */}
               <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
-              <Route path="/assessor-dashboard" element={<AssessorDashboard />} />
+              <Route path="/assessor/*" element={<AssessorDashboard />} />
               <Route path="/insurer/*" element={<InsurerDashboard />} />
               
               {/* Legacy Redirects - Improved to handle sub-paths */}
+              <Route path="/assessor-dashboard" element={<Navigate to="/assessor/dashboard" replace />} />
               <Route path="/insurer-dashboard" element={<Navigate to="/insurer/dashboard" replace />} />
               <Route 
                 path="/insurer-dashboard/:section/*" 
@@ -92,6 +95,7 @@ const App = () => {
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
