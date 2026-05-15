@@ -29,9 +29,7 @@ import { getUserProfile, getAssessors } from "@/services/usersAPI";
 import { getPolicies } from "@/services/policiesApi";
 import { getClaims } from "@/services/claimsApi";
 import { getInsuranceRequests } from "@/services/farmsApi";
-import assessmentsApiService, {
-  createAssessment,
-} from "@/services/assessmentsApi";
+import assessmentsApiService from "@/services/assessmentsApi";
 import { createPolicyFromAssessment } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -77,7 +75,6 @@ import {
   Sparkles,
   ArrowUpRight,
   User,
-  Activity,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -183,9 +180,7 @@ export default function InsurerDashboard() {
   const insurerId = getUserId() || "";
   const insurerPhone = getPhoneNumber() || "";
   const insurerEmail = getEmail() || "";
-  // Use email or phone number as display name, or fallback to "Insurer"
-  const insurerName = insurerEmail || insurerPhone || "Insurer";
-
+  
   // State for Profile
   const [insurerProfile, setInsurerProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -266,12 +261,15 @@ export default function InsurerDashboard() {
   };
 
   useEffect(() => {
+    loadInsurerProfile();
+  }, [insurerId]);
+
+  useEffect(() => {
     if (activePage === "requests") {
       loadInsuranceRequests();
     } else if (activePage === "assessments") {
       loadSubmittedAssessments();
     } else if (activePage === "dashboard") {
-      loadInsurerProfile();
       loadDashboardData();
     }
   }, [activePage, insurerId]);
@@ -1247,6 +1245,9 @@ export default function InsurerDashboard() {
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
+  // Derive insurer name from profile or fallback to email/phone
+  const insurerName = insurerProfile?.fullName || insurerProfile?.name || insurerEmail || insurerPhone || "Insurer";
+
   // Get display name from profile if available
   const displayName = insurerProfile
     ? insurerProfile.firstName && insurerProfile.lastName
@@ -1262,6 +1263,7 @@ export default function InsurerDashboard() {
       userType="insurer"
       userId={insurerId}
       userName={displayName}
+      userEmail={insurerEmail}
       navigationItems={navigationItems}
       activePage={activePage}
       onPageChange={setActivePage}
