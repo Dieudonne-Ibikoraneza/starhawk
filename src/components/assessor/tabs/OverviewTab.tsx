@@ -144,7 +144,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case "APPROVED":
       case "COMPLETED": return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      case "SUBMITTED": return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
+      case "REJECTED": return <AlertTriangle className="h-4 w-4 text-rose-500" />;
       case "PENDING": return <Clock className="h-4 w-4 text-amber-500" />;
       case "IN_PROGRESS": return <Clock className="h-4 w-4 text-blue-500" />;
       default: return <Clock className="h-4 w-4 text-slate-500" />;

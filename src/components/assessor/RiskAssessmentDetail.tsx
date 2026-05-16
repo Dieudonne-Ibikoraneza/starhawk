@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   ArrowLeft, 
   Shield, 
@@ -17,16 +18,23 @@ import {
   CloudRain, 
   Leaf,
   AlertTriangle,
-  CheckCircle,
+  CheckCircle2,
   TrendingUp,
   Download,
   Share2,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  Eye,
+  CheckCircle
 } from "lucide-react";
 import assessmentsApiService from "@/services/assessmentsApi";
-import { getFarmById, getVegetationStats, getHistoricalWeather } from "@/services/farmsApi";
-import LeafletMap from "@/components/common/LeafletMap";
-import { format } from "date-fns";
+import { getFarmById } from "@/services/farmsApi";
+import { BasicInfoTab } from "./tabs/BasicInfoTab";
+import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
+import DroneTab from "./tabs/DroneTab";
+import OverviewTab from "./tabs/OverviewTab";
+
+const API_BASE_URL = "https://starhawk-backend-agriplatform.onrender.com/api";
 
 export default function RiskAssessmentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -35,8 +43,11 @@ export default function RiskAssessmentDetail() {
   
   const [assessment, setAssessment] = useState<any>(null);
   const [farm, setFarm] = useState<any>(null);
+  const [farmer, setFarmer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("basic");
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [selectedPdfType, setSelectedPdfType] = useState<string | null>(null);
   
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -49,7 +60,15 @@ export default function RiskAssessmentDetail() {
       const farmId = data.farmId?._id || data.farmId;
       if (farmId) {
         const farmResp = await getFarmById(farmId);
-        setFarm(farmResp.data || farmResp);
+        const farmData = farmResp.data || farmResp;
+        setFarm(farmData);
+        
+        // Use the farmer data if populated, or fetch it
+        if (farmData.farmerId && typeof farmData.farmerId === 'object') {
+          setFarmer(farmData.farmerId);
+        } else if (data.farmerId && typeof data.farmerId === 'object') {
+          setFarmer(data.farmerId);
+        }
       }
     } catch (err: any) {
       console.error("Failed to load assessment details:", err);
@@ -70,315 +89,238 @@ export default function RiskAssessmentDetail() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <RefreshCw className="h-10 w-10 text-indigo-500 animate-spin mb-4" />
-        <p className="text-slate-500 font-medium">Loading assessment details...</p>
+        <RefreshCw className="h-10 w-10 text-green-600 animate-spin mb-4" />
+        <p className="text-gray-600 font-medium">Loading assessment details...</p>
       </div>
     );
   }
 
-  if (!assessment) {
+  if (!assessment || !farm) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <AlertTriangle className="h-16 w-16 text-amber-500 mb-4" />
-        <h2 className="text-2xl font-bold text-slate-900">Assessment Not Found</h2>
-        <p className="text-slate-500 mt-2 max-w-md">The assessment you're looking for doesn't exist or you don't have permission to view it.</p>
-        <Button className="mt-6 bg-indigo-600" onClick={() => navigate("/assessor/risk-assessments")}>
+        <h2 className="text-2xl font-bold text-gray-900">Assessment Not Found</h2>
+        <p className="text-gray-500 mt-2 max-w-md">The assessment data is incomplete or unavailable.</p>
+        <Button className="mt-6 bg-green-600" onClick={() => navigate("/assessor/risk-assessments")}>
           Back to Assessments
         </Button>
       </div>
     );
   }
 
-  const status = assessment.status?.toLowerCase() || "pending";
-  const riskScore = assessment.riskScore || 0;
-  
-  const getRiskColor = (score: number) => {
-    if (score >= 70) return "text-rose-600 bg-rose-50 border-rose-100";
-    if (score >= 40) return "text-amber-600 bg-amber-50 border-amber-100";
-    return "text-emerald-600 bg-emerald-50 border-emerald-100";
+  const getFullPdfUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
+  const calculateOverallRisk = (dronePdfs: any[], weatherData: any) => {
+    let score = 45; // Base score
+    if (dronePdfs?.length > 0) score += 15;
+    if (weatherData) score += 10;
+    return { score: Math.min(score, 100) };
+  };
+
+  const computedRisk = calculateOverallRisk(assessment.dronePdfs || [], assessment.weatherData);
+  const finalRiskScore = assessment.riskScore !== null && assessment.riskScore !== undefined
+    ? assessment.riskScore
+    : computedRisk.score;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      {/* Breadcrumb & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Button 
-          variant="ghost" 
-          className="w-fit text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 -ml-2"
-          onClick={() => navigate("/assessor/risk-assessments")}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Assessments
-        </Button>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="border-slate-200">
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
+    <div className="min-h-screen bg-gray-50 pt-6 pb-8">
+      {/* Header */}
+      <div className="px-6 mb-6">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/assessor/risk-assessments")}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
           </Button>
-          <Button variant="outline" size="sm" className="border-slate-200">
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
+            <Shield className="h-6 w-6 text-green-600" />
+            Assessment Details
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {farmer?.firstName} {farmer?.lastName} • {farm.cropType} • {farm.name || "Farm"}
+          </p>
         </div>
       </div>
 
-      {/* Header Card */}
-      <Card className="border-slate-200 shadow-sm overflow-hidden bg-white">
-        <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500" />
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 rounded-lg">
-                  <Shield className="h-6 w-6 text-indigo-600" />
+      {/* Stats Cards */}
+      <div className="px-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-md">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-green-600 mb-1">Risk Score</p>
+                  <p className="text-2xl font-bold text-green-900">{finalRiskScore.toFixed(1)}</p>
                 </div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                  Risk Assessment: {assessment._id?.slice(-8).toUpperCase()}
-                </h1>
-                <Badge className={cn(
-                  "px-3 py-1 uppercase text-[10px] font-bold tracking-wider",
-                  status === "approved" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                  status === "pending" ? "bg-amber-50 text-amber-700 border-amber-100" :
-                  "bg-indigo-50 text-indigo-700 border-indigo-100"
-                )}>
-                  {status}
-                </Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-sm text-slate-500">
-                <span className="flex items-center">
-                  <User className="h-4 w-4 mr-2 text-slate-400" />
-                  Farmer: <span className="font-semibold text-slate-900 ml-1">
-                    {assessment.farmId?.farmerId?.firstName} {assessment.farmId?.farmerId?.lastName || "Gad KALISA"}
-                  </span>
-                </span>
-                <span className="flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-slate-400" />
-                  Location: <span className="font-semibold text-slate-900 ml-1">{farm?.locationName || "Rwanda"}</span>
-                </span>
-                <span className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-2 text-slate-400" />
-                  Date: <span className="font-semibold text-slate-900 ml-1">
-                    {assessment.createdAt ? format(new Date(assessment.createdAt), 'MMM dd, yyyy') : "N/A"}
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="text-center">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Overall Risk</p>
-                <div className={cn("text-3xl font-black rounded-xl px-4 py-2 border", getRiskColor(riskScore))}>
-                  {riskScore}%
-                </div>
-              </div>
-              <div className="h-12 w-[1px] bg-slate-200" />
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Recommendation</p>
-                <p className="text-sm font-bold text-slate-700">
-                  {riskScore < 40 ? "Proceed with Policy" : riskScore < 70 ? "Requires Review" : "High Risk - Deny"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Details & Tabs */}
-        <div className="lg:col-span-2 space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-slate-100 p-1 rounded-xl w-full flex">
-              <TabsTrigger value="overview" className="flex-1 rounded-lg py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="drone" className="flex-1 rounded-lg py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                Drone Analysis
-              </TabsTrigger>
-              <TabsTrigger value="weather" className="flex-1 rounded-lg py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                Weather History
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="mt-4 space-y-6">
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold flex items-center">
-                    <FileText className="h-5 w-5 mr-2 text-indigo-500" />
-                    Assessor Observations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-slate max-w-none">
-                    <p className="text-slate-700 leading-relaxed italic bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      "{assessment.reportText || "No detailed observations provided for this assessment."}"
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-6">
-                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                      <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Key Strengths</p>
-                      <ul className="text-xs text-emerald-700 space-y-1">
-                        <li className="flex items-center"><CheckCircle className="h-3 w-3 mr-1.5" /> Proper irrigation systems</li>
-                        <li className="flex items-center"><CheckCircle className="h-3 w-3 mr-1.5" /> High quality seed variety</li>
-                      </ul>
-                    </div>
-                    <div className="p-4 bg-rose-50 rounded-xl border border-rose-100">
-                      <p className="text-[10px] font-bold text-rose-600 uppercase mb-1">Potential Hazards</p>
-                      <ul className="text-xs text-rose-700 space-y-1">
-                        <li className="flex items-center"><AlertTriangle className="h-3 w-3 mr-1.5" /> Steep terrain slope</li>
-                        <li className="flex items-center"><AlertTriangle className="h-3 w-3 mr-1.5" /> Previous pest infestation</li>
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Photos Section */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold">Field Media</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {assessment.photoUrls?.length > 0 ? (
-                      assessment.photoUrls.map((url: string, index: number) => (
-                        <div key={index} className="aspect-square rounded-xl overflow-hidden border border-slate-100 shadow-sm group relative">
-                          <img src={url} alt={`Field ${index}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                             <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
-                               <Eye className="h-4 w-4" />
-                             </Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                         <FileText className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                         <p className="text-sm text-slate-400">No field photos uploaded</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="drone" className="mt-4">
-               <Card className="border-slate-200 shadow-sm">
-                 <CardContent className="p-8 text-center">
-                    <Activity className="h-12 w-12 text-indigo-200 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-slate-800">Advanced Drone Analysis</h3>
-                    <p className="text-slate-500 mt-2 max-w-md mx-auto">
-                      View multi-spectral imaging, plant health (NDVI) mapping, and automated pest detection reports for this field.
-                    </p>
-                    <Button className="mt-6 bg-indigo-600">
-                      View Interactive Report
-                    </Button>
-                 </CardContent>
-               </Card>
-            </TabsContent>
-
-            <TabsContent value="weather" className="mt-4">
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader>
-                   <CardTitle className="text-lg font-bold">Historical Climate Data</CardTitle>
-                </CardHeader>
-                <CardContent>
-                   <div className="space-y-4">
-                      <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">
-                         <CloudRain className="h-8 w-8 text-indigo-300 animate-pulse" />
-                         <span className="ml-3 text-slate-400 font-medium">Loading weather charts...</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                         <div className="p-3 bg-blue-50 rounded-xl text-center">
-                            <p className="text-[10px] font-bold text-blue-400 uppercase">Avg Rainfall</p>
-                            <p className="text-xl font-black text-blue-700">1,240mm</p>
-                         </div>
-                         <div className="p-3 bg-orange-50 rounded-xl text-center">
-                            <p className="text-[10px] font-bold text-orange-400 uppercase">Avg Temp</p>
-                            <p className="text-xl font-black text-orange-700">24°C</p>
-                         </div>
-                         <div className="p-3 bg-purple-50 rounded-xl text-center">
-                            <p className="text-[10px] font-bold text-purple-400 uppercase">Humidity</p>
-                            <p className="text-xl font-black text-purple-700">72%</p>
-                         </div>
-                      </div>
-                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Right Column: Sidebar info */}
-        <div className="space-y-6">
-          {/* Map Card */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50/50 pb-3 border-b border-slate-100">
-              <CardTitle className="text-sm font-bold flex items-center">
-                <MapPin className="h-4 w-4 mr-2 text-indigo-500" />
-                Field Boundary
-              </CardTitle>
-            </CardHeader>
-            <div className="h-64 bg-slate-200 relative">
-              <LeafletMap 
-                center={farm?.location?.coordinates ? [farm.location.coordinates[1], farm.location.coordinates[0]] : [-1.9441, 30.0619]}
-                zoom={14}
-                height="100%"
-                tileLayer="satellite"
-                boundary={farm?.boundary}
-              />
-            </div>
-            <CardContent className="p-4 bg-white">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500">Total Area:</span>
-                <span className="font-bold text-slate-900">{farm?.area || "1.2"} Hectares</span>
+                <Activity className="h-5 w-5 text-green-600" />
               </div>
             </CardContent>
           </Card>
 
-          {/* Farm Details */}
-          <Card className="border-slate-200 shadow-sm">
-             <CardHeader className="pb-3 border-b border-slate-50">
-               <CardTitle className="text-sm font-bold">Field Specification</CardTitle>
-             </CardHeader>
-             <CardContent className="p-0">
-                <div className="divide-y divide-slate-50">
-                   <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-xs text-slate-500">Crop Variety</span>
-                      <span className="text-xs font-bold text-slate-800">{farm?.cropType || "Maize"}</span>
-                   </div>
-                   <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-xs text-slate-500">Sowing Date</span>
-                      <span className="text-xs font-bold text-slate-800">{farm?.sowingDate || "Oct 12, 2025"}</span>
-                   </div>
-                   <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-xs text-slate-500">Soil Type</span>
-                      <span className="text-xs font-bold text-slate-800">Sandy Loam</span>
-                   </div>
-                   <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-xs text-slate-500">Irrigation</span>
-                      <span className="text-xs font-bold text-emerald-600">Available</span>
-                   </div>
+          <Card className={`bg-gradient-to-br shadow-md ${
+            assessment.status === "APPROVED" || assessment.status === "COMPLETED"
+              ? "from-emerald-50 to-emerald-100 border-emerald-200"
+              : assessment.status === "REJECTED"
+              ? "from-rose-50 to-rose-100 border-rose-200"
+              : "from-blue-50 to-blue-100 border-blue-200"
+          }`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-xs font-medium mb-1 ${
+                    assessment.status === "APPROVED" || assessment.status === "COMPLETED"
+                      ? "text-emerald-600"
+                      : assessment.status === "REJECTED"
+                      ? "text-rose-600"
+                      : "text-blue-600"
+                  }`}>Status</p>
+                  <p className={`text-lg font-bold capitalize ${
+                    assessment.status === "APPROVED" || assessment.status === "COMPLETED"
+                      ? "text-emerald-900"
+                      : assessment.status === "REJECTED"
+                      ? "text-rose-900"
+                      : "text-blue-900"
+                  }`}>
+                    {assessment.status ? assessment.status.toLowerCase().replace("_", " ") : "N/A"}
+                  </p>
                 </div>
-             </CardContent>
+                {(() => {
+                  switch (assessment.status) {
+                    case "APPROVED":
+                    case "COMPLETED": return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
+                    case "REJECTED": return <AlertTriangle className="h-5 w-5 text-rose-600" />;
+                    case "PENDING": return <Clock className="h-5 w-5 text-amber-600" />;
+                    default: return <FileText className="h-5 w-5 text-blue-600" />;
+                  }
+                })()}
+              </div>
+            </CardContent>
           </Card>
 
-          {/* Action Card */}
-          <Card className="bg-indigo-600 border-none shadow-md shadow-indigo-200">
-             <CardContent className="p-6">
-                <h3 className="text-white font-bold mb-2">Ready to submit?</h3>
-                <p className="text-indigo-100 text-xs mb-4">Finalize this assessment and send it to the insurer for policy approval.</p>
-                <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50 font-bold border-none shadow-sm">
-                   Submit to Insurer
-                </Button>
-             </CardContent>
+          <Card className={`bg-gradient-to-br ${
+            (assessment.droneAnalysisPdfs?.length ?? 0) > 0 || assessment.droneAnalysisPdfUrl
+              ? "from-purple-50 to-purple-100 border-purple-200"
+              : "from-gray-50 to-gray-100 border-gray-200"
+          } shadow-md`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-purple-600 mb-1">Drone PDF</p>
+                  <p className="text-lg font-bold text-purple-900">
+                    {(assessment.droneAnalysisPdfs?.length ?? 0) > 0 || assessment.droneAnalysisPdfUrl
+                      ? `${(assessment.droneAnalysisPdfs?.length || 0) + (assessment.dronePdfs?.length || 0) || 1} Uploaded`
+                      : "Not Uploaded"}
+                  </p>
+                </div>
+                <Upload className="h-5 w-5 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`bg-gradient-to-br ${
+            assessment.reportGenerated
+              ? "from-emerald-50 to-emerald-100 border-emerald-200"
+              : "from-gray-50 to-gray-100 border-gray-200"
+          } shadow-md`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-emerald-600 mb-1">Report</p>
+                  <p className="text-lg font-bold text-emerald-900">
+                    {assessment.reportGenerated ? "Generated" : "Pending"}
+                  </p>
+                </div>
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+              </div>
+            </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="px-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-white border border-gray-200 shadow-md inline-flex h-12 items-center justify-center rounded-xl p-1.5 gap-1">
+            <TabsTrigger value="basic" className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all">
+              <FileText className="h-4 w-4 mr-2" /> Basic Info
+            </TabsTrigger>
+            <TabsTrigger value="weather" className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all">
+              <CloudRain className="h-4 w-4 mr-2" /> Weather
+            </TabsTrigger>
+            <TabsTrigger value="drone" className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all">
+              <Activity className="h-4 w-4 mr-2" /> Drone Analysis
+            </TabsTrigger>
+            <TabsTrigger value="overview" className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all">
+              <Activity className="h-4 w-4 mr-2" /> Overview
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="basic">
+            <BasicInfoTab
+              fieldId={farm?._id || farm?.id}
+              farmerId={farmer?.id || ""}
+              fieldName={farm?.name || farm?.cropType || "Unknown"}
+              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim()}
+              cropType={farm?.cropType || ""}
+              area={farm?.area || 0}
+              season={farm?.season || "B"}
+              location={farm?.locationName || "N/A"}
+              sowingDate={farm?.sowingDate}
+              boundary={farm?.boundary}
+              locationCoords={farm?.location?.coordinates}
+            />
+          </TabsContent>
+
+          <TabsContent value="weather" forceMount className="data-[state=inactive]:hidden mt-0">
+            <WeatherAnalysisTab
+              fieldId={farm?._id || farm?.id}
+              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim()}
+              cropType={farm?.cropType}
+              location={farm?.locationName || "N/A"}
+            />
+          </TabsContent>
+
+          <TabsContent value="drone">
+            <DroneTab assessment={assessment} onRefresh={loadData} />
+          </TabsContent>
+
+          <TabsContent value="overview">
+            <OverviewTab assessment={assessment} farm={farm} farmer={farmer} onRefresh={loadData} />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* PDF Modal */}
+      <Dialog open={pdfModalOpen} onOpenChange={setPdfModalOpen}>
+        <DialogContent className="max-w-5xl w-full h-[90vh] p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-gray-600" />
+              Drone Analysis PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden bg-gray-100">
+            {assessment.droneAnalysisPdfUrl && (
+              <iframe
+                src={`${getFullPdfUrl(assessment.droneAnalysisPdfUrl)}#toolbar=0`}
+                className="w-full h-full border-0"
+                title="Drone Analysis PDF Viewer"
+                style={{ minHeight: "calc(90vh - 100px)" }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ");
 }
