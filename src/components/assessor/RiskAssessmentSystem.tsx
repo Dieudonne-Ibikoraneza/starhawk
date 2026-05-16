@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +146,7 @@ interface Assessment {
 
 export default function RiskAssessmentSystem(): JSX.Element {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"farmers" | "assessment">("farmers");
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -658,23 +660,8 @@ export default function RiskAssessmentSystem(): JSX.Element {
       const assessmentData = assessmentDetails.data || assessmentDetails;
 
       if (assessmentData) {
-        setAssessment(assessmentData);
-
-        const riskScoreValue = assessmentData.riskScore;
-        if (
-          riskScoreValue !== null &&
-          riskScoreValue !== undefined &&
-          typeof riskScoreValue === "number"
-        ) {
-          setRiskScore(riskScoreValue);
-        } else {
-          setRiskScore(null);
-        }
-
-        setComprehensiveNotes(assessmentData.comprehensiveNotes || "");
-        setViewMode("assessment");
-
-        await loadFieldData(farmId);
+        // Navigate to the detail page with the assessment ID
+        navigate(`/assessor/risk-assessments/${assessmentData._id || assessmentData.id}`);
       } else {
         toast({
           title: "No Assessment Found",

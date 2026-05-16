@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ interface LossAssessment {
 
 export default function LossAssessmentSystem() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssessment, setSelectedAssessment] = useState<LossAssessment | null>(null);
   const [assessmentNotes, setAssessmentNotes] = useState("");
@@ -420,8 +422,7 @@ export default function LossAssessmentSystem() {
   });
 
   const handleAssessmentClick = (assessment: LossAssessment) => {
-    setSelectedAssessment(assessment);
-    setViewMode("detail");
+    navigate(`/assessor/loss-assessments/${assessment.id}`);
   };
 
   const handleBackToList = () => {

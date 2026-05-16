@@ -163,6 +163,8 @@ interface WeatherData {
 }
 
 export default function AssessorDashboard() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -411,6 +413,56 @@ export default function AssessorDashboard() {
       loadAlerts();
     }
   }, [activePage, assessorId]);
+
+  // Sync state with URL parameters for deep-linking
+  useEffect(() => {
+    const path = location.pathname;
+    
+    // Farmer detail sync: /assessor/farmers/:id
+    const farmerMatch = path.match(/\/assessor\/farmers\/([^\/]+)$/);
+    if (farmerMatch && farmers.length > 0) {
+      const id = farmerMatch[1];
+      const farmer = farmers.find(f => (f._id || f.id) === id);
+      if (farmer && (!selectedFarmerDetail || (selectedFarmerDetail._id !== id && selectedFarmerDetail.id !== id))) {
+        setSelectedFarmerDetail(farmer);
+        setFarmerViewMode("detail");
+        loadFarmerFields(id);
+      }
+    }
+    
+    // Crop monitoring farmer sync: /assessor/crop-monitoring/farmer/:id
+    const cmFarmerMatch = path.match(/\/assessor\/crop-monitoring\/farmer\/([^\/]+)$/);
+    if (cmFarmerMatch && farmers.length > 0) {
+      const id = cmFarmerMatch[1];
+      const farmer = farmers.find(f => (f._id || f.id) === id);
+      if (farmer && (!selectedFarmerForCropMonitoring || (selectedFarmerForCropMonitoring._id !== id && selectedFarmerForCropMonitoring.id !== id))) {
+        setSelectedFarmerForCropMonitoring(farmer);
+        setCropMonitoringViewMode("farmerFields");
+        if (id && !farmerFields[id]?.length) {
+          loadFarmerFields(id);
+        }
+      }
+    }
+    
+    // Crop monitoring field sync: /assessor/crop-monitoring/field/:id
+    const cmFieldMatch = path.match(/\/assessor\/crop-monitoring\/field\/([^\/]+)$/);
+    if (cmFieldMatch && farms.length > 0) {
+      const id = cmFieldMatch[1];
+      const field = farms.find(f => (f._id || f.id) === id);
+      if (field && (!selectedFieldForCropMonitoring || (selectedFieldForCropMonitoring._id !== id && selectedFieldForCropMonitoring.id !== id))) {
+        setSelectedFieldForCropMonitoring(field);
+        setCropMonitoringViewMode("fieldDetail");
+        setCropMonitoringTab("basic");
+        
+        // Also try to find and set the farmer for this field
+        const farmerId = field.farmerId?._id || field.farmerId || field.farmer?._id || field.farmer;
+        if (farmerId && farmers.length > 0) {
+          const farmer = farmers.find(f => (f._id || f.id) === farmerId);
+          if (farmer) setSelectedFarmerForCropMonitoring(farmer);
+        }
+      }
+    }
+  }, [location.pathname, farmers, farms, selectedFarmerDetail, selectedFarmerForCropMonitoring, selectedFieldForCropMonitoring]);
 
   const loadAssessorProfile = async () => {
     if (profileLoading) return;
@@ -3429,6 +3481,11 @@ export default function AssessorDashboard() {
     // Field is processed - allow access to field detail
     setSelectedField(field);
     setViewMode("fieldDetail");
+    
+    // Also navigate to the field detail URL if it's a monitoring field
+    if (field.id) {
+      navigate(`/assessor/crop-monitoring/field/${field.id}`);
+    }
   };
 
   const handleBackToList = () => {
@@ -3471,6 +3528,9 @@ export default function AssessorDashboard() {
       
       // Also load farmer's fields
       await loadFarmerFields(farmerId);
+      
+      // Navigate to the farmer detail URL
+      navigate(`/assessor/farmers/${farmerId}`);
     } catch (err: any) {
       console.error('Failed to load farmer details:', err);
       toast({
@@ -3486,6 +3546,7 @@ export default function AssessorDashboard() {
   const handleBackToFarmersList = () => {
     setFarmerViewMode("list");
     setSelectedFarmerDetail(null);
+    navigate("/assessor/farmers");
   };
 
   const handleBackToFields = () => {
@@ -5597,10 +5658,14 @@ export default function AssessorDashboard() {
                           <tr 
                             key={farmerIdKey}
                             onClick={() => {
+                              const fId = farmer._id || farmer.id;
                               setSelectedFarmerForFarmersPage(farmer);
                               setFarmersPageViewMode("farmerFields");
-                              if (farmerId && !farmerFields[farmerIdKey]?.length) {
-                                loadFarmerFields(farmerId);
+                              if (fId) {
+                                if (!farmerFields[farmerIdKey]?.length) {
+                                  loadFarmerFields(fId);
+                                }
+                                navigate(`/assessor/farmers/${fId}`);
                               }
                             }}
                             className="hover:bg-gray-50/50 transition-all duration-150 border-b border-gray-100 cursor-pointer"
@@ -6532,15 +6597,19 @@ export default function AssessorDashboard() {
               onClick={() => {
                 if (selectedFieldForCropMonitoring) {
                   if (selectedFarmerForCropMonitoring) {
+                    const fId = selectedFarmerForCropMonitoring._id || selectedFarmerForCropMonitoring.id;
                     setCropMonitoringViewMode("farmerFields");
+                    navigate(`/assessor/crop-monitoring/farmer/${fId}`);
                   } else {
                     setCropMonitoringViewMode("farmers");
+                    navigate("/assessor/crop-monitoring");
                   }
                   setSelectedFieldForCropMonitoring(null);
                 } else {
                   setCropMonitoringViewMode("farmers");
                   setSelectedFarmerForDetail(null);
                   setSelectedFarmForDetail(null);
+                  navigate("/assessor/crop-monitoring");
                 }
               }}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-700 font-medium"
@@ -6687,11 +6756,6 @@ export default function AssessorDashboard() {
   };
 
   const renderCropMonitoring = () => {
-    // Show field detail view
-    if (cropMonitoringViewMode === "fieldDetail" && selectedFieldForCropMonitoring) {
-      return renderCropMonitoringFieldDetail();
-    }
-
     // Show farmer fields view
     if (cropMonitoringViewMode === "farmerFields" && selectedFarmerForCropMonitoring) {
       const farmerId = selectedFarmerForCropMonitoring._id || selectedFarmerForCropMonitoring.id;
@@ -6804,7 +6868,18 @@ export default function AssessorDashboard() {
                           }
 
                           return (
-                            <tr key={farmId || index} className="hover:bg-gray-50 transition-colors">
+                            <tr 
+                              key={farmId || index} 
+                              onClick={() => {
+                                if (farmId) {
+                                  setSelectedFieldForCropMonitoring(farm);
+                                  setCropMonitoringViewMode("fieldDetail");
+                                  setCropMonitoringTab("basic");
+                                  navigate(`/assessor/crop-monitoring/field/${farmId}`);
+                                }
+                              }}
+                              className="hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
                               <td className="py-4 px-6 whitespace-nowrap">
                                 <div className="text-sm font-medium text-gray-900">{displayFieldId}</div>
                               </td>
@@ -6832,10 +6907,14 @@ export default function AssessorDashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => {
-                                    setSelectedFieldForCropMonitoring(farm);
-                                    setCropMonitoringViewMode("fieldDetail");
-                                    setCropMonitoringTab("basic");
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (farmId) {
+                                      setSelectedFieldForCropMonitoring(farm);
+                                      setCropMonitoringViewMode("fieldDetail");
+                                      setCropMonitoringTab("basic");
+                                      navigate(`/assessor/crop-monitoring/field/${farmId}`);
+                                    }
                                   }}
                                   className="border-green-600 text-green-600 hover:bg-green-50"
                                 >
@@ -6997,10 +7076,14 @@ export default function AssessorDashboard() {
                               <tr 
                                 key={farmerIdKey}
                                 onClick={() => {
+                                  const fId = farmer._id || farmer.id;
                                   setSelectedFarmerForCropMonitoring(farmer);
                                   setCropMonitoringViewMode("farmerFields");
-                                  if (farmerId && !farmerFields[farmerIdKey]?.length) {
-                                    loadFarmerFields(farmerId);
+                                  if (fId) {
+                                    if (!farmerFields[farmerIdKey]?.length) {
+                                      loadFarmerFields(fId);
+                                    }
+                                    navigate(`/assessor/crop-monitoring/farmer/${fId}`);
                                   }
                                 }}
                                 className="hover:bg-gray-50/50 transition-all duration-150 border-b border-gray-100 cursor-pointer"
@@ -7064,10 +7147,12 @@ export default function AssessorDashboard() {
                                 key={policy._id || idx}
                                 onClick={() => {
                                   if (details.farm) {
+                                    const farmId = details.farm._id || details.farm.id;
                                     setSelectedFieldForCropMonitoring(details.farm);
                                     setSelectedFarmerForCropMonitoring(details.farmer);
                                     setCropMonitoringViewMode("fieldDetail");
                                     setCropMonitoringTab("basic");
+                                    navigate(`/assessor/crop-monitoring/field/${farmId}`);
                                   }
                                 }}
                                 className="hover:bg-gray-50/50 transition-all duration-150 border-b border-gray-100 cursor-pointer"
@@ -7092,10 +7177,12 @@ export default function AssessorDashboard() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (details.farm) {
+                                        const farmId = details.farm._id || details.farm.id;
                                         setSelectedFieldForCropMonitoring(details.farm);
                                         setSelectedFarmerForCropMonitoring(details.farmer);
                                         setCropMonitoringViewMode("fieldDetail");
                                         setCropMonitoringTab("basic");
+                                        navigate(`/assessor/crop-monitoring/field/${farmId}`);
                                       }
                                     }}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
@@ -7907,9 +7994,7 @@ export default function AssessorDashboard() {
       </div>
     );
   };
-
-  const location = useLocation();
-  const navigate = useNavigate();
+  
 
   const navigationItems = [
     { id: "dashboard", label: "Overview", icon: BarChart3, path: "/assessor/dashboard" },
@@ -7949,7 +8034,7 @@ export default function AssessorDashboard() {
         <main className="flex-1 overflow-auto bg-gray-50/50 p-4 md:p-6">
           <Routes>
             <Route path="/" element={<Navigate to="dashboard" replace />} />
-            <Route path="/dashboard" element={
+            <Route path="dashboard" element={
               <AssessorDashboardOverview
                 totalFarmers={totalFarmers}
                 totalFields={totalFields}
@@ -7977,23 +8062,31 @@ export default function AssessorDashboard() {
                 onViewFarmerFields={handleViewFarmerFields}
                 onToggleFarmerExpansion={toggleFarmerExpansion}
                 onViewFarmerDetail={(farmer) => {
+                  const farmerId = farmer._id || farmer.id;
                   setSelectedFarmerDetail(farmer);
                   setFarmerViewMode("detail");
-                  navigate("/assessor/farmers");
+                  if (farmerId) {
+                    navigate(`/assessor/farmers/${farmerId}`);
+                  } else {
+                    navigate("/assessor/farmers");
+                  }
                 }}
               />
             } />
-            <Route path="/risk-assessments" element={<RiskAssessmentSystem />} />
-            <Route path="/risk-assessments/:id" element={<RiskAssessmentDetail />} />
-            <Route path="/loss-assessments" element={<LossAssessmentSystem />} />
-            <Route path="/loss-assessments/:id" element={<LossAssessmentDetail />} />
-            <Route path="/farmers" element={
+            <Route path="risk-assessments" element={<RiskAssessmentSystem />} />
+            <Route path="risk-assessments/:id" element={<RiskAssessmentDetail />} />
+            <Route path="loss-assessments" element={<LossAssessmentSystem />} />
+            <Route path="loss-assessments/:id" element={<LossAssessmentDetail />} />
+            <Route path="farmers" element={
                farmerViewMode === "detail" ? renderFarmerDetail() : renderFarmersPage()
             } />
-            <Route path="/crop-monitoring" element={renderCropMonitoring()} />
-            <Route path="/crop-monitoring/:id" element={<CropMonitoringDetail />} />
-            <Route path="/notifications" element={<AssessorNotifications />} />
-            <Route path="/settings" element={<AssessorProfileSettings />} />
+            <Route path="farmers/:id" element={renderFarmerDetail()} />
+            <Route path="crop-monitoring" element={renderCropMonitoring()} />
+            <Route path="crop-monitoring/farmer/:id" element={renderCropMonitoring()} />
+            <Route path="crop-monitoring/field/:id" element={<CropMonitoringDetail />} />
+            <Route path="crop-monitoring/:id" element={<CropMonitoringDetail />} />
+            <Route path="notifications" element={<AssessorNotifications />} />
+            <Route path="settings" element={<AssessorProfileSettings />} />
           </Routes>
         </main>
       </div>
