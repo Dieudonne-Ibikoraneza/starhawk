@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function AssessorNotifications() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { 
     notifications, 
     loading, 
@@ -344,7 +346,9 @@ export default function AssessorNotifications() {
                       className="bg-indigo-600 hover:bg-indigo-700 text-white"
                       onClick={() => {
                         setIsDetailOpen(false);
-                        window.location.href = selectedNotification.href!;
+                        if (selectedNotification.href) {
+                          navigate(selectedNotification.href);
+                        }
                       }}
                     >
                       View Details

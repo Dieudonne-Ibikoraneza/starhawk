@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 
 export default function InsurerNotifications() {
+  const navigate = useNavigate();
   const { 
     notifications, 
     loading, 
@@ -228,7 +230,9 @@ export default function InsurerNotifications() {
                           </Button>
                         )}
                         {notification.href && (
-                          <Button size="sm" className="h-8 bg-slate-900 hover:bg-slate-800 text-white" onClick={() => window.location.href = notification.href!}>
+                          <Button size="sm" className="h-8 bg-slate-900 hover:bg-slate-800 text-white" onClick={() => {
+                            if (notification.href) navigate(notification.href);
+                          }}>
                             View Details
                           </Button>
                         )}

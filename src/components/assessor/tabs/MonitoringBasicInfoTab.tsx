@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sprout, MapPin, Calendar, Clock, CheckCircle2 } from "lucide-react";
+import { Sprout, MapPin, Calendar, Clock, CheckCircle2, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { FieldMapWithLayers } from "../FieldMapWithLayers";
 import { CropMonitoringRecord } from "@/lib/api/services/cropMonitoring";
 import { formatCropTypeLabel } from "@/lib/crops";
@@ -46,6 +47,7 @@ export const MonitoringBasicInfoTab = ({
   sowingDate,
   readOnly = false,
 }: MonitoringBasicInfoTabProps) => {
+  const navigate = useNavigate();
   const sowingDateObj = sowingDate ? new Date(sowingDate) : null;
   const completedCount = cycles.filter(c => c.status === "COMPLETED").length;
   
@@ -179,7 +181,8 @@ export const MonitoringBasicInfoTab = ({
             {cycles.map((cycle) => (
               <div
                 key={cycle._id}
-                className="flex items-center gap-3 p-4 rounded-lg border bg-background"
+                onClick={() => navigate(`/assessor/crop-monitoring/${cycle._id}`)}
+                className="flex items-center gap-3 p-4 rounded-lg border bg-background hover:bg-gray-50 cursor-pointer transition-colors group"
               >
                 {cycle.status === "COMPLETED" ? (
                   <CheckCircle2 className="h-6 w-6 text-green-600 shrink-0" />
@@ -187,9 +190,12 @@ export const MonitoringBasicInfoTab = ({
                   <Clock className="h-6 w-6 text-amber-500 shrink-0" />
                 )}
                 <div className="flex-1">
-                  <p className="font-semibold">
-                    Cycle #{cycle.monitoringNumber}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">
+                      Cycle #{cycle.monitoringNumber}
+                    </p>
+                    <Eye className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Started:{" "}
                     {new Date(cycle.monitoringDate).toLocaleDateString()}
