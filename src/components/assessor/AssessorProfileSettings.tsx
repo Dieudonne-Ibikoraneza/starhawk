@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
+import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
 import { getUserById, updateUserProfile, getUserProfile } from "@/services/usersAPI";
 import { useToast } from "@/hooks/use-toast";
 import { photosService } from "@/lib/api/services/photos";
@@ -392,6 +392,58 @@ export default function AssessorProfileSettings() {
     }
   };
 
+  const handlePasswordSubmit = async () => {
+    if (!securityData.currentPassword || !securityData.newPassword || !securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All password fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword !== securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 8 characters long.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePassword(securityData.currentPassword, securityData.newPassword);
+      toast({
+        title: "Success",
+        description: "Password updated successfully.",
+      });
+      setSecurityData(prev => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      }));
+    } catch (error: any) {
+      toast({
+        title: "Error updating password",
+        description: error.message || "Failed to update password.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderProfileTab = () => (
     <div className="space-y-6">
       {/* Profile Picture Card */}
@@ -481,8 +533,8 @@ export default function AssessorProfileSettings() {
               <Input
                 id="fullName"
                 value={profileData.fullName}
-                onChange={(e) => handleProfileUpdate('fullName', e.target.value)}
-                className="bg-gray-50 border-gray-300 text-gray-900"
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
               />
             </div>
             <div className="space-y-2">
@@ -503,8 +555,8 @@ export default function AssessorProfileSettings() {
                 id="email"
                 type="email"
                 value={profileData.email}
-                onChange={(e) => handleProfileUpdate('email', e.target.value)}
-                className="bg-gray-50 border-gray-300 text-gray-900"
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
               />
             </div>
             <div className="space-y-2">
@@ -512,8 +564,8 @@ export default function AssessorProfileSettings() {
               <Input
                 id="phone"
                 value={profileData.phone}
-                onChange={(e) => handleProfileUpdate('phone', e.target.value)}
-                className="bg-gray-50 border-gray-300 text-gray-900"
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
               />
             </div>
           </div>
@@ -523,8 +575,8 @@ export default function AssessorProfileSettings() {
             <Input
               id="address"
               value={profileData.address}
-              onChange={(e) => handleProfileUpdate('address', e.target.value)}
-              className="bg-gray-50 border-gray-300 text-gray-900"
+              disabled
+              className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
             />
           </div>
         </CardContent>
@@ -753,8 +805,12 @@ export default function AssessorProfileSettings() {
             </div>
           </div>
 
-          <Button className="bg-green-600 hover:bg-green-700 text-white text-xs h-9">
-            Update Password
+          <Button 
+            className="bg-green-600 hover:bg-green-700 text-white text-xs h-9"
+            onClick={handlePasswordSubmit}
+            disabled={saving}
+          >
+            {saving ? "Updating..." : "Update Password"}
           </Button>
         </CardContent>
       </Card>

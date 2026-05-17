@@ -3,7 +3,7 @@ import { Search, Sparkles, AlignLeft } from "lucide-react";
 // import { SidebarTrigger } from "@/components/ui/sidebar"; // We don't have this exact component, but we can use a Button to toggle sidebar state if needed, or just use a custom trigger.
 // For now I'll use a standard Button as a placeholder or check DashboardLayout
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { GlobalSearch } from "./GlobalSearch";
@@ -14,13 +14,15 @@ export function Topbar({
   sidebarCollapsed,
   userName, 
   userEmail,
-  userRole 
+  userRole,
+  userPhoto
 }: { 
   onToggleSidebar?: () => void, 
   sidebarCollapsed?: boolean,
   userName?: string, 
   userEmail?: string,
-  userRole?: string 
+  userRole?: string,
+  userPhoto?: string
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -61,6 +63,7 @@ export function Topbar({
 
           <div className="hidden items-center gap-3 rounded-full border border-border/60 bg-card py-1 pl-1 pr-3 shadow-sm sm:flex">
             <Avatar className="h-7 w-7 ring-2 ring-indigo-50 border-white">
+              {userPhoto && <AvatarImage src={userPhoto} alt={userName || "User"} />}
               <AvatarFallback className="bg-indigo-600 text-[10px] font-semibold text-white">
                 {userName ? userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'EM'}
               </AvatarFallback>
@@ -77,6 +80,7 @@ export function Topbar({
           </div>
 
           <Avatar className="h-8 w-8 sm:hidden">
+            {userPhoto && <AvatarImage src={userPhoto} alt={userName || "User"} />}
             <AvatarFallback className="bg-blue-600 text-xs font-semibold text-white">
                {userName ? userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'EM'}
             </AvatarFallback>

@@ -40,6 +40,7 @@ interface DashboardLayoutProps {
   onPageChange: (page: string) => void;
   onLogout: () => void;
   userEmail?: string;
+  userPhoto?: string;
 }
 
 export default function DashboardLayout({
@@ -51,7 +52,8 @@ export default function DashboardLayout({
   activePage,
   onPageChange,
   onLogout,
-  userEmail
+  userEmail,
+  userPhoto
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -331,6 +333,7 @@ export default function DashboardLayout({
           userName={userName}
           userEmail={userEmail}
           userRole={getUserLabel()}
+          userPhoto={userPhoto}
         />
 
          {/* Page Content */}

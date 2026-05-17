@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { getUserProfile, updateUserProfile } from "@/services/usersAPI";
-import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
+import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
 import { photosService } from "@/lib/api/services/photos";
 import ImageCropper from "@/components/ui/image-cropper";
 import {
@@ -46,7 +47,11 @@ export default function InsurerProfileSettings() {
     contactPerson: "",
     companyLogoUrl: null as string | null,
     profilePictureUrl: null as string | null,
-    insurerId: ""
+    insurerId: "",
+    bio: "",
+    website: "",
+    licenseNumber: "",
+    officialEmail: ""
   });
 
   const [cropperData, setCropperData] = useState<{
@@ -90,7 +95,11 @@ export default function InsurerProfileSettings() {
           contactPerson: user.insurerProfile?.contactPerson || "",
           companyLogoUrl: user.insurerProfile?.companyLogoUrl || null,
           profilePictureUrl: user.insurerProfile?.profilePictureUrl || null,
-          insurerId: user._id || user.id || insurerId || ""
+          insurerId: user._id || user.id || insurerId || "",
+          bio: user.insurerProfile?.bio || "",
+          website: user.insurerProfile?.website || "",
+          licenseNumber: user.insurerProfile?.licenseNumber || "",
+          officialEmail: user.insurerProfile?.officialEmail || ""
         });
       }
     } catch (err: any) {
@@ -236,6 +245,58 @@ export default function InsurerProfileSettings() {
       toast({
         title: "Error saving changes",
         description: error.message || "Failed to save profile changes.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!securityData.currentPassword || !securityData.newPassword || !securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All password fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword !== securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 8 characters long.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePassword(securityData.currentPassword, securityData.newPassword);
+      toast({
+        title: "Success",
+        description: "Password updated successfully.",
+      });
+      setSecurityData(prev => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      }));
+    } catch (error: any) {
+      toast({
+        title: "Error updating password",
+        description: error.message || "Failed to update password.",
         variant: "destructive"
       });
     } finally {
@@ -418,12 +479,12 @@ export default function InsurerProfileSettings() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="contactPerson" className="text-gray-700 font-medium">Contact Person</Label>
+              <Label htmlFor="contactPerson" className="text-gray-700 font-medium">Contact Person (Full Name)</Label>
               <Input
                 id="contactPerson"
                 value={profileData.contactPerson}
-                onChange={(e) => handleProfileUpdate("contactPerson", e.target.value)}
-                className="border-gray-300"
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
               />
             </div>
             <div className="space-y-2">
@@ -432,19 +493,66 @@ export default function InsurerProfileSettings() {
                 id="email"
                 type="email"
                 value={profileData.email}
-                onChange={(e) => handleProfileUpdate("email", e.target.value)}
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-gray-700 font-medium">Phone Number</Label>
+              <Input
+                id="phone"
+                value={profileData.phone}
+                disabled
+                className="bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="officialEmail" className="text-gray-700 font-medium">Official Business Email</Label>
+              <Input
+                id="officialEmail"
+                type="email"
+                value={profileData.officialEmail}
+                onChange={(e) => handleProfileUpdate("officialEmail", e.target.value)}
+                placeholder="info@company.com"
+                className="border-gray-300"
+              />
+            </div>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="licenseNumber" className="text-gray-700 font-medium">Insurance License Number</Label>
+              <Input
+                id="licenseNumber"
+                value={profileData.licenseNumber}
+                onChange={(e) => handleProfileUpdate("licenseNumber", e.target.value)}
+                placeholder="LIC-12345678"
+                className="border-gray-300"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="website" className="text-gray-700 font-medium">Company Website</Label>
+              <Input
+                id="website"
+                value={profileData.website}
+                onChange={(e) => handleProfileUpdate("website", e.target.value)}
+                placeholder="https://www.company.com"
                 className="border-gray-300"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone" className="text-gray-700 font-medium">Phone Number</Label>
-            <Input
-              id="phone"
-              value={profileData.phone}
-              onChange={(e) => handleProfileUpdate("phone", e.target.value)}
-              className="border-gray-300"
+            <Label htmlFor="bio" className="text-gray-700 font-medium">Professional Biography</Label>
+            <Textarea
+              id="bio"
+              value={profileData.bio}
+              onChange={(e) => handleProfileUpdate("bio", e.target.value)}
+              placeholder="Describe your insurance agency's history and mission..."
+              className="min-h-[120px] border-gray-300"
             />
           </div>
         </CardContent>
@@ -528,8 +636,12 @@ export default function InsurerProfileSettings() {
             </div>
           </div>
 
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] text-xs h-9">
-            Update Password
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] text-xs h-9"
+            onClick={handlePasswordSubmit}
+            disabled={saving}
+          >
+            {saving ? "Updating..." : "Update Password"}
           </Button>
         </CardContent>
       </Card>
