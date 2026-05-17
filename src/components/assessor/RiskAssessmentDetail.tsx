@@ -36,8 +36,9 @@ import OverviewTab from "./tabs/OverviewTab";
 
 const API_BASE_URL = "https://starhawk-backend-agriplatform.onrender.com/api";
 
-export default function RiskAssessmentDetail() {
-  const { id } = useParams<{ id: string }>();
+export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }: { assessmentId?: string, onBack?: () => void, readOnly?: boolean } = {}) {
+  const params = useParams<{ id: string }>();
+  const id = assessmentId || params.id;
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -134,7 +135,7 @@ export default function RiskAssessmentDetail() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/assessor/risk-assessments")}
+            onClick={() => onBack ? onBack() : navigate("/assessor/risk-assessments")}
             className="text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -295,7 +296,7 @@ export default function RiskAssessmentDetail() {
           </TabsContent>
 
           <TabsContent value="overview">
-            <OverviewTab assessment={assessment} farm={farm} farmer={farmer} onRefresh={loadData} />
+            <OverviewTab assessment={assessment} farm={farm} farmer={farmer} onRefresh={loadData} isInsurerView={readOnly} />
           </TabsContent>
         </Tabs>
       </div>
