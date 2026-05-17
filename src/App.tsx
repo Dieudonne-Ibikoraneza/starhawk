@@ -29,6 +29,7 @@ import Services from "./pages/Services";
 import NotFound from "./pages/NotFound";
 import UserDetailsPage from "./pages/UserDetailsPage";
 import Onboarding from "./pages/Onboarding";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -58,9 +59,30 @@ const App = () => {
               <Route path="/onboarding" element={<Onboarding />} />
               
               {/* Dashboard Routes */}
-              <Route path="/farmer/*" element={<FarmerDashboard />} />
-              <Route path="/assessor/*" element={<AssessorDashboard />} />
-              <Route path="/insurer/*" element={<InsurerDashboard />} />
+              <Route 
+                path="/farmer/*" 
+                element={
+                  <ProtectedRoute allowedRole="FARMER">
+                    <FarmerDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/assessor/*" 
+                element={
+                  <ProtectedRoute allowedRole="ASSESSOR">
+                    <AssessorDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/insurer/*" 
+                element={
+                  <ProtectedRoute allowedRole="INSURER">
+                    <InsurerDashboard />
+                  </ProtectedRoute>
+                } 
+              />
               
               {/* Legacy Redirects - Improved to handle sub-paths */}
               <Route path="/farmer-dashboard" element={<Navigate to="/farmer/dashboard" replace />} />
@@ -73,7 +95,14 @@ const App = () => {
               <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="/admin-dashboard/users/:userId" element={<Navigate to="/admin/users/:userId" replace />} />
               
-              <Route path="/admin/*" element={<AdminDashboard />} />
+              <Route 
+                path="/admin/*" 
+                element={
+                  <ProtectedRoute allowedRole="ADMIN">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
               
               {/* User Details Route */}
               <Route path="/admin/users/:userId" element={<UserDetailsPage />} />

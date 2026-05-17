@@ -17,6 +17,7 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
+  syncAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,15 +39,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for existing token and user data
+  const syncAuth = () => {
     const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storedRole = localStorage.getItem('role');
+    const storedUserId = localStorage.getItem('userId');
+    const storedUserStr = localStorage.getItem('user');
 
-    if (storedToken && storedUser) {
+    if (storedToken) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      if (storedUserStr) {
+        setUser(JSON.parse(storedUserStr));
+      } else if (storedRole) {
+        setUser({
+          id: storedUserId || "user_001",
+          email: localStorage.getItem('email') || "",
+          role: storedRole,
+          name: localStorage.getItem('name') || "User",
+          profile: null
+        });
+      }
+    } else {
+      setUser(null);
+      setToken(null);
     }
+  };
+
+  useEffect(() => {
+    syncAuth();
     setIsLoading(false);
   }, []);
 
@@ -121,6 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isLoading,
     isAuthenticated,
+    syncAuth,
   };
 
   return (

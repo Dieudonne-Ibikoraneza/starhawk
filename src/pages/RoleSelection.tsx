@@ -6,6 +6,7 @@ import CustomScrollbar from "@/components/ui/CustomScrollbar";
 import { useToast } from "@/hooks/use-toast";
 import { farmerLogin, assessorLogin, insurerLogin, adminLogin } from "@/services/authAPI";
 import { API_BASE_URL } from "@/config/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─────────────────────────────────────────────────────────────────
 //  DEMO / OFFLINE CREDENTIALS
@@ -43,6 +44,7 @@ const STATS = [
 export default function RoleSelection() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { syncAuth } = useAuth();
 
   const [formData, setFormData] = useState({ phoneNumber: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -167,6 +169,7 @@ export default function RoleSelection() {
         });
 
         await new Promise((r) => setTimeout(r, 600));
+        syncAuth(); // Sync context state for ProtectedRoute
         navigate(getDashboardRoute(demo.role));
         return;
       }
@@ -178,6 +181,7 @@ export default function RoleSelection() {
       const role = loginResponse.role || localStorage.getItem("role");
       if (!role) throw new Error("Unable to determine user role.");
 
+      syncAuth(); // Sync context state for ProtectedRoute
       toast({ title: "Welcome back!", description: `Redirecting to your ${role.toLowerCase()} dashboard…` });
       navigate(getDashboardRoute(role));
     } catch (err: any) {
