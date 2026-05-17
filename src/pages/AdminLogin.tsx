@@ -33,7 +33,7 @@ export default function AdminLogin() {
       });
       
       // Redirect to admin dashboard
-      navigate("/admin-dashboard");
+      navigate("/admin/dashboard");
     } catch (error: any) {
       console.error("Login error:", error);
       toast({

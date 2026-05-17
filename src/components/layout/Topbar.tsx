@@ -67,10 +67,12 @@ export function Topbar({
             </Avatar>
             <div className="hidden flex-col leading-[1.1] md:flex">
               <span className="text-xs font-bold text-slate-900 truncate max-w-[120px]">{userName}</span>
-              <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[120px]">{userEmail || (userRole === "Farmer" ? "Verified Producer" : "Certified Assessor")}</span>
+              <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[120px]">
+                {userEmail || (userRole === "Farmer" ? "Verified Producer" : userRole === "Admin" ? "System Administrator" : userRole === "Insurer" ? "Insurance Provider" : "Certified Assessor")}
+              </span>
             </div>
             <Badge variant="secondary" className="ml-1 h-5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-0 text-[9px] font-bold uppercase tracking-tight">
-              {userRole === "Assessor" ? "Expert" : userRole === "Farmer" ? "Pro" : "User"}
+              {userRole === "Assessor" ? "Expert" : userRole === "Farmer" ? "Pro" : userRole === "Admin" ? "Admin" : userRole === "Insurer" ? "Provider" : "User"}
             </Badge>
           </div>
 

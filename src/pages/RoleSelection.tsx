@@ -25,7 +25,7 @@ const DEMO_CARD_LIST = [
   { icon: Building2, label: "Insurer",    phone: "0781000001", password: "insurer@123", route: "/insurer/dashboard" },
   { icon: MapPin,    label: "Assessor",   phone: "0781000002", password: "assess@123",  route: "/assessor-dashboard" },
   { icon: BarChart3, label: "Government", phone: "0781000003", password: "gov@123",     route: "/government-dashboard" },
-  { icon: Settings,  label: "Admin",      phone: "0781000004", password: "admin@123",   route: "/admin-dashboard" },
+  { icon: Settings,  label: "Admin",      phone: "0781000004", password: "admin@123",   route: "/admin/dashboard" },
 ];
 
 const TRUST_BADGES = [
@@ -76,7 +76,7 @@ export default function RoleSelection() {
       ASSESSOR: "/assessor-dashboard",
       INSURER: "/insurer/dashboard",
       GOVERNMENT: "/government-dashboard",
-      ADMIN: "/admin-dashboard",
+      ADMIN: "/admin/dashboard",
     };
     return map[role.toUpperCase()] || "/role-selection";
   };

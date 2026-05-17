@@ -138,8 +138,26 @@ export function StatusBadge({
   status: string;
   variant?: "default" | "success" | "warning" | "danger" | "info";
 }) {
+  // Auto-detect variant from status if not provided
+  const autoVariant = variant === "default" ? (() => {
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("paid") || statusLower.includes("active") || statusLower.includes("completed") || statusLower.includes("approved")) {
+      return "success";
+    }
+    if (statusLower.includes("pending") || statusLower.includes("processing") || statusLower.includes("assigned") || statusLower.includes("progress")) {
+      return "warning";
+    }
+    if (statusLower.includes("outstanding") || statusLower.includes("overdue") || statusLower.includes("rejected") || statusLower.includes("cancelled")) {
+      return "danger";
+    }
+    if (statusLower.includes("submitted") || statusLower.includes("review")) {
+      return "info";
+    }
+    return "default";
+  })() : variant;
+
   const getVariantStyles = () => {
-    switch (variant) {
+    switch (autoVariant) {
       case "success":
         return "bg-green-100 text-green-800 border-green-200";
       case "warning":
@@ -153,30 +171,22 @@ export function StatusBadge({
     }
   };
 
-  // Auto-detect variant from status if not provided
-  const autoVariant = variant === "default" ? (() => {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes("paid") || statusLower.includes("active") || statusLower.includes("completed") || statusLower.includes("approved")) {
-      return "success";
-    }
-    if (statusLower.includes("pending") || statusLower.includes("processing")) {
-      return "warning";
-    }
-    if (statusLower.includes("outstanding") || statusLower.includes("overdue") || statusLower.includes("rejected") || statusLower.includes("cancelled")) {
-      return "danger";
-    }
-    if (statusLower.includes("submitted") || statusLower.includes("review")) {
-      return "info";
-    }
-    return "default";
-  })() : variant;
+  const formatStatusText = (text: string) => {
+    if (!text) return text;
+    return text
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   return (
     <Badge
       className={`${getVariantStyles()} border px-2.5 py-0.5 text-xs font-medium rounded-full`}
       variant="outline"
     >
-      {status}
+      {formatStatusText(status)}
     </Badge>
   );
 }

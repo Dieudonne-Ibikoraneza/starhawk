@@ -110,7 +110,7 @@ export default function UserDetailsPage() {
 
   const handlePageChange = (page: string) => {
     // Navigate to admin dashboard with the selected page
-    navigate("/admin-dashboard");
+    navigate("/admin/users");
     // The AdminDashboard will handle the page change internally
   };
 
@@ -290,7 +290,7 @@ export default function UserDetailsPage() {
               <p className="text-red-600">{error || "User not found"}</p>
             </div>
             <Button
-              onClick={() => navigate("/admin-dashboard")}
+              onClick={() => navigate("/admin/dashboard")}
               variant="outline"
               className="border-gray-300 text-gray-900 hover:bg-gray-100"
             >
@@ -308,7 +308,7 @@ export default function UserDetailsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
-              onClick={() => navigate("/admin-dashboard")}
+              onClick={() => navigate("/admin/dashboard")}
               variant="ghost"
               className="text-gray-900/60 hover:text-gray-900"
             >

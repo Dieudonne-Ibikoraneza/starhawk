@@ -133,10 +133,11 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
     navigate(path);
   };
 
-  const role = localStorage.getItem('role') || 'insurer';
+  const role = localStorage.getItem('userType') || localStorage.getItem('role') || 'insurer';
   const isAssessor = role.toLowerCase() === 'assessor';
   const isFarmer = role.toLowerCase() === 'farmer';
-  const isInsurer = !isAssessor && !isFarmer;
+  const isAdmin = role.toLowerCase() === 'admin';
+  const isInsurer = !isAssessor && !isFarmer && !isAdmin;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[750px] md:max-w-[850px]">
@@ -180,6 +181,14 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   <CommandItem onSelect={() => go("/farmer/file-claim")} className="py-3 px-4 rounded-xl cursor-pointer"><AlertTriangle className="mr-3 h-4 w-4 text-amber-500" />File New Claim</CommandItem>
                   <CommandItem onSelect={() => go("/farmer/profile")} className="py-3 px-4 rounded-xl cursor-pointer"><Settings className="mr-3 h-4 w-4 text-slate-500" />Account Settings</CommandItem>
                 </>
+              ) : isAdmin ? (
+                <>
+                  <CommandItem onSelect={() => go("/admin/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-purple-600" />Admin Dashboard</CommandItem>
+                  <CommandItem onSelect={() => go("/admin/users")} className="py-3 px-4 rounded-xl cursor-pointer"><User className="mr-3 h-4 w-4 text-blue-600" />User Management</CommandItem>
+                  <CommandItem onSelect={() => go("/admin/policies")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-emerald-600" />Policies Management</CommandItem>
+                  <CommandItem onSelect={() => go("/admin/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-slate-600" />Claims Management</CommandItem>
+                  <CommandItem onSelect={() => go("/admin/assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><ClipboardCheck className="mr-3 h-4 w-4 text-amber-600" />Assessments Management</CommandItem>
+                </>
               ) : (
                 <>
                   <CommandItem onSelect={() => go("/insurer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-indigo-500" />Overview Dashboard</CommandItem>
@@ -201,7 +210,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmName = a.farmId?.name || a.farm?.name || "Farm";
                   const district = a.farmId?.locationName?.split(',')[0] || a.farmId?.district || "N/A";
                   return (
-                    <CommandItem key={a._id || a.id} value={`${farmerName} ${farmName} ${a.status} assessment`} onSelect={() => go(isAssessor ? `/assessor/risk-assessments/${a._id || a.id}` : isFarmer ? `/farmer/dashboard` : `/insurer/assessments/${a._id || a.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={a._id || a.id} value={`${farmerName} ${farmName} ${a.status} assessment`} onSelect={() => go(isAssessor ? `/assessor/risk-assessments/${a._id || a.id}` : isFarmer ? `/farmer/dashboard` : isAdmin ? `/admin/assessments` : `/insurer/assessments/${a._id || a.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                         <User className="h-4 w-4" />
                       </div>
@@ -220,13 +229,13 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               </CommandGroup>
             )}
 
-            {policies.length > 0 && (
+            {!isAssessor && policies.length > 0 && (
               <CommandGroup heading="Managed Policies">
                 {policies.map((p) => {
                   const pNum = p.policyNumber || `POL-${(p._id || p.id)?.slice(-6).toUpperCase()}`;
                   const farmerName = getFarmerName(p);
                   return (
-                    <CommandItem key={p._id || p.id} value={`${pNum} ${farmerName} ${p.cropType} policy`} onSelect={() => go(isAssessor ? `/assessor/farmers` : isFarmer ? `/farmer/insurance` : `/insurer/policies`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={p._id || p.id} value={`${pNum} ${farmerName} ${p.cropType} policy`} onSelect={() => go(isAssessor ? `/assessor/farmers` : isFarmer ? `/farmer/insurance` : isAdmin ? `/admin/policies` : `/insurer/policies`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                         <Shield className="h-4 w-4" />
                       </div>
@@ -252,7 +261,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmerName = getFarmerName(c);
                   const cause = c.cause || "Claim Request";
                   return (
-                    <CommandItem key={c._id || c.id} value={`${cNum} ${farmerName} ${c.status} claim`} onSelect={() => go(isAssessor ? `/assessor/loss-assessments/${c._id || c.id}` : isFarmer ? `/farmer/claims` : `/insurer/claims/${c._id || c.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={c._id || c.id} value={`${cNum} ${farmerName} ${c.status} claim`} onSelect={() => go(isAssessor ? `/assessor/loss-assessments/${c._id || c.id}` : isFarmer ? `/farmer/claims` : isAdmin ? `/admin/claims` : `/insurer/claims/${c._id || c.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-600">
                         <Wallet className="h-4 w-4" />
                       </div>
@@ -279,7 +288,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmerName = getFarmerName(f);
                   const crop = f.policyId?.cropType || f.cropType || "Crop";
                   return (
-                    <CommandItem key={mId} value={`${mId} ${farmName} ${crop} monitoring field`} onSelect={() => go(isAssessor ? `/assessor/crop-monitoring/${mId}` : isFarmer ? `/farmer/monitoring` : `/insurer/monitoring/${mId}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={mId} value={`${mId} ${farmName} ${crop} monitoring field`} onSelect={() => go(isAssessor ? `/assessor/crop-monitoring/${mId}` : isFarmer ? `/farmer/monitoring` : isAdmin ? `/admin/dashboard` : `/insurer/monitoring/${mId}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
                         <Leaf className="h-4 w-4" />
                       </div>
@@ -302,7 +311,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const name = i.name || i.companyName || "Insurer";
                   const email = i.email || "partner@starhawk.com";
                   return (
-                    <CommandItem key={i._id || i.id} value={`${name} ${email} insurer partner`} onSelect={() => go(isFarmer ? `/farmer/insurers` : `/insurer/dashboard`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={i._id || i.id} value={`${name} ${email} insurer partner`} onSelect={() => go(isFarmer ? `/farmer/insurers` : isAdmin ? `/admin/users` : `/insurer/dashboard`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                         <Building2 className="h-4 w-4" />
                       </div>
