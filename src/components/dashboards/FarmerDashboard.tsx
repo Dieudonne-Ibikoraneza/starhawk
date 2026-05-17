@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import DashboardLayout from "../layout/DashboardLayout";
-import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
+import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
 import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
 import { photosService } from "@/lib/api/services/photos";
 import ImageCropper from "@/components/ui/image-cropper";
@@ -40,6 +40,8 @@ import {
   Save,
   Shield,
   Eye,
+  EyeOff,
+  Key,
   TrendingUp,
   CloudRain,
   Droplets,
@@ -189,6 +191,72 @@ export default function FarmerDashboard() {
     aspect: number;
     circular: boolean;
   } | null>(null);
+  
+  // Security/Password state
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [securityData, setSecurityData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+
+  const handleSecurityUpdate = (field: string, value: string) => {
+    setSecurityData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!securityData.currentPassword || !securityData.newPassword || !securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All password fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword !== securityData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (securityData.newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 8 characters long.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmittingPassword(true);
+    try {
+      await updatePassword(securityData.currentPassword, securityData.newPassword);
+      toast({
+        title: "Success",
+        description: "Password updated successfully.",
+      });
+      setSecurityData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating password",
+        description: error.message || "Failed to update password.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({
     PROFILE: 0
@@ -2073,26 +2141,13 @@ export default function FarmerDashboard() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-6">
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center space-x-6">
-            <div className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${profileStep >= 1 ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
-              <span className="font-semibold">1</span>
-            </div>
-            <div className={`w-20 h-1 rounded-full transition-all duration-300 ${profileStep >= 2 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${profileStep >= 2 ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
-              <span className="font-semibold">2</span>
-            </div>
-          </div>
-        </div>
-
         <Card className="max-w-2xl mx-auto bg-white border border-gray-200 shadow-sm">
           <CardHeader className="text-center pb-8">
             <CardTitle className="text-2xl font-semibold text-gray-900 mb-2">
-              {profileStep === 1 ? "Personal Information" : "Location Details"}
+              Personal Information
             </CardTitle>
             <p className="text-gray-600">
-              {profileStep === 1 ? "Update your personal details" : "Update your location information"}
+              Update your personal and location details
             </p>
           </CardHeader>
           <CardContent>
@@ -2103,7 +2158,6 @@ export default function FarmerDashboard() {
               </div>
             ) : (
               <form onSubmit={handleProfileSubmit} className="space-y-6">
-                {profileStep === 1 && (
                   <>
                     {/* Profile Picture Upload Section */}
                     <div className="flex flex-col items-center gap-4 mb-8 pb-6 border-b border-gray-100">
@@ -2182,22 +2236,30 @@ export default function FarmerDashboard() {
                         <Input
                           id="fullName"
                           value={profileFormData.fullName}
-                          onChange={(e) => handleProfileInputChange('fullName', e.target.value)}
+                          disabled
                           placeholder="Enter your full name"
                           required
-                          className="!rounded-none"
+                          className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="gender">Gender *</Label>
-                        <Select value={profileFormData.gender} onValueChange={(value) => handleProfileInputChange('gender', value)}>
-                          <SelectTrigger className="!rounded-none">
+                        <Select 
+                          value={profileFormData.gender} 
+                          disabled={farmerProfile?.sex || farmerProfile?.gender ? true : false}
+                          onValueChange={(value) => handleProfileInputChange("gender", value)}
+                        >
+                          <SelectTrigger className={`!rounded-none ${
+                            farmerProfile?.sex || farmerProfile?.gender
+                              ? "bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
+                              : "bg-white border-gray-300 text-gray-900"
+                          }`}>
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2208,10 +2270,10 @@ export default function FarmerDashboard() {
                       <Input
                         id="nationalId"
                         value={profileFormData.nationalId}
-                        onChange={(e) => handleProfileInputChange('nationalId', e.target.value)}
+                        disabled
                         placeholder="Enter your national ID number"
                         required
-                        className="!rounded-none"
+                        className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
                       />
                     </div>
 
@@ -2222,10 +2284,10 @@ export default function FarmerDashboard() {
                           id="phoneNumber"
                           type="tel"
                           value={profileFormData.phoneNumber}
-                          onChange={(e) => handleProfileInputChange('phoneNumber', e.target.value)}
+                          disabled
                           placeholder="+250 7XX XXX XXX"
                           required
-                          className="!rounded-none"
+                          className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
                         />
                       </div>
                       <div className="space-y-2">
@@ -2234,76 +2296,162 @@ export default function FarmerDashboard() {
                           id="email"
                           type="email"
                           value={profileFormData.email}
-                          onChange={(e) => handleProfileInputChange('email', e.target.value)}
+                          disabled
                           placeholder="your.email@example.com"
-                          className="!rounded-none"
+                          className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500"
                         />
                       </div>
                     </div>
-                  </>
-                )}
-
-                {profileStep === 2 && (
-                  <>
-                    <div className="space-y-4">
-                      <div className="text-center mb-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Your Location</h3>
-                        <p className="text-gray-600">Choose your province, district, sector, village, and cell</p>
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Location Details</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Province</Label>
+                          <Input value={profileFormData.province || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>District</Label>
+                          <Input value={profileFormData.district || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sector</Label>
+                          <Input value={profileFormData.sector || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cell</Label>
+                          <Input value={profileFormData.cell || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Village</Label>
+                          <Input value={profileFormData.village || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
+                        </div>
                       </div>
-
-                      <RwandaLocationSelector
-                        onLocationChange={(location) => {
-                          setSelectedLocation(location);
-                          // Update form data with selected location
-                          setProfileFormData(prev => ({
-                            ...prev,
-                            province: location.province?.name || '',
-                            district: location.district?.name || '',
-                            sector: location.sector?.name || '',
-                            village: location.village?.name || '',
-                            cell: location.cell?.name || ''
-                          }));
-                        }}
-                        levels={['province', 'district', 'sector', 'village', 'cell']}
-                        className="space-y-4"
-                      />
                     </div>
                   </>
-                )}
 
-                <div className="flex justify-between pt-8">
-                  {profileStep === 2 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setProfileStep(1)}
-                      className="!rounded-none"
-                    >
-                      Previous
-                    </Button>
-                  )}
-                  <div className="flex-1"></div>
-                  {profileStep === 1 ? (
-                    <Button
-                      type="button"
-                      onClick={() => setProfileStep(2)}
-                      disabled={!isProfileStep1Valid}
-                      className="bg-green-600 hover:bg-green-700 text-white !rounded-none"
-                    >
-                      Next Step
-                    </Button>
-                  ) : (
+                <div className="flex justify-end gap-3 pt-8">
+                  {(!farmerProfile?.sex && !farmerProfile?.gender) && (
                     <Button
                       type="submit"
-                      disabled={!isProfileStep2Valid || isSubmittingProfile}
-                      className="bg-green-600 hover:bg-green-700 text-white !rounded-none"
+                      disabled={isSubmittingProfile}
+                      className="bg-green-600 hover:bg-green-700 text-white !rounded-none min-w-[120px]"
                     >
-                      {isSubmittingProfile ? "Updating Profile..." : "Update Profile"}
+                      {isSubmittingProfile ? "Saving..." : "Save Changes"}
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    disabled={true}
+                    className="bg-gray-300 text-gray-500 cursor-not-allowed !rounded-none"
+                  >
+                    NIDA Details Verified
+                  </Button>
                 </div>
               </form>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Change Password Card */}
+        <Card className="max-w-2xl mx-auto mt-6 bg-white border border-gray-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <Key className="h-5 w-5 text-green-600" />
+              Change Password
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Update your account password for security
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={securityData.currentPassword}
+                  onChange={(e) => handleSecurityUpdate("currentPassword", e.target.value)}
+                  className="bg-gray-50 border-gray-300 text-gray-900 pr-10 !rounded-none"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={securityData.newPassword}
+                  onChange={(e) => handleSecurityUpdate("newPassword", e.target.value)}
+                  className="bg-gray-50 border-gray-300 text-gray-900 pr-10 !rounded-none"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={securityData.confirmPassword}
+                  onChange={(e) => handleSecurityUpdate("confirmPassword", e.target.value)}
+                  className="bg-gray-50 border-gray-300 text-gray-900 pr-10 !rounded-none"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button 
+                type="button"
+                className="bg-green-600 hover:bg-green-700 text-white min-w-[120px] text-xs h-9 !rounded-none"
+                onClick={handlePasswordSubmit}
+                disabled={isSubmittingPassword}
+              >
+                {isSubmittingPassword ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -2460,6 +2608,7 @@ export default function FarmerDashboard() {
       userId={farmerId}
       userName={displayName}
       userEmail={farmerEmail}
+      userPhoto={farmerProfile?.farmerProfile?.profilePictureUrl || farmerProfile?.profilePictureUrl}
       navigationItems={navigationItems}
       activePage={activePage} 
       onPageChange={(page) => navigate(`/farmer/${page}`)}

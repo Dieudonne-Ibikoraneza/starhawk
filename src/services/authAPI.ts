@@ -426,6 +426,28 @@ class AuthApiService {
   getEmail(): string | null {
     return localStorage.getItem("email");
   }
+
+  // Change Password
+  async updatePassword(currentPassword: string, newPassword: string): Promise<any> {
+    const token = this.getToken();
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}/auth/password`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || "Failed to update password.");
+    }
+    return response.json();
+  }
 }
 
 // Create and export a singleton instance
@@ -459,5 +481,8 @@ export const getUserId = () => authApiService.getUserId();
 export const getPhoneNumber = () => authApiService.getPhoneNumber();
 
 export const getEmail = () => authApiService.getEmail();
+
+export const updatePassword = (currentPassword: string, newPassword: string) =>
+  authApiService.updatePassword(currentPassword, newPassword);
 
 export default authApiService;

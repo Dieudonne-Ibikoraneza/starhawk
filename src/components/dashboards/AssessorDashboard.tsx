@@ -8019,6 +8019,7 @@ export default function AssessorDashboard() {
       userId={assessorId}
       userName={userDisplayName}
       userEmail={assessorEmail}
+      userPhoto={assessorProfile?.assessorProfile?.profilePhotoUrl || assessorProfile?.assessorProfile?.profilePictureUrl}
       navigationItems={navigationItems}
       activePage={activePageId}
       onPageChange={(pageId) => {
