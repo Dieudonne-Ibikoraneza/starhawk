@@ -12,6 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import DashboardLayout from "../layout/DashboardLayout";
 import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
 import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
+import { photosService } from "@/lib/api/services/photos";
+import ImageCropper from "@/components/ui/image-cropper";
+import { Progress } from "@/components/ui/progress";
+import { Pencil, Trash2 } from "lucide-react";
 import { getFarms, getAllFarms, createFarm, createInsuranceRequest, getFarmById, getWeatherForecast, getHistoricalWeather, getVegetationStats } from "@/services/farmsApi";
 import RwandaLocationSelector from "@/components/common/RwandaLocationSelector";
 import { API_BASE_URL, getAuthToken } from "@/config/api";
@@ -174,8 +178,109 @@ export default function FarmerDashboard() {
     district: "",
     sector: "",
     cell: "",
-    village: ""
+    village: "",
+    profilePictureUrl: null as string | null
   });
+
+  const [cropperData, setCropperData] = useState<{
+    image: string;
+    type: string;
+    title: string;
+    aspect: number;
+    circular: boolean;
+  } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({
+    PROFILE: 0
+  });
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file || !farmerId) return;
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      setCropperData({
+        image: reader.result as string,
+        type,
+        title: "Crop Profile Photo",
+        aspect: 1,
+        circular: true,
+      });
+    });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const uploadCroppedImage = async (croppedBlob: Blob) => {
+    if (!cropperData || !farmerId) return;
+
+    const type = cropperData.type;
+    setCropperData(null);
+    setIsUploading(true);
+    setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+
+    try {
+      const response = await photosService.uploadPhoto(
+        croppedBlob,
+        type,
+        farmerId,
+        (progress) => setUploadProgress(prev => ({ ...prev, [type]: progress }))
+      );
+
+      setProfileFormData(prev => ({
+        ...prev,
+        profilePictureUrl: response.url
+      }));
+
+      toast({
+        title: "Success",
+        description: "Profile picture uploaded successfully.",
+      });
+      
+      // Reload profile
+      await loadFarmerProfile();
+    } catch (error: any) {
+      toast({
+        title: "Error uploading photo",
+        description: error.message || "Failed to upload photo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+    }
+  };
+
+  const handlePhotoRemove = async (type: string) => {
+    if (!farmerId) return;
+
+    setIsUploading(true);
+    try {
+      await photosService.clearProfilePhoto(farmerId, type);
+      
+      setProfileFormData(prev => ({
+        ...prev,
+        profilePictureUrl: null
+      }));
+
+      toast({
+        title: "Success",
+        description: "Profile picture removed successfully.",
+      });
+      
+      // Reload profile
+      await loadFarmerProfile();
+    } catch (error: any) {
+      toast({
+        title: "Error removing photo",
+        description: error.message || "Failed to remove photo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
   const [selectedLocation, setSelectedLocation] = useState<{
     province: any;
     district: any;
@@ -309,7 +414,8 @@ export default function FarmerDashboard() {
           district: profileData.district || profileData.farmerProfile?.farmDistrict || "",
           sector: profileData.sector || profileData.farmerProfile?.farmSector || "",
           cell: profileData.cell || profileData.farmerProfile?.farmCell || "",
-          village: profileData.village || profileData.farmerProfile?.farmVillage || ""
+          village: profileData.village || profileData.farmerProfile?.farmVillage || "",
+          profilePictureUrl: profileData.farmerProfile?.profilePictureUrl || null
         });
       }
     } catch (err: any) {
@@ -1999,6 +2105,77 @@ export default function FarmerDashboard() {
               <form onSubmit={handleProfileSubmit} className="space-y-6">
                 {profileStep === 1 && (
                   <>
+                    {/* Profile Picture Upload Section */}
+                    <div className="flex flex-col items-center gap-4 mb-8 pb-6 border-b border-gray-100">
+                      <Label className="text-gray-700 font-semibold text-sm">Profile Picture</Label>
+                      <div 
+                        className="group relative h-32 w-32 rounded-full border-2 border-dashed border-gray-300 hover:border-green-600 flex items-center justify-center overflow-hidden bg-gray-50 cursor-pointer transition-all duration-300"
+                        onClick={() => document.getElementById("farmer-profile-upload")?.click()}
+                      >
+                        {profileFormData.profilePictureUrl ? (
+                          <img 
+                            src={profileFormData.profilePictureUrl} 
+                            alt="Profile" 
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                          />
+                        ) : (
+                          <User className="h-12 w-12 text-gray-400" />
+                        )}
+
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-1 text-white">
+                          {profileFormData.profilePictureUrl ? (
+                            <Pencil className="h-4 w-4" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                          <span className="text-[10px] font-semibold px-1 text-center uppercase tracking-wider">
+                            {profileFormData.profilePictureUrl ? "Edit" : "Add"}
+                          </span>
+                        </div>
+
+                        {isUploading && (uploadProgress["PROFILE"] > 0) && (
+                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-3">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mb-1"></div>
+                            <Progress value={uploadProgress["PROFILE"]} className="h-1 w-full bg-white/20" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col items-center gap-2">
+                        <input 
+                          type="file" 
+                          id="farmer-profile-upload" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => handlePhotoUpload(e, "PROFILE")}
+                        />
+                        {profileFormData.profilePictureUrl && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs py-1 h-7"
+                            disabled={isUploading}
+                            onClick={() => handlePhotoRemove("PROFILE")}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Remove Photo
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {cropperData && (
+                      <ImageCropper
+                        image={cropperData.image}
+                        aspect={cropperData.aspect}
+                        circular={cropperData.circular}
+                        title={cropperData.title}
+                        onCancel={() => setCropperData(null)}
+                        onCropComplete={uploadCroppedImage}
+                      />
+                    )}
+
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="fullName">Full Name *</Label>

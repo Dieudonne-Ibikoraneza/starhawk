@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { getUserId, getPhoneNumber, getEmail } from "@/services/authAPI";
 import { getUserById, updateUserProfile, getUserProfile } from "@/services/usersAPI";
 import { useToast } from "@/hooks/use-toast";
+import { photosService } from "@/lib/api/services/photos";
+import ImageCropper from "@/components/ui/image-cropper";
 import { 
   User, 
   MapPin, 
@@ -27,7 +30,11 @@ import {
   Award,
   Calendar,
   Map,
-  GraduationCap
+  GraduationCap,
+  Trash2,
+  Pencil,
+  Plus,
+  Loader2
 } from "lucide-react";
 
 export default function AssessorProfileSettings() {
@@ -52,7 +59,8 @@ export default function AssessorProfileSettings() {
     experience: "",
     licenseNumber: "",
     certificationDate: "",
-    bio: ""
+    bio: "",
+    profilePhotoUrl: null as string | null
   });
 
   // Load user data from localStorage and API on component mount
@@ -100,6 +108,7 @@ export default function AssessorProfileSettings() {
             licenseNumber: user.assessorProfile?.licenseNumber || prev.licenseNumber || "",
             certificationDate: user.assessorProfile?.certificationDate || prev.certificationDate || "",
             bio: user.assessorProfile?.bio || prev.bio || "",
+            profilePhotoUrl: user.assessorProfile?.profilePhotoUrl || null
           }));
 
           // Load work preferences from assessor profile
@@ -160,6 +169,115 @@ export default function AssessorProfileSettings() {
     performanceReports: true,
     weatherAlerts: true
   });
+
+  const [cropperData, setCropperData] = useState<{
+    image: string;
+    type: string;
+    title: string;
+    aspect: number;
+    circular: boolean;
+  } | null>(null);
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({
+    PROFILE: 0
+  });
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      setCropperData({
+        image: reader.result as string,
+        type,
+        title: "Crop Profile Photo",
+        aspect: 1,
+        circular: true
+      });
+    });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const uploadCroppedImage = async (croppedBlob: Blob) => {
+    if (!cropperData || !assessorId) return;
+
+    const type = cropperData.type;
+    setCropperData(null);
+    setIsUploading(true);
+    setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+
+    try {
+      const response = await photosService.uploadPhoto(
+        croppedBlob,
+        type,
+        assessorId,
+        (progress) => setUploadProgress(prev => ({ ...prev, [type]: progress }))
+      );
+
+      setProfileData(prev => ({
+        ...prev,
+        profilePhotoUrl: response.url
+      }));
+
+      toast({
+        title: "Success",
+        description: "Profile photo uploaded successfully.",
+      });
+
+      // Trigger full data reload
+      try {
+        const userData: any = await getUserProfile().catch(() => getUserById(assessorId));
+        const user = userData.data || userData;
+        if (user) {
+          setProfileData(prev => ({
+            ...prev,
+            profilePhotoUrl: user.assessorProfile?.profilePhotoUrl || response.url
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to re-fetch after photo upload", err);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error uploading photo",
+        description: error.message || "Failed to upload photo",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+    }
+  };
+
+  const handlePhotoRemove = async (type: string) => {
+    if (!assessorId) return;
+
+    setIsUploading(true);
+    try {
+      await photosService.clearProfilePhoto(assessorId, type);
+
+      setProfileData(prev => ({
+        ...prev,
+        profilePhotoUrl: null
+      }));
+
+      toast({
+        title: "Success",
+        description: "Profile photo removed successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error removing photo",
+        description: error.message || "Failed to remove photo",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleProfileUpdate = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
@@ -247,6 +365,7 @@ export default function AssessorProfileSettings() {
           licenseNumber: user.assessorProfile?.licenseNumber || prev.licenseNumber || "",
           certificationDate: user.assessorProfile?.certificationDate || prev.certificationDate || "",
           bio: user.assessorProfile?.bio || prev.bio || "",
+          profilePhotoUrl: user.assessorProfile?.profilePhotoUrl || null,
         }));
 
         if (user.assessorProfile) {
@@ -275,6 +394,82 @@ export default function AssessorProfileSettings() {
 
   const renderProfileTab = () => (
     <div className="space-y-6">
+      {/* Profile Picture Card */}
+      <Card className="bg-white border border-gray-200 shadow-sm max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-900">Profile Photo</CardTitle>
+          <CardDescription className="text-gray-500">Your personal professional photo for identification.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-6">
+          <div 
+            className="group relative h-40 w-40 rounded-full border-2 border-dashed border-gray-300 hover:border-green-500 flex items-center justify-center overflow-hidden bg-gray-50 cursor-pointer transition-all duration-300"
+            onClick={() => document.getElementById("profile-upload")?.click()}
+          >
+            {profileData.profilePhotoUrl ? (
+              <img 
+                src={profileData.profilePhotoUrl} 
+                alt="Profile" 
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
+              />
+            ) : (
+              <User className="h-16 w-16 text-gray-400" />
+            )}
+
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 text-white">
+              {profileData.profilePhotoUrl ? (
+                <Pencil className="h-6 w-6" />
+              ) : (
+                <Plus className="h-6 w-6" />
+              )}
+              <span className="text-xs font-semibold px-2 text-center uppercase tracking-wider">
+                {profileData.profilePhotoUrl ? "Edit Photo" : "Add Photo"}
+              </span>
+            </div>
+
+            {isUploading && (uploadProgress["PROFILE"] > 0) && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 text-white animate-spin mb-2" />
+                <Progress value={uploadProgress["PROFILE"]} className="h-1 w-full bg-white/20" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <input 
+              type="file" 
+              id="profile-upload" 
+              className="hidden" 
+              accept="image/*"
+              onChange={(e) => handlePhotoUpload(e, "PROFILE")}
+            />
+            {profileData.profilePhotoUrl && (
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={isUploading}
+                onClick={() => handlePhotoRemove("PROFILE")}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Remove Photo
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {cropperData && (
+        <ImageCropper
+          image={cropperData.image}
+          aspect={cropperData.aspect}
+          circular={cropperData.circular}
+          title={cropperData.title}
+          onCancel={() => setCropperData(null)}
+          onCropComplete={uploadCroppedImage}
+        />
+      )}
+
       <Card className="bg-white border border-gray-200 shadow-sm">
         <CardHeader className="border-b border-gray-200 bg-gray-50">
           <CardTitle className="text-base font-semibold text-gray-900">Personal Information</CardTitle>
