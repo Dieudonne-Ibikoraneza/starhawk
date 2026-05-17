@@ -14,7 +14,8 @@ import {
   Activity,
   User,
   History,
-  Search
+  Search,
+  AlertTriangle
 } from "lucide-react";
 import { getPolicies } from "@/services/policiesApi";
 import { getClaims } from "@/services/claimsApi";
@@ -22,6 +23,8 @@ import assessmentsApiService from "@/services/assessmentsApi";
 import { getMonitoringHistory } from "@/services/cropMonitoringApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getInsurers } from "@/services/usersAPI";
+import { Building2, Bell } from "lucide-react";
 
 export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const navigate = useNavigate();
@@ -30,6 +33,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   const [claims, setClaims] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [monitorings, setMonitorings] = useState<any[]>([]);
+  const [insurers, setInsurers] = useState<any[]>([]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -51,11 +55,12 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   const loadData = async () => {
     setLoading(true);
     try {
-      const [p, c, a, m] = await Promise.allSettled([
+      const [p, c, a, m, i] = await Promise.allSettled([
         getPolicies(1, 100),
         getClaims(),
         assessmentsApiService.getAssessments(1, 100),
-        getMonitoringHistory()
+        getMonitoringHistory(),
+        getInsurers(0, 100)
       ]);
 
       if (p.status === "fulfilled") {
@@ -73,6 +78,10 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
       if (m.status === "fulfilled") {
         const data = (m.value as any).data || m.value || [];
         setMonitorings(Array.isArray(data) ? data : (data.items || data.results || []));
+      }
+      if (i.status === "fulfilled") {
+        const data = (i.value as any).items || i.value || [];
+        setInsurers(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error("Global search data load failed:", err);
@@ -126,6 +135,8 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const role = localStorage.getItem('role') || 'insurer';
   const isAssessor = role.toLowerCase() === 'assessor';
+  const isFarmer = role.toLowerCase() === 'farmer';
+  const isInsurer = !isAssessor && !isFarmer;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[750px] md:max-w-[850px]">
@@ -157,6 +168,18 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   <CommandItem onSelect={() => go("/assessor/farmers")} className="py-3 px-4 rounded-xl cursor-pointer"><User className="mr-3 h-4 w-4 text-blue-500" />Farmers Management</CommandItem>
                   <CommandItem onSelect={() => go("/assessor/crop-monitoring")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-rose-500" />Field Monitoring</CommandItem>
                 </>
+              ) : isFarmer ? (
+                <>
+                  <CommandItem onSelect={() => go("/farmer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-green-600" />Farmer Dashboard</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/my-fields")} className="py-3 px-4 rounded-xl cursor-pointer"><Leaf className="mr-3 h-4 w-4 text-emerald-600" />My Fields & Farms</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/insurance")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-blue-600" />Insurance Policies</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-slate-600" />Claims History</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/insurers")} className="py-3 px-4 rounded-xl cursor-pointer"><Building2 className="mr-3 h-4 w-4 text-amber-600" />Insurers Network</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/monitoring")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-rose-600" />Field Monitoring</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/notifications")} className="py-3 px-4 rounded-xl cursor-pointer"><Bell className="mr-3 h-4 w-4 text-indigo-600" />Notifications</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/file-claim")} className="py-3 px-4 rounded-xl cursor-pointer"><AlertTriangle className="mr-3 h-4 w-4 text-amber-500" />File New Claim</CommandItem>
+                  <CommandItem onSelect={() => go("/farmer/profile")} className="py-3 px-4 rounded-xl cursor-pointer"><Settings className="mr-3 h-4 w-4 text-slate-500" />Account Settings</CommandItem>
+                </>
               ) : (
                 <>
                   <CommandItem onSelect={() => go("/insurer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-indigo-500" />Overview Dashboard</CommandItem>
@@ -178,7 +201,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmName = a.farmId?.name || a.farm?.name || "Farm";
                   const district = a.farmId?.locationName?.split(',')[0] || a.farmId?.district || "N/A";
                   return (
-                    <CommandItem key={a._id || a.id} value={`${farmerName} ${farmName} ${a.status} assessment`} onSelect={() => go(isAssessor ? `/assessor/risk-assessments/${a._id || a.id}` : `/insurer/assessments/${a._id || a.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={a._id || a.id} value={`${farmerName} ${farmName} ${a.status} assessment`} onSelect={() => go(isAssessor ? `/assessor/risk-assessments/${a._id || a.id}` : isFarmer ? `/farmer/dashboard` : `/insurer/assessments/${a._id || a.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                         <User className="h-4 w-4" />
                       </div>
@@ -203,7 +226,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const pNum = p.policyNumber || `POL-${(p._id || p.id)?.slice(-6).toUpperCase()}`;
                   const farmerName = getFarmerName(p);
                   return (
-                    <CommandItem key={p._id || p.id} value={`${pNum} ${farmerName} ${p.cropType} policy`} onSelect={() => go(isAssessor ? `/assessor/farmers` : `/insurer/policies`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={p._id || p.id} value={`${pNum} ${farmerName} ${p.cropType} policy`} onSelect={() => go(isAssessor ? `/assessor/farmers` : isFarmer ? `/farmer/insurance` : `/insurer/policies`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                         <Shield className="h-4 w-4" />
                       </div>
@@ -229,7 +252,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmerName = getFarmerName(c);
                   const cause = c.cause || "Claim Request";
                   return (
-                    <CommandItem key={c._id || c.id} value={`${cNum} ${farmerName} ${c.status} claim`} onSelect={() => go(isAssessor ? `/assessor/loss-assessments/${c._id || c.id}` : `/insurer/claims/${c._id || c.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={c._id || c.id} value={`${cNum} ${farmerName} ${c.status} claim`} onSelect={() => go(isAssessor ? `/assessor/loss-assessments/${c._id || c.id}` : isFarmer ? `/farmer/claims` : `/insurer/claims/${c._id || c.id}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-600">
                         <Wallet className="h-4 w-4" />
                       </div>
@@ -256,7 +279,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   const farmerName = getFarmerName(f);
                   const crop = f.policyId?.cropType || f.cropType || "Crop";
                   return (
-                    <CommandItem key={mId} value={`${mId} ${farmName} ${crop} monitoring field`} onSelect={() => go(isAssessor ? `/assessor/crop-monitoring/${mId}` : `/insurer/monitoring/${mId}`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                    <CommandItem key={mId} value={`${mId} ${farmName} ${crop} monitoring field`} onSelect={() => go(isAssessor ? `/assessor/crop-monitoring/${mId}` : isFarmer ? `/farmer/monitoring` : `/insurer/monitoring/${mId}`)} className="py-3 px-4 rounded-xl cursor-pointer">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
                         <Leaf className="h-4 w-4" />
                       </div>
@@ -266,6 +289,29 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100/50 text-rose-700 border border-rose-200/50 uppercase tracking-tighter shadow-sm">Live Monitor</span>
                         </div>
                         <span className="text-[11px] text-gray-500 font-medium">{farmName} · {farmerName} · {crop}</span>
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
+
+            {insurers.length > 0 && (
+              <CommandGroup heading="Insurance Partners">
+                {insurers.map((i) => {
+                  const name = i.name || i.companyName || "Insurer";
+                  const email = i.email || "partner@starhawk.com";
+                  return (
+                    <CommandItem key={i._id || i.id} value={`${name} ${email} insurer partner`} onSelect={() => go(isFarmer ? `/farmer/insurers` : `/insurer/dashboard`)} className="py-3 px-4 rounded-xl cursor-pointer">
+                      <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="flex flex-col flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-900">{name}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100/50 text-amber-700 border border-amber-200/50 uppercase tracking-tighter shadow-sm">Partner</span>
+                        </div>
+                        <span className="text-[11px] text-gray-500 font-medium">{email}</span>
                       </div>
                     </CommandItem>
                   );
