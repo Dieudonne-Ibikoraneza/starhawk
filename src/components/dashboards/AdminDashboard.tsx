@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../layout/DashboardLayout";
 import {
   isAdmin,
@@ -41,6 +41,7 @@ import {
 } from "@/services/claimsApi";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { getFarms } from "@/services/farmsApi";
+import RiskAssessmentDetail from "../assessor/RiskAssessmentDetail";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -137,10 +138,13 @@ import {
   FileCheck,
   AlertCircle,
 } from "lucide-react";
+import ClaimDetailView from "../insurer/ClaimDetailView";
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [activePage, setActivePage] = useState("dashboard");
+  const location = useLocation();
+  const pathParts = location.pathname.split("/").filter(Boolean);
+  const activePage = pathParts[1] || "dashboard";
   const [adminId] = useState(getUserId() || "ADMIN-001");
   const [adminName] = useState(
     getEmail() || getPhoneNumber() || "System Administrator",
@@ -201,14 +205,10 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (activePage === "dashboard" || activePage === "analytics") {
       loadAdminStatistics();
-      loadAdminProfile();
       loadHealthStatus();
     }
     if (activePage === "analytics") {
       loadAnalyticsData();
-    }
-    if (activePage === "settings") {
-      loadAdminProfile();
     }
   }, [activePage]);
 
@@ -238,6 +238,12 @@ export const AdminDashboard = () => {
       setAdminProfileLoading(false);
     }
   };
+
+  // Load admin profile globally once on mount
+  useEffect(() => {
+    loadAdminProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load login history
   const loadLoginHistory = async () => {
@@ -1534,7 +1540,7 @@ export const AdminDashboard = () => {
 
   // Handle view user details - navigate to user details page
   const handleViewUser = (userId: string) => {
-    navigate(`/admin-dashboard/users/${userId}`);
+    navigate(`/admin/users/${userId}`);
   };
 
   // Handle edit user button click
@@ -6701,6 +6707,20 @@ export const AdminDashboard = () => {
 
   // Claims Management Page
   const renderClaimsManagement = () => {
+    if (pathParts[2]) {
+      const claimId = pathParts[2];
+      const selectedClaim = claims.find(c => c._id === claimId || c.id === claimId) || { id: claimId };
+      return (
+        <ClaimDetailView
+          claim={selectedClaim}
+          onBack={() => navigate("/admin/claims")}
+          onApprove={() => {}}
+          onReject={() => {}}
+          readOnly={true}
+        />
+      );
+    }
+
     const filteredClaims = claims.filter((claim) => {
       const matchesSearch =
         claimSearchQuery === "" ||
@@ -6839,6 +6859,8 @@ export const AdminDashboard = () => {
             </CardHeader>
             <CardContent className="p-6">
               <ModernTable
+                onRowClick={(row) => navigate(`/admin/claims/${row.claimId || row._id || row.id}`)}
+                className="cursor-pointer [&_tbody_tr]:transition-colors hover:[&_tbody_tr]:bg-gray-50"
                 columns={[
                   {
                     key: "claimId",
@@ -6855,24 +6877,33 @@ export const AdminDashboard = () => {
                     key: "farmer",
                     label: "Farmer",
                     render: (_, row) =>
-                      row.farmerId?.toString().substring(0, 8) || "N/A",
+                      safeExtractUserName(row.farmerId) || safeExtractUserName(row.farmer) || "N/A",
                   },
                   {
                     key: "cropType",
                     label: "Crop Type",
-                    render: (value) => value || "N/A",
+                    render: (_, row) => row.farmId?.cropType || row.farmId?.crop || row.farm?.cropType || row.farm?.crop || row.cropType || row.crop || row.policy?.cropType || row.policyId?.cropType || "N/A",
                   },
                   {
                     key: "damageType",
                     label: "Damage Type",
-                    render: (value) => value || "N/A",
+                    render: (_, row) => {
+                      const val = row.lossEventType || row.eventType || (row.damageType !== "N/A" ? row.damageType : null);
+                      if (!val || val === "N/A") return "N/A";
+                      return String(val)
+                        .replace(/_/g, " ")
+                        .toLowerCase()
+                        .split(" ")
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(" ");
+                    },
                   },
                   {
                     key: "amount",
-                    label: "Amount",
+                    label: "Estimated Loss",
                     render: (_, row) => (
                       <span className="text-gray-900">
-                        RWF {row.amount?.toLocaleString() || "0"}
+                        RWF {(row.estimatedLoss || row.payoutAmount || row.amount || row.claimAmount || 0).toLocaleString()}
                       </span>
                     ),
                   },
@@ -6882,37 +6913,7 @@ export const AdminDashboard = () => {
                     render: (value) => (
                       <StatusBadge status={value || "Unknown"} />
                     ),
-                  },
-                  {
-                    key: "actions",
-                    label: "Actions",
-                    render: (_, row) => (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditClaim(row);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-gray-600 hover:text-red-600 hover:bg-red-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingClaimId(row._id || row.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ),
-                  },
+                  }
                 ]}
                 data={filteredClaims
                   .filter((c) => c != null)
@@ -7647,6 +7648,17 @@ export const AdminDashboard = () => {
 
   // Render Assessments Management Page
   const renderAssessmentsManagement = () => {
+    if (pathParts[2]) {
+      const assessmentId = pathParts[2];
+      return (
+        <RiskAssessmentDetail 
+          assessmentId={assessmentId} 
+          onBack={() => navigate("/admin/assessments")} 
+          readOnly={true}
+        />
+      );
+    }
+
     const filteredAssessments = assessments.filter((assessment) => {
       // Handle new API structure: farmId is an object
       const farmIdObj = assessment.farmId || assessment.farm;
@@ -8018,9 +8030,6 @@ export const AdminDashboard = () => {
                       <th className="text-left py-4 px-6 font-medium text-gray-900">
                         Created
                       </th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-900">
-                        Actions
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -8029,7 +8038,8 @@ export const AdminDashboard = () => {
                       .map((assessment, index) => (
                         <tr
                           key={assessment?._id || assessment?.id || index}
-                          className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                          onClick={() => navigate(`/admin/assessments/${assessment?._id || assessment?.id}`)}
+                          className={`cursor-pointer border-b border-gray-200 hover:bg-gray-50 transition-colors ${
                             index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                           }`}
                         >
@@ -8053,22 +8063,15 @@ export const AdminDashboard = () => {
                           </td>
                           <td className="py-4 px-6 text-gray-900">
                             {(() => {
-                              // Handle new API structure: farmId has farmerId
-                              const farmIdObj =
-                                assessment.farmId || assessment.farm;
-                              if (
-                                farmIdObj?.farmerName &&
-                                typeof farmIdObj.farmerName === "string"
-                              ) {
+                              const farmIdObj = assessment.farmId || assessment.farm;
+                              const farmerObj = assessment.farmer || farmIdObj?.farmer || farmIdObj?.farmerId || assessment.farmerId;
+                              
+                              if (farmIdObj?.farmerName && typeof farmIdObj.farmerName === "string") {
                                 return farmIdObj.farmerName;
                               }
-                              const farmerName = safeExtractUserName(
-                                assessment.farmer,
-                              );
-                              if (farmerName !== "N/A") return farmerName;
-                              return (
-                                safeExtractUserName(farmIdObj?.farmer) || "N/A"
-                              );
+                              
+                              const extractedName = safeExtractUserName(farmerObj);
+                              return extractedName !== "N/A" ? extractedName : "N/A";
                             })()}
                           </td>
                           <td className="py-4 px-6 text-gray-900">
@@ -8137,38 +8140,7 @@ export const AdminDashboard = () => {
                             })()}
                           </td>
                           <td className="py-4 px-6">
-                            <Badge
-                              variant={
-                                assessment.status === "COMPLETED" ||
-                                assessment.status === "SUBMITTED" ||
-                                assessment.status === "completed" ||
-                                assessment.status === "submitted"
-                                  ? "default"
-                                  : assessment.status === "IN_PROGRESS" ||
-                                      assessment.status === "ASSIGNED" ||
-                                      assessment.status === "in-progress" ||
-                                      assessment.status === "assigned"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                              className={
-                                assessment.status === "COMPLETED" ||
-                                assessment.status === "SUBMITTED" ||
-                                assessment.status === "completed" ||
-                                assessment.status === "submitted"
-                                  ? "bg-green-100 text-green-700 border-green-300"
-                                  : assessment.status === "IN_PROGRESS" ||
-                                      assessment.status === "ASSIGNED" ||
-                                      assessment.status === "in-progress" ||
-                                      assessment.status === "assigned"
-                                    ? "bg-yellow-100 text-yellow-700 border-yellow-300"
-                                    : "bg-gray-100 text-gray-700 border-gray-300"
-                              }
-                            >
-                              {assessment.status
-                                ? String(assessment.status).replace("_", " ")
-                                : "PENDING"}
-                            </Badge>
+                            <StatusBadge status={assessment.status || "PENDING"} />
                           </td>
                           <td className="py-4 px-6 text-gray-900/80">
                             {assessment.createdAt
@@ -8176,47 +8148,6 @@ export const AdminDashboard = () => {
                                   assessment.createdAt,
                                 ).toLocaleDateString()
                               : "N/A"}
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  // View assessment details
-                                  toast({
-                                    title: "Assessment Details",
-                                    description: `Assessment ID: ${assessment._id || assessment.id}`,
-                                    variant: "default",
-                                  });
-                                }}
-                                className="text-gray-900 hover:bg-gray-100"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {(assessment.status === "SUBMITTED" ||
-                                assessment.status === "submitted" ||
-                                assessment.status === "completed") && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={async () => {
-                                    // Load insurers before opening dialog
-                                    await loadInsurers();
-                                    setPolicyIssuanceDialog({
-                                      open: true,
-                                      assessmentId:
-                                        assessment._id || assessment.id,
-                                      assessment: assessment,
-                                    });
-                                  }}
-                                  className="border-green-600 text-green-600 hover:bg-green-50"
-                                >
-                                  <Shield className="h-4 w-4 mr-1" />
-                                  Issue Policy
-                                </Button>
-                              )}
-                            </div>
                           </td>
                         </tr>
                       ))}
@@ -8916,12 +8847,17 @@ export const AdminDashboard = () => {
       userType="admin"
       userId={adminId}
       userName={displayName}
+      userEmail={adminProfile?.email || getEmail() || ""}
       navigationItems={navigationItems}
       activePage={activePage}
-      onPageChange={setActivePage}
+      onPageChange={(page) => navigate(`/admin/${page}`)}
       onLogout={handleLogout}
     >
-      {renderPage()}
+      <div className="flex flex-col h-full">
+        <main className="flex-1 overflow-auto bg-gray-50/50 p-4 md:p-6">
+          {renderPage()}
+        </main>
+      </div>
     </DashboardLayout>
   );
 };

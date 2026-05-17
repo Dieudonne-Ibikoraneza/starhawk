@@ -70,10 +70,13 @@ const App = () => {
                 path="/insurer-dashboard/:section/*" 
                 element={<NavigateToNewPath />} 
               />
-              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="/admin-dashboard/users/:userId" element={<Navigate to="/admin/users/:userId" replace />} />
+              
+              <Route path="/admin/*" element={<AdminDashboard />} />
               
               {/* User Details Route */}
-              <Route path="/admin-dashboard/users/:userId" element={<UserDetailsPage />} />
+              <Route path="/admin/users/:userId" element={<UserDetailsPage />} />
               
               {/* Policy Details Route */}
               <Route path="/policy-details/:policyId" element={<PolicyDetailsPage />} />
