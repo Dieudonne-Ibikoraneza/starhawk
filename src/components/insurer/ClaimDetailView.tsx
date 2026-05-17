@@ -61,9 +61,10 @@ interface ClaimDetailViewProps {
   onApprove: (claimId: string, approvedAmount?: number, notes?: string) => void | Promise<void>;
   onReject: (claimId: string, reason: string) => void | Promise<void>;
   onViewPolicy?: (policyId: string) => void;
+  readOnly?: boolean;
 }
 
-export default function ClaimDetailView({ claim, onBack, onApprove, onReject, onViewPolicy }: ClaimDetailViewProps) {
+export default function ClaimDetailView({ claim, onBack, onApprove, onReject, onViewPolicy, readOnly = false }: ClaimDetailViewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentClaim, setCurrentClaim] = useState<any | null>(null);
@@ -73,7 +74,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [approvedAmount, setApprovedAmount] = useState<string>(claim.claimAmount.toString());
+  const [approvedAmount, setApprovedAmount] = useState<string>((currentClaim?.claimAmount || claim.claimAmount || 0).toString());
   const [showApprovalForm, setShowApprovalForm] = useState(false);
   const [showRejectionForm, setShowRejectionForm] = useState(false);
 
@@ -108,7 +109,13 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
     async function loadClaimAndFarmData() {
       setLoading(true);
       try {
-        const claimRes = await getClaimById(claim.id);
+        const fetchId = claim.id || (claim as any)._id;
+        if (!fetchId) {
+          console.warn("No valid claim ID provided to ClaimDetailView");
+          setLoading(false);
+          return;
+        }
+        const claimRes = await getClaimById(fetchId);
         const claimObj = claimRes?.data || claimRes;
         setCurrentClaim(claimObj);
         
@@ -123,7 +130,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
         }
 
         // Auto-fetch existing AI analysis
-        const existingAnalysis = await getInsight(claim.id, 'RISK_ANALYSIS', 'INSURER');
+        const existingAnalysis = await getInsight(fetchId, 'RISK_ANALYSIS', 'INSURER');
         if (existingAnalysis) {
           setAiRiskAnalysis(existingAnalysis);
         }
@@ -134,7 +141,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
       }
     }
     loadClaimAndFarmData();
-  }, [claim.id]);
+  }, [claim.id, (claim as any)._id]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -224,22 +231,22 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Claim Review</h1>
-            <p className="text-sm text-gray-500">Claim ID: {claim.id}</p>
+            <p className="text-sm text-gray-500">Claim ID: {currentClaim?._id || currentClaim?.id || (claim as any).claimId || claim.id}</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Badge className={`${getPriorityColor(claim.priority)} border`}>
-            {claim.priority.toUpperCase()} PRIORITY
+          <Badge className={`${getPriorityColor(currentClaim?.priority || claim.priority || 'medium')} border`}>
+            {(currentClaim?.priority || claim.priority || 'medium').toUpperCase()} PRIORITY
           </Badge>
-          <Badge className={`${getStatusColor(claim.status)} border`}>
-            {claim.status.replace('_', ' ').toUpperCase()}
+          <Badge className={`${getStatusColor(currentClaim?.status || claim.status || 'pending')} border`}>
+            {(currentClaim?.status || claim.status || 'pending').replace('_', ' ').toUpperCase()}
           </Badge>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className={`grid gap-6 ${readOnly ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
         {/* Main Claim Details with correct Assessor Tabs */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`${readOnly ? '' : 'lg:col-span-2'} space-y-6`}>
           {/* Starhawk AI Insights Card */}
           <Card className="border-green-200 shadow-md bg-gradient-to-br from-white to-green-50 overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
@@ -341,122 +348,56 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Farmer Information */}
-          <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-gray-900 flex items-center">
-                <User className="h-5 w-5 mr-2 text-green-600" />
-                Farmer Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <User className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Name</p>
-                  <p className="text-sm font-semibold text-gray-900">{claim.farmerName}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <Building2 className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Farmer ID</p>
-                  <p className="text-sm font-mono text-gray-900">{claim.farmerId}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <MapPin className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Location</p>
-                  <p className="text-sm font-semibold text-gray-900">{claim.location}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {!readOnly && (
+          <div className="space-y-6">
+            {/* Action Buttons */}
+            <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+              <CardHeader className="pb-3 border-b border-gray-50 bg-slate-50/50">
+                <CardTitle className="text-sm font-bold text-gray-900 uppercase tracking-wider">Review Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4">
+                {!["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      onClick={() => setShowApprovalForm(true)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                      Approve & Payout
+                    </Button>
+                    <Button 
+                      onClick={() => setShowRejectionForm(true)}
+                      variant="outline"
+                      className="w-full border-rose-200 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold rounded-xl h-11 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                      Reject Claim
+                    </Button>
+                  </div>
+                )}
 
-          {/* Policy Information */}
-          <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-gray-900 flex items-center">
-                <Building2 className="h-5 w-5 mr-2 text-green-600" />
-                Policy Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <FileText className="h-5 w-5 text-gray-400" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">Policy ID</p>
-                  <button
-                    onClick={handleViewPolicy}
-                    className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors flex items-center space-x-1"
-                  >
-                    <span>
-                      {typeof claim.policyId === 'object' && claim.policyId !== null 
-                        ? ((claim.policyId as any).policyNumber || (claim.policyId as any)._id || '—') 
-                        : (claim.policyId || '—')}
-                    </span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <Crop className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Coverage</p>
-                  <p className="text-sm font-semibold text-gray-900">{claim.cropType}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                {["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
+                  <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                    <p className="text-sm font-bold text-gray-900">Review Completed</p>
+                    <p className="text-xs text-gray-500">
+                      This claim was marked as <strong className="capitalize">{claim.status.replace('_', ' ')}</strong> on {claim.filedDate}.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          {/* Action Buttons */}
-          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <CardHeader className="pb-3 border-b border-gray-50 bg-slate-50/50">
-              <CardTitle className="text-sm font-bold text-gray-900 uppercase tracking-wider">Review Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5 space-y-4">
-              {!["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
-                <div className="flex flex-col gap-3">
-                  <Button 
-                    onClick={() => setShowApprovalForm(true)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <ThumbsUp className="h-4 w-4" />
-                    Approve & Payout
-                  </Button>
-                  <Button 
-                    onClick={() => setShowRejectionForm(true)}
-                    variant="outline"
-                    className="w-full border-rose-200 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold rounded-xl h-11 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <ThumbsDown className="h-4 w-4" />
-                    Reject Claim
-                  </Button>
-                </div>
-              )}
-
-              {["approved", "rejected"].includes(claim.status?.toLowerCase()) && (
-                <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                  <p className="text-sm font-bold text-gray-900">Review Completed</p>
-                  <p className="text-xs text-gray-500">
-                    This claim was marked as <strong className="capitalize">{claim.status.replace('_', ' ')}</strong> on {claim.filedDate}.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Approve & Payout Dialog */}
-          <Dialog open={showApprovalForm} onOpenChange={(open) => !isSubmitting && setShowApprovalForm(open)}>
-            <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl p-6 border border-gray-100">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <CheckCircle className="h-6 w-6 text-emerald-600" />
-                  Approve Payout
-                </DialogTitle>
+        {/* Approve & Payout Dialog */}
+        <Dialog open={showApprovalForm} onOpenChange={(open) => !isSubmitting && setShowApprovalForm(open)}>
+          <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl p-6 border border-gray-100">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                Approve Payout
+              </DialogTitle>
                 <DialogDescription className="text-sm text-gray-500 mt-1">
                   Specify the final payout amount to settle this claim. This will notify the farmer.
                 </DialogDescription>
@@ -466,7 +407,7 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
                 <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Original Claim Amount</p>
-                    <p className="text-lg font-bold text-slate-800 mt-0.5">${claim.claimAmount.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-slate-800 mt-0.5">${(currentClaim?.claimAmount || claim.claimAmount || 0).toLocaleString()}</p>
                   </div>
                   <DollarSign className="h-8 w-8 text-emerald-600 opacity-20" />
                 </div>
@@ -575,7 +516,6 @@ export default function ClaimDetailView({ claim, onBack, onApprove, onReject, on
               </div>
             </DialogContent>
           </Dialog>
-        </div>
       </div>
     </div>
   );
