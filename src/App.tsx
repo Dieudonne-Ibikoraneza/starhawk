@@ -58,11 +58,12 @@ const App = () => {
               <Route path="/onboarding" element={<Onboarding />} />
               
               {/* Dashboard Routes */}
-              <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
+              <Route path="/farmer/*" element={<FarmerDashboard />} />
               <Route path="/assessor/*" element={<AssessorDashboard />} />
               <Route path="/insurer/*" element={<InsurerDashboard />} />
               
               {/* Legacy Redirects - Improved to handle sub-paths */}
+              <Route path="/farmer-dashboard" element={<Navigate to="/farmer/dashboard" replace />} />
               <Route path="/assessor-dashboard" element={<Navigate to="/assessor/dashboard" replace />} />
               <Route path="/insurer-dashboard" element={<Navigate to="/insurer/dashboard" replace />} />
               <Route 

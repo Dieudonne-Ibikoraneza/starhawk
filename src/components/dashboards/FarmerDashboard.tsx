@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,12 @@ import {
 
 export default function FarmerDashboard() {
   const { toast } = useToast();
-  const [activePage, setActivePage] = useState("dashboard");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Derive activePage from URL
+  const pathParts = location.pathname.split("/").filter(Boolean);
+  const activePage = pathParts[1] || "dashboard";
   
   // Get logged-in farmer data from localStorage
   const farmerId = getUserId() || "";
@@ -267,7 +273,17 @@ export default function FarmerDashboard() {
         loadFarmerProfile();
       }
     }
-  }, [activePage, farmerId]);
+    
+    // Sync selectedFarmId from URL for direct linking
+    if (activePage === "my-fields" && pathParts[2] && pathParts[2] !== selectedFarmId) {
+      setSelectedFarmId(pathParts[2]);
+    }
+
+    // Sync selectedPolicyId from URL for direct linking
+    if (activePage === "insurance" && pathParts[2] && pathParts[2] !== selectedPolicyId) {
+      setSelectedPolicyId(pathParts[2]);
+    }
+  }, [activePage, farmerId, pathParts[2]]);
 
   const loadFarmerProfile = async () => {
     if (profileLoading) return;
@@ -686,7 +702,7 @@ export default function FarmerDashboard() {
     try {
       const farm = await getFarmById(farmId);
       setSelectedFarm(farm.data || farm);
-      setActivePage("farm-details");
+      navigate(`/farmer/my-fields/${farmId}`);
     } catch (err: any) {
       console.error('Failed to load farm details:', err);
       toast({
@@ -1016,7 +1032,7 @@ export default function FarmerDashboard() {
       setUploadedFiles([]);
       
       // Navigate to claims to see the new claim
-      setActivePage("claims");
+      navigate("/farmer/claims");
       loadAllReports();
     } catch (err: any) {
       console.error('Failed to file claim:', err);
@@ -1466,7 +1482,7 @@ export default function FarmerDashboard() {
             Refresh
           </Button>
           <Button 
-            onClick={() => setActivePage("create-farm")}
+            onClick={() => navigate("/farmer/create-farm")}
             className="bg-green-600 hover:bg-green-700 text-gray-900 !rounded-none"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -1599,7 +1615,7 @@ export default function FarmerDashboard() {
                                 onClick={() => {
                                   setSelectedFarm(farm);
                                   loadFarmAnalytics(farmId);
-                                  setActivePage("farm-analytics");
+                                  navigate("/farmer/farm-analytics");
                                 }}
                                 className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 px-3 text-xs font-medium rounded-md"
                               >
@@ -1726,7 +1742,7 @@ export default function FarmerDashboard() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setActivePage("dashboard")}
+                    onClick={() => navigate("/farmer/dashboard")}
                     className="mt-2 border-gray-300 text-gray-900 hover:bg-gray-50 !rounded-none"
                   >
                     Go to Dashboard
@@ -1907,7 +1923,7 @@ export default function FarmerDashboard() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setActivePage("claims")}
+                onClick={() => navigate("/farmer/claims")}
                 className="border-gray-300 text-gray-900 hover:bg-gray-50"
               >
                 Cancel
@@ -2122,16 +2138,44 @@ export default function FarmerDashboard() {
       case "dashboard": 
         return renderDashboard();
       case "my-fields": 
+        if (pathParts[2]) {
+          const farmIdToUse = pathParts[2];
+          const activePolicy = policies.find(p => {
+            const pFarmId = typeof p.farmId === 'object' ? p.farmId?._id || p.farmId?.id : p.farmId;
+            return pFarmId === farmIdToUse;
+          });
+          
+          return (
+            <FarmDetailsTab 
+              farmId={farmIdToUse} 
+              onBack={() => navigate("/farmer/my-fields")}
+              onViewPolicy={(id) => {
+                setSelectedPolicyId(id);
+                navigate(`/farmer/insurance/${id}`);
+              }}
+              onFileClaim={(id) => {
+                const targetPolicyId = id || (activePolicy?._id || activePolicy?.id || "");
+                setSelectedPolicyId(targetPolicyId);
+                setClaimFormData(prev => ({
+                  ...prev,
+                  policyId: targetPolicyId
+                }));
+                navigate("/farmer/file-claim");
+              }}
+              activePolicy={activePolicy}
+            />
+          );
+        }
         return (
           <MyFarmsTab 
-            onRegisterFarm={() => setActivePage("create-farm")} 
+            onRegisterFarm={() => navigate("/farmer/create-farm")} 
             onViewDetails={(farm) => {
               setSelectedFarmId(farm._id || farm.id);
-              setActivePage("farm-details");
+              navigate(`/farmer/my-fields/${farm._id || farm.id}`);
             }}
             onViewAnalytics={(farm) => {
               setSelectedFarmId(farm._id || farm.id);
-              setActivePage("monitoring");
+              navigate("/farmer/monitoring");
             }}
             onRequestInsurance={(farm) => {
               setInsuranceRequestDialog({
@@ -2149,16 +2193,29 @@ export default function FarmerDashboard() {
             onRegisterFarm={(insurerId, insurerName) => {
               setSelectedInsurerId(insurerId);
               setSelectedInsurerName(insurerName);
-              setActivePage("register-farm");
+              navigate("/farmer/register-farm");
             }}
           />
         );
       case "insurance": 
+        if (pathParts[2]) {
+          const policyIdToUse = pathParts[2];
+          return (
+            <PolicyDetailsTab 
+              policyId={policyIdToUse} 
+              onBack={() => navigate("/farmer/insurance")}
+              onFileClaim={(id) => {
+                setSelectedPolicyId(id);
+                navigate("/farmer/file-claim");
+              }}
+            />
+          );
+        }
         return (
           <InsuranceTab 
             onViewDetails={(id) => {
               setSelectedPolicyId(id);
-              setActivePage("policy-details");
+              navigate(`/farmer/insurance/${id}`);
             }} 
           />
         );
@@ -2170,20 +2227,20 @@ export default function FarmerDashboard() {
             onSkip={() => {
               setSelectedInsurerId(null);
               setSelectedInsurerName(null);
-              setActivePage("register-farm");
+              navigate("/farmer/register-farm");
             }}
             onRegisterFarm={(insurerId, insurerName) => {
               setSelectedInsurerId(insurerId);
               setSelectedInsurerName(insurerName);
-              setActivePage("register-farm");
+              navigate("/farmer/register-farm");
             }}
           />
         );
       case "register-farm":
         return (
           <RegisterFarmTab 
-            onSuccess={() => setActivePage("my-fields")} 
-            onCancel={() => setActivePage("create-farm")} 
+            onSuccess={() => navigate("/farmer/my-fields")} 
+            onCancel={() => navigate("/farmer/create-farm")} 
             insurerId={selectedInsurerId || undefined}
             insurerName={selectedInsurerName || undefined}
           />
@@ -2193,43 +2250,7 @@ export default function FarmerDashboard() {
       case "claims":
         return (
           <ClaimsTab 
-            onFileClaim={() => setActivePage("file-claim")} 
-          />
-        );
-      case "farm-details": 
-        const activePolicy = policies.find(p => {
-          const pFarmId = typeof p.farmId === 'object' ? p.farmId?._id || p.farmId?.id : p.farmId;
-          return pFarmId === selectedFarmId;
-        });
-        return (
-          <FarmDetailsTab 
-            farmId={selectedFarmId!} 
-            onBack={() => setActivePage("my-fields")}
-            onViewPolicy={(id) => {
-              setSelectedPolicyId(id);
-              setActivePage("policy-details");
-            }}
-            onFileClaim={(id) => {
-              const targetPolicyId = id || (activePolicy?._id || activePolicy?.id || "");
-              setSelectedPolicyId(targetPolicyId);
-              setClaimFormData(prev => ({
-                ...prev,
-                policyId: targetPolicyId
-              }));
-              setActivePage("file-claim");
-            }}
-            activePolicy={activePolicy}
-          />
-        );
-      case "policy-details":
-        return (
-          <PolicyDetailsTab 
-            policyId={selectedPolicyId!} 
-            onBack={() => setActivePage("insurance")}
-            onFileClaim={(id) => {
-              setSelectedPolicyId(id);
-              setActivePage("file-claim");
-            }}
+            onFileClaim={() => navigate("/farmer/file-claim")} 
           />
         );
       case "profile": return renderProfileSettings();
@@ -2261,9 +2282,10 @@ export default function FarmerDashboard() {
       userType="farmer"
       userId={farmerId}
       userName={displayName}
+      userEmail={farmerEmail}
       navigationItems={navigationItems}
       activePage={activePage} 
-      onPageChange={setActivePage}
+      onPageChange={(page) => navigate(`/farmer/${page}`)}
       onLogout={() => {
         localStorage.removeItem('token');
         localStorage.removeItem('role');
