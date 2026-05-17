@@ -41,6 +41,7 @@ export interface InsuredFarmer {
   province: string;
   district: string;
   sector: string;
+  profilePictureUrl?: string | null;
   activePoliciesCount: number;
   totalPoliciesCount: number;
   status: 'ACTIVE' | 'INACTIVE';

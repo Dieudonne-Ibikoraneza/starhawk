@@ -968,8 +968,16 @@ export default function InsurerDashboard() {
                   {/* Farmer */}
                   <td className="py-5 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-inner">
-                        {getInitials(farmerName)}
+                      <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-inner overflow-hidden">
+                        {farmer.profilePictureUrl ? (
+                          <img 
+                            src={farmer.profilePictureUrl} 
+                            alt={farmerName} 
+                            className="h-full w-full object-cover" 
+                          />
+                        ) : (
+                          getInitials(farmerName)
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
@@ -1269,6 +1277,7 @@ export default function InsurerDashboard() {
       userId={insurerId}
       userName={displayName}
       userEmail={insurerEmail}
+      userPhoto={insurerProfile?.insurerProfile?.profilePictureUrl}
       navigationItems={navigationItems}
       activePage={activePage}
       onPageChange={setActivePage}

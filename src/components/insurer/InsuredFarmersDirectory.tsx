@@ -908,8 +908,16 @@ export default function InsuredFarmersDirectory() {
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between p-5 gap-5">
                   {/* Farmer Core Profile Details */}
                   <div className="flex items-center gap-4 flex-1">
-                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
-                      {initials}
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
+                      {farmer.profilePictureUrl ? (
+                        <img 
+                          src={farmer.profilePictureUrl} 
+                          alt={farmer.name} 
+                          className="h-full w-full object-cover" 
+                        />
+                      ) : (
+                        initials
+                      )}
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -999,8 +1007,16 @@ export default function InsuredFarmersDirectory() {
                 <div className="p-5 flex-1 space-y-4">
                   {/* Top line with Avatar and Status */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-sm shadow-sm group-hover:scale-105 transition-transform">
-                      {initials}
+                    <div className="h-11 w-11 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black text-sm shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+                      {farmer.profilePictureUrl ? (
+                        <img 
+                          src={farmer.profilePictureUrl} 
+                          alt={farmer.name} 
+                          className="h-full w-full object-cover" 
+                        />
+                      ) : (
+                        initials
+                      )}
                     </div>
                     <Badge className={`shadow-none px-2 py-0.5 rounded-md text-[10px] uppercase font-black tracking-wider ${getStatusBadgeClass(farmer.status)}`}>
                       {statusLabel}
