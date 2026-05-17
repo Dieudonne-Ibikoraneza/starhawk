@@ -75,8 +75,10 @@ import {
   Sparkles,
   ArrowUpRight,
   User,
+  Users,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import InsuredFarmersDirectory from "../insurer/InsuredFarmersDirectory";
 
 export default function InsurerDashboard() {
   const navigate = useNavigate();
@@ -95,6 +97,7 @@ export default function InsurerDashboard() {
 
     // Whitelist of valid sidebar IDs
     const validSections = [
+      "farmers",
       "requests",
       "assessments",
       "policies",
@@ -1153,6 +1156,7 @@ export default function InsurerDashboard() {
       <Routes>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={renderDashboard()} />
+        <Route path="farmers" element={<InsuredFarmersDirectory />} />
         <Route path="requests" element={renderInsuranceRequests()} />
         <Route path="assessments" element={renderSubmittedAssessments()} />
         <Route
@@ -1236,6 +1240,7 @@ export default function InsurerDashboard() {
 
   const navigationItems = [
     { id: "dashboard", label: "Overview", icon: BarChart3 },
+    { id: "farmers", label: "Farmers", icon: Users },
     { id: "requests", label: "Requests", icon: FileBadge },
     { id: "assessments", label: "Assessments", icon: ClipboardCheck },
     { id: "policies", label: "Policies", icon: Shield },
