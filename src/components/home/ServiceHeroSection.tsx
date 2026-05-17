@@ -17,21 +17,33 @@ export function ServiceHeroSection() {
     <section className="relative w-full overflow-hidden">
       <div className="relative w-full min-h-[50vh] flex flex-col">
         {/* Background Image */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 z-0">
           <img
             src="/service.png"
             alt="Subscribe background"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#14284B]/90 via-[#14284B]/75 to-[#0a1628]/85" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#14284B]/95 via-[#14284B]/85 to-[#0a1628]/90" />
+          
           {/* Grid texture */}
           <div
-            className="absolute inset-0 opacity-[0.04]"
+            className="absolute inset-0 opacity-[0.03]"
             style={{
               backgroundImage:
                 "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)",
               backgroundSize: "60px 60px",
             }}
+          />
+        </div>
+
+        {/* Dynamic Edge Circular Accent */}
+        <div className="absolute top-1/2 -translate-y-1/2 -left-[20%] xl:-left-[10%] opacity-20 pointer-events-none select-none z-0 mix-blend-screen overflow-hidden">
+          <motion.img
+            src="/circle.svg"
+            alt=""
+            className="w-[500px] h-[500px] md:w-[700px] md:h-[700px] lg:w-[900px] lg:h-[900px] max-w-none opacity-60"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
           />
         </div>
 

@@ -38,10 +38,12 @@ export function HeroSection() {
       <div className="relative w-full min-h-[88vh] flex flex-col">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <motion.img
             src="/intro.webp"
             alt="STARHAWK hero — AI-powered farmland monitoring"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover origin-center"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
           />
           {/* Gradient overlay — navy tint bottom */}
           <div className="absolute inset-0 bg-gradient-to-br from-[#14284B]/80 via-[#14284B]/60 to-[#0a1628]/75" />
@@ -58,30 +60,17 @@ export function HeroSection() {
 
         {/* Content */}
         <div className="relative z-10 flex-1 flex flex-col justify-center px-6 sm:px-10 md:px-16 lg:px-24 xl:px-32 pt-28 pb-32 md:pb-40">
-          {/* Label pill */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 mb-6 w-fit"
-          >
-            <span className="flex h-2 w-2 rounded-full bg-[#4ade80] animate-pulse" />
-            <span className="text-[#a8c4e0] text-sm font-medium tracking-widest uppercase">
-              Agricultural Insurance Platform
-            </span>
-          </motion.div>
-
           {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.1 }}
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white leading-[0.95] tracking-tight mb-6"
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
             style={{ fontFamily: "AvenirLTStd-Black, sans-serif" }}
           >
-            STAR
+            Fast, Data-Backed{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#a8c4e0] to-[#e2eaf5]">
-              HAWK
+              Crop Insurance Assessments.
             </span>
           </motion.h1>
 
@@ -92,8 +81,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.25 }}
             className="text-lg sm:text-xl md:text-2xl text-white/80 font-light leading-relaxed max-w-2xl mb-10"
           >
-            Protecting farms with the power of AI, satellite intelligence, and
-            real-time climate data — so farmers can grow with confidence.
+            Replace slow, expensive manual field inspections with high-resolution aerial insights. Starhawk delivers insurance-ready risk and loss reports using geospatial AI.
           </motion.p>
 
           {/* CTAs */}
@@ -118,28 +106,6 @@ export function HeroSection() {
             </button>
           </motion.div>
 
-          {/* Stats row */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className="mt-14 flex flex-wrap gap-8"
-          >
-            {[
-              { val: "5,000+", label: "Farmers Protected" },
-              { val: "98%", label: "Claim Success Rate" },
-              { val: "15+", label: "Districts Covered" },
-            ].map(({ val, label }) => (
-              <div key={label} className="flex flex-col">
-                <span className="text-3xl font-black text-white leading-none">
-                  {val}
-                </span>
-                <span className="text-sm text-white/60 font-medium mt-1">
-                  {label}
-                </span>
-              </div>
-            ))}
-          </motion.div>
         </div>
       </div>
 

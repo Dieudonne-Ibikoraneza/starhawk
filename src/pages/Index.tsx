@@ -1,8 +1,7 @@
 import { HomeNavbar } from "@/components/layout/HomeNavbar";
 import { HeroSection } from "@/components/home/HeroSection";
-import { ServiceHeroSection } from "@/components/home/ServiceHeroSection";
-import { WhyWeExistSection } from "@/components/home/WhyWeExistSection";
-import { ImpactSection } from "@/components/home/ImpactSection";
+import { RedefiningClaimSection } from "@/components/home/RedefiningClaimSection";
+import { SatelliteDroneSection } from "@/components/home/SatelliteDroneSection";
 import { FooterSection } from "@/components/home/FooterSection";
 import CustomScrollbar from "@/components/ui/CustomScrollbar";
 
@@ -15,9 +14,8 @@ const Index = () => {
         <HeroSection />
         {/* Rest of sections sit below the hero overlap cards */}
         <div className="relative z-10 pt-6">
-          <ImpactSection />
-          <WhyWeExistSection />
-          <ServiceHeroSection />
+          <RedefiningClaimSection />
+          <SatelliteDroneSection />
           <FooterSection />
         </div>
       </div>
