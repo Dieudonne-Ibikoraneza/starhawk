@@ -38,8 +38,8 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   
-  // Default sowing date to 14 days from now
-  const defaultSowingDate = format(addDays(new Date(), 14), "yyyy-MM-dd");
+  // Default sowing date to 14 days prior to today (in the past)
+  const defaultSowingDate = format(addDays(new Date(), -14), "yyyy-MM-dd");
   
   const [formData, setFormData] = useState({
     cropType: "",
@@ -183,20 +183,20 @@ export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insure
             </div>
 
             <div className="space-y-3">
-              <Label htmlFor="sowing" className="text-sm font-semibold text-gray-700">Expected Sowing Date</Label>
+              <Label htmlFor="sowing" className="text-sm font-semibold text-gray-700">Sowing / Planting Date</Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <Input 
                   id="sowing" 
                   type="date" 
-                  min={defaultSowingDate}
+                  max={defaultSowingDate}
                   className="pl-10 h-12 rounded-xl border-gray-200 focus:border-green-500 focus:ring-green-500 text-base"
                   value={formData.sowingDate}
                   onChange={(e) => setFormData({...formData, sowingDate: e.target.value})}
                 />
               </div>
               <p className="text-xs text-gray-500 px-1">
-                Defaults to 14 days from today to allow time for field assessment and mapping.
+                Defaults to 14 days prior to today (in the past) to ensure crops are up and visible on the ground for risk assessment.
               </p>
             </div>
           </div>
