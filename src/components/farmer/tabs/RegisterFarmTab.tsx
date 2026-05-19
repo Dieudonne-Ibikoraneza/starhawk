@@ -37,9 +37,18 @@ interface RegisterFarmTabProps {
 export default function RegisterFarmTab({ onSuccess, onCancel, insurerId, insurerName }: RegisterFarmTabProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  
+  // Helper to format past date correctly as yyyy-MM-dd in local timezone
+  const getPastDateString = (daysAgo: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Default sowing date to 14 days prior to today (in the past)
-  const defaultSowingDate = format(addDays(new Date(), -14), "yyyy-MM-dd");
+  const defaultSowingDate = getPastDateString(14);
   
   const [formData, setFormData] = useState({
     cropType: "",
