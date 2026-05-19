@@ -15,6 +15,7 @@ import { getFarmById, getVegetationStats, getWeatherForecast } from "@/services/
 import { getFarmerSuggestions, getMonitoringCycle, getInsight } from "@/services/aiApi";
 import { useToast } from "@/hooks/use-toast";
 import { AiChatInterface } from "@/components/common/AiChatInterface";
+import { FieldMapWithLayers } from "@/components/assessor/FieldMapWithLayers";
 
 interface FarmDetailsTabProps {
   farmId: string;
@@ -236,11 +237,16 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                   </div>
                 </div>
 
-                <div className="relative rounded-2xl bg-gray-100 aspect-video flex items-center justify-center overflow-hidden border border-gray-200 group">
-                  <Satellite className="h-12 w-12 text-gray-300 group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
-                    <span className="text-white text-xs font-medium">Satellite View Simulation</span>
-                  </div>
+                <div className="relative rounded-2xl bg-gray-100 aspect-video overflow-hidden border border-gray-200 shadow-inner">
+                  <FieldMapWithLayers
+                    fieldId={farmId}
+                    showLayerControls={true}
+                    boundary={farm.boundary}
+                    center={farm.location?.coordinates && farm.location.coordinates.length >= 2 
+                      ? [farm.location.coordinates[1], farm.location.coordinates[0]] 
+                      : undefined
+                    }
+                  />
                 </div>
               </div>
             </CardContent>

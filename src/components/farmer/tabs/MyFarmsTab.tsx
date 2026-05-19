@@ -10,14 +10,12 @@ interface MyFarmsTabProps {
   onRegisterFarm: () => void;
   onViewDetails: (farm: any) => void;
   onViewAnalytics: (farm: any) => void;
-  onRequestInsurance: (farm: any) => void;
 }
 
 export default function MyFarmsTab({ 
   onRegisterFarm, 
   onViewDetails, 
-  onViewAnalytics,
-  onRequestInsurance
+  onViewAnalytics
 }: MyFarmsTabProps) {
   const { toast } = useToast();
   const [farms, setFarms] = useState<any[]>([]);
@@ -160,17 +158,7 @@ export default function MyFarmsTab({
                         </td>
                         <td className="py-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {status === 'REGISTERED' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onRequestInsurance(farm)}
-                                className="h-8 border-green-600 text-green-600 hover:bg-green-50 transition-all active:scale-[0.98]"
-                              >
-                                <Shield className="h-3.5 w-3.5 mr-1" />
-                                Request Insurance
-                              </Button>
-                            )}
+
                             <Button
                               size="sm"
                               variant="ghost"

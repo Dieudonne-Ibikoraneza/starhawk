@@ -2507,14 +2507,6 @@ export default function FarmerDashboard() {
               setSelectedFarmId(farm._id || farm.id);
               navigate("/farmer/monitoring");
             }}
-            onRequestInsurance={(farm) => {
-              setInsuranceRequestDialog({
-                open: true,
-                farmId: farm._id || farm.id,
-                farmName: farm.name || "Unnamed Farm",
-                insurerId: ""
-              });
-            }}
           />
         );
       case "insurers": 
