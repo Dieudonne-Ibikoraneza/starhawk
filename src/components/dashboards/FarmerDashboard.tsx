@@ -1226,19 +1226,24 @@ export default function FarmerDashboard() {
       return { valid: true }; // Date is optional
     }
     
+    const dateParts = date.split('-').map(Number);
+    if (dateParts.length !== 3 || dateParts.some(isNaN)) {
+      return { valid: false, error: 'Invalid sowing date format' };
+    }
+    
+    const selectedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
+    
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset to start of day
+    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
     
-    const maxDate = new Date(today);
-    maxDate.setDate(today.getDate() - 14);
-    
-    const selectedDate = new Date(date);
-    selectedDate.setHours(0, 0, 0, 0);
+    const maxDate = new Date(todayUTC);
+    maxDate.setUTCDate(todayUTC.getUTCDate() - 14);
     
     if (selectedDate > maxDate) {
+      const maxDateStr = maxDate.toISOString().split('T')[0];
       return {
         valid: false,
-        error: `Sowing date must be at least 14 days prior to today. Maximum allowed date: ${maxDate.toISOString().split('T')[0]}`
+        error: `Sowing date must be at least 14 days prior to today. Maximum allowed date: ${maxDateStr}`
       };
     }
     
