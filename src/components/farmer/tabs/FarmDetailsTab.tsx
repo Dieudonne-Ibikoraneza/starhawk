@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Sprout, Shield, FileWarning, 
   ClipboardList, Activity, Satellite, Hash, Loader2, 
   ChevronRight, TrendingUp, CloudRain, Droplets, Thermometer,
-  Wind, ShieldCheck, AlertTriangle, Sparkles
+  Wind, ShieldCheck, AlertTriangle, Sparkles, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +147,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
 
   const ndviValue = monitoring?.[0]?.ndvi || monitoring?.ndvi;
   const healthPercent = typeof ndviValue === 'number' ? Math.round(ndviValue * 100) : null;
+  const cycleData = cycleAnalysis?.data || cycleAnalysis;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -211,42 +212,44 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                 Live Health Snapshot
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Vegetation Index (NDVI)</span>
-                      <span className="text-3xl font-black text-gray-900">{healthPercent !== null ? `${healthPercent}%` : "N/A"}</span>
-                    </div>
-                    <Progress value={healthPercent || 0} className="h-3 bg-gray-100" />
-                    <p className="text-xs text-gray-400 italic">
-                      Last updated: {monitoring?.[0]?.monitoredAt ? format(new Date(monitoring[0].monitoredAt), "PPP") : "Just now"}
-                    </p>
-                  </div>
+            <CardContent className="p-6 space-y-6">
+              {/* Map at the top (increased height and full width) */}
+              <div className="relative rounded-2xl bg-gray-100 h-[450px] w-full overflow-hidden border border-gray-200 shadow-inner">
+                <FieldMapWithLayers
+                  fieldId={farmId}
+                  showLayerControls={true}
+                  boundary={farm.boundary}
+                  center={farm.location?.coordinates && farm.location.coordinates.length >= 2 
+                    ? [farm.location.coordinates[1], farm.location.coordinates[0]] 
+                    : undefined
+                  }
+                />
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="text-xs text-gray-500 font-medium mb-1">Moisture Level</div>
-                      <div className="text-xl font-bold text-gray-900">Optimal</div>
-                    </div>
-                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="text-xs text-gray-500 font-medium mb-1">Growth Stage</div>
-                      <div className="text-xl font-bold text-gray-900">Vegetative</div>
-                    </div>
+              {/* Stats at the bottom */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                {/* NDVI Progress */}
+                <div className="md:col-span-1 space-y-2 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Vegetation Index (NDVI)</span>
+                    <span className="text-2xl font-black text-gray-900">{healthPercent !== null ? `${healthPercent}%` : "N/A"}</span>
                   </div>
+                  <Progress value={healthPercent || 0} className="h-2 bg-gray-200" />
+                  <p className="text-[10px] text-gray-400 italic">
+                    Last updated: {monitoring?.[0]?.monitoredAt ? format(new Date(monitoring[0].monitoredAt), "PPP") : "Just now"}
+                  </p>
                 </div>
 
-                <div className="relative rounded-2xl bg-gray-100 aspect-video overflow-hidden border border-gray-200 shadow-inner">
-                  <FieldMapWithLayers
-                    fieldId={farmId}
-                    showLayerControls={true}
-                    boundary={farm.boundary}
-                    center={farm.location?.coordinates && farm.location.coordinates.length >= 2 
-                      ? [farm.location.coordinates[1], farm.location.coordinates[0]] 
-                      : undefined
-                    }
-                  />
+                {/* Moisture Level */}
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex flex-col justify-center">
+                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Moisture Level</div>
+                  <div className="text-xl font-bold text-gray-900">Optimal</div>
+                </div>
+
+                {/* Growth Stage */}
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex flex-col justify-center">
+                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Growth Stage</div>
+                  <div className="text-xl font-bold text-gray-900">Vegetative</div>
                 </div>
               </div>
             </CardContent>
@@ -343,26 +346,26 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Current Stage</p>
-                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.currentStage || "N/A"}</p>
+                      <p className="text-sm font-black text-gray-900">{cycleData.currentStage || "N/A"}</p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Health Trend</p>
                       <p className={`text-sm font-black ${
-                        cycleAnalysis.healthTrend === 'Improving' ? 'text-green-600' : 
-                        cycleAnalysis.healthTrend === 'Declining' ? 'text-red-500' : 'text-blue-600'
+                        cycleData.healthTrend === 'Improving' ? 'text-green-600' : 
+                        cycleData.healthTrend === 'Declining' ? 'text-red-500' : 'text-blue-600'
                       }`}>
-                        {cycleAnalysis.healthTrend || "Stable"}
+                        {cycleData.healthTrend || "Stable"}
                       </p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Days to Harvest</p>
-                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.daysToHarvest || "N/A"} Days</p>
+                      <p className="text-sm font-black text-gray-900">{cycleData.daysToHarvest || "N/A"} Days</p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Market Score</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-black text-gray-900">{cycleAnalysis.marketValueScore || 0}%</p>
-                        <Progress value={cycleAnalysis.marketValueScore || 0} className="h-1.5 w-12 bg-blue-100" />
+                        <p className="text-sm font-black text-gray-900">{cycleData.marketValueScore || 0}%</p>
+                        <Progress value={cycleData.marketValueScore || 0} className="h-1.5 w-12 bg-blue-100" />
                       </div>
                     </div>
                   </div>
@@ -370,7 +373,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                   <div className="space-y-3">
                     <h4 className="text-xs font-bold text-blue-900 uppercase tracking-widest">Cycle Report</h4>
                     <p className="text-sm text-gray-700 leading-relaxed italic border-l-2 border-blue-200 pl-4 bg-blue-50/30 py-2 rounded-r-lg">
-                      {cycleAnalysis.cycleAnalysis}
+                      {cycleData.cycleAnalysis}
                     </p>
                   </div>
 
@@ -378,7 +381,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold text-green-700 uppercase tracking-widest">Growth Recommendations</h4>
                       <ul className="space-y-1.5">
-                        {(cycleAnalysis.recommendations || []).map((rec: string, i: number) => (
+                        {(cycleData.recommendations || []).map((rec: string, i: number) => (
                           <li key={i} className="text-xs text-gray-600 flex items-center gap-2">
                             <CheckCircle2 className="h-3 w-3 text-green-500" />
                             {rec}
@@ -389,7 +392,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold text-blue-700 uppercase tracking-widest">Market Potential</h4>
                       <p className="text-xs text-gray-600 leading-relaxed">
-                        {cycleAnalysis.investmentPotential}
+                        {cycleData.investmentPotential}
                       </p>
                     </div>
                   </div>
