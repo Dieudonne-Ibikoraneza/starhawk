@@ -1220,7 +1220,7 @@ export default function FarmerDashboard() {
     }
   };
 
-  // Validate sowing date is at least 14 days in the future
+  // Validate sowing date is at least 14 days prior to today (in the past)
   const validateSowingDate = (date: string): { valid: boolean; error?: string } => {
     if (!date) {
       return { valid: true }; // Date is optional
@@ -1229,16 +1229,16 @@ export default function FarmerDashboard() {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset to start of day
     
-    const minDate = new Date(today);
-    minDate.setDate(today.getDate() + 14);
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() - 14);
     
     const selectedDate = new Date(date);
     selectedDate.setHours(0, 0, 0, 0);
     
-    if (selectedDate < minDate) {
+    if (selectedDate > maxDate) {
       return {
         valid: false,
-        error: `Sowing date must be at least 14 days in the future. Minimum date: ${minDate.toISOString().split('T')[0]}`
+        error: `Sowing date must be at least 14 days prior to today. Maximum allowed date: ${maxDate.toISOString().split('T')[0]}`
       };
     }
     
