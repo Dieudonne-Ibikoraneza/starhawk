@@ -1456,6 +1456,7 @@ export default function FarmerDashboard() {
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Crop Type</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Area (ha)</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Registered At</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1491,6 +1492,11 @@ export default function FarmerDashboard() {
                           }`}>
                             {toDisplayText(farm.status, "REGISTERED")}
                           </span>
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="text-sm text-gray-600">
+                            {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1723,6 +1729,7 @@ export default function FarmerDashboard() {
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Area (ha)</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Location</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Status</th>
+                      <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Registered At</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -1769,6 +1776,11 @@ export default function FarmerDashboard() {
                             }`}>
                               {toDisplayText(farm.status, "REGISTERED")}
                             </span>
+                          </td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <div className="text-sm text-gray-600">
+                              {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                            </div>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
                             <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>

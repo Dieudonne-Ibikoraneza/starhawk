@@ -126,11 +126,12 @@ export default function MyFarmsTab({
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Farm Name</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Crop Type</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Location</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Status</th>
-                    <th className="text-right py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Actions</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Farm Name</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Crop Type</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Location</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Registered At</th>
+                    <th className="text-right py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -140,17 +141,17 @@ export default function MyFarmsTab({
                     
                     return (
                       <tr key={farmId} className="hover:bg-gray-50/50 transition-colors group">
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="font-bold text-gray-900">{toDisplayText(farm.name, "Unnamed Farm")}</div>
                           <div className="text-xs text-gray-400 mt-0.5">ID: {farmId.substring(0, 8)}...</div>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <div className="h-2 w-2 rounded-full bg-green-500" />
                             {toDisplayText(farm.cropType || farm.crop, "N/A")}
                           </div>
                         </td>
-                        <td className="py-4 px-6 max-w-[200px] md:max-w-[280px]">
+                        <td className="py-4 px-6 max-w-[200px] md:max-w-[280px] whitespace-nowrap">
                           <div 
                             className="flex items-center gap-1.5 text-sm text-gray-500 truncate"
                             title={formatLocation(farm)}
@@ -159,7 +160,7 @@ export default function MyFarmsTab({
                             <span className="truncate">{formatLocation(farm)}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <Badge className={`${
                             status === 'INSURED' ? 'bg-green-100 text-green-700 border-green-200' :
                             status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
@@ -168,7 +169,12 @@ export default function MyFarmsTab({
                             {status}
                           </Badge>
                         </td>
-                        <td className="py-4 px-6 text-right">
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="text-sm text-gray-600">
+                            {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
 
                             <Button

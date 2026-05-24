@@ -230,6 +230,15 @@ export const assessorService = {
       ASSESSOR_ENDPOINTS.deletePdf(assessmentId, pdfType),
     );
   },
+
+  /**
+   * Process manual drone analysis PDF on demand
+   */
+  processPdf: async (assessmentId: string, pdfType: string): Promise<any> => {
+    return apiClient.post<any>(
+      `/assessments/${assessmentId}/pdfs/${pdfType}/process`
+    );
+  },
 };
 
 /**

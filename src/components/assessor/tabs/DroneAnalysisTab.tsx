@@ -32,6 +32,12 @@ import {
   X,
   Check,
   AlertTriangle,
+  Play,
+  RefreshCw,
+  AlertCircle,
+  Cpu,
+  Clock,
+  FileDown
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -83,6 +89,86 @@ function firstMapImageFromPdfs(pdfs: AssessmentDronePdf[]): string | null {
   }
   return null;
 }
+
+const AgremoLoadingSkeleton = ({ pdfType, progressMessage }: { pdfType: string; progressMessage: string }) => {
+  return (
+    <div className="space-y-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100 animate-pulse">
+      {/* Processing Status Bar */}
+      <div className="flex flex-col items-center justify-center py-6 bg-emerald-50/40 border border-emerald-100/50 rounded-2xl text-center space-y-3">
+        <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-emerald-950 uppercase tracking-wider">Manual Extraction Active</p>
+          <p className="text-xs text-emerald-700/80 font-semibold animate-bounce">{progressMessage || "Extracting crop intelligence..."}</p>
+        </div>
+      </div>
+
+      {/* Structured Metric Blocks */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm space-y-2">
+            <div className="h-3 w-16 bg-slate-200 rounded-full" />
+            <div className="h-5 w-24 bg-slate-300 rounded-full" />
+          </div>
+        ))}
+      </div>
+
+      {/* Main Split Layout: Map Preview & Zonation Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mock Map Skeleton with glowing contour lines */}
+        <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <div className="h-4 w-32 bg-slate-200 rounded-full" />
+            <div className="h-4 w-12 bg-slate-200 rounded-full" />
+          </div>
+          <div className="h-64 w-full rounded-xl bg-slate-100 border border-slate-200/50 relative overflow-hidden flex items-center justify-center">
+            {/* Glowing Map Contours */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-30">
+              <svg viewBox="0 0 100 100" className="w-48 h-48 animate-pulse text-emerald-400">
+                <path d="M30,20 Q50,10 70,25 T90,60 T60,90 T20,70 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="text-emerald-500 animate-spin duration-10000" />
+                <path d="M40,35 Q55,25 68,38 T75,65 T50,80 T30,55 Z" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-yellow-500" />
+                <path d="M50,45 Q58,35 63,48 T62,60 T48,70 T42,52 Z" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-rose-500" />
+              </svg>
+            </div>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider relative bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+              Rendering High-Res Zonation Map...
+            </span>
+          </div>
+        </div>
+
+        {/* Mock Zonation Table */}
+        <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm space-y-5">
+          <div className="h-4 w-40 bg-slate-200 rounded-full" />
+          
+          <div className="border border-slate-100 rounded-xl overflow-hidden">
+            <div className="bg-slate-50/80 p-3 grid grid-cols-3 gap-4 border-b border-slate-100">
+              <div className="h-3 w-12 bg-slate-200 rounded-full" />
+              <div className="h-3 w-8 bg-slate-200 rounded-full ml-auto" />
+              <div className="h-3 w-16 bg-slate-200 rounded-full ml-auto" />
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-3 grid grid-cols-3 gap-4 border-b border-slate-50 items-center">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${i === 1 ? "bg-emerald-300" : i === 2 ? "bg-yellow-300" : "bg-rose-300"}`} />
+                  <div className="h-3 w-16 bg-slate-200 rounded-full" />
+                </div>
+                <div className="h-3 w-10 bg-slate-200 rounded-full ml-auto" />
+                <div className="h-3 w-8 bg-slate-200 rounded-full ml-auto" />
+              </div>
+            ))}
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-50/50 border border-slate-100/80 flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="h-3 w-28 bg-slate-200 rounded-full" />
+              <div className="h-5 w-40 bg-slate-300 rounded-full" />
+            </div>
+            <div className="h-8 w-8 rounded-full bg-slate-200" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const DroneAnalysisTab = ({
   fieldId,
@@ -145,80 +231,50 @@ export const DroneAnalysisTab = ({
   const [showExtractedMap, setShowExtractedMap] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingStartTimeRef = useRef<number | null>(null);
+  // States for manual processing and error retry
+  const [processingTypes, setProcessingTypes] = useState<Record<string, boolean>>({});
+  const [failedTypes, setFailedTypes] = useState<Record<string, string>>({});
+  const [currentProgressPhase, setCurrentProgressPhase] = useState<string>("");
 
-  // Polling function to check for analysis data (same as Starhawk)
-  const startPollingForData = (assessmentId: string) => {
-    // Clear any existing polling
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
+  const handleProcessPdf = async (pdfType: string) => {
+    if (!assessmentId) return;
+    
+    setProcessingTypes((prev) => ({ ...prev, [pdfType]: true }));
+    setFailedTypes((prev) => {
+      const copy = { ...prev };
+      delete copy[pdfType];
+      return copy;
+    });
+
+    const phases = [
+      "Parsing Agremo layout rules...",
+      "Resolving crop stress indexes...",
+      "Synthesizing field boundary geometries...",
+      "Extracting spatial zonation layers...",
+      "Compiling final agricultural data matrix..."
+    ];
+    
+    let phaseIndex = 0;
+    setCurrentProgressPhase(phases[0]);
+    const phaseInterval = setInterval(() => {
+      phaseIndex = (phaseIndex + 1) % phases.length;
+      setCurrentProgressPhase(phases[phaseIndex]);
+    }, 4500);
+
+    try {
+      await assessorService.processPdf(assessmentId, pdfType);
+      toast.success("Crop intelligence extracted successfully!");
+      void refetchAssessment();
+    } catch (error: any) {
+      console.error("Processing error:", error);
+      const errorMsg = error.message || "Manual processing failed. Microservice might be offline.";
+      setFailedTypes((prev) => ({ ...prev, [pdfType]: errorMsg }));
+      toast.error(`Extraction failed: ${errorMsg}`);
+    } finally {
+      clearInterval(phaseInterval);
+      setProcessingTypes((prev) => ({ ...prev, [pdfType]: false }));
     }
-
-    pollingStartTimeRef.current = Date.now();
-    const MAX_POLLING_TIME = 3 * 60 * 1000; // 3 minutes max
-    const POLL_INTERVAL = 15000; // Poll every 15 seconds
-
-    console.log("🔄 Starting to poll for drone analysis data...");
-
-    pollingIntervalRef.current = setInterval(async () => {
-      if (!pollingIntervalRef.current) return;
-
-      const elapsed = Date.now() - (pollingStartTimeRef.current || 0);
-
-      if (elapsed > MAX_POLLING_TIME) {
-        console.log("⏱️ Polling timeout reached, stopping...");
-        stopPollingForData();
-        toast.error(
-          "Processing timeout. Please refresh the page or contact support.",
-        );
-        return;
-      }
-
-      try {
-        console.log(
-          "🔍 Polling for drone analysis data... (elapsed:",
-          Math.round(elapsed / 1000),
-          "s)",
-        );
-        const updated = await assessorService.getAssessment(assessmentId);
-
-        // Check if drone analysis data is available
-        if (updated.droneAnalysisPdfs && updated.droneAnalysisPdfs.length > 0) {
-          const withData = updated.droneAnalysisPdfs.find(
-            (p: any) => p.extractedData || p.droneAnalysisData,
-          );
-          if (withData) {
-            console.log("✅ Drone analysis data found!");
-            stopPollingForData();
-            toast.success(
-              "Analysis complete! Drone analysis data is now available.",
-            );
-            void refetchAssessment();
-          }
-        }
-      } catch (err: any) {
-        console.error("❌ Error while polling for drone data:", err);
-      }
-    }, POLL_INTERVAL);
   };
-
-  // Stop polling function (same as Starhawk)
-  const stopPollingForData = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-    pollingStartTimeRef.current = null;
-    console.log("🛑 Stopped polling for drone analysis data");
-  };
-
-  // Cleanup polling on unmount (same as Starhawk)
-  useEffect(() => {
-    return () => {
-      stopPollingForData();
-    };
-  }, []);
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -229,8 +285,6 @@ export const DroneAnalysisTab = ({
       return;
     }
 
-    console.log("DEBUG: handlePdfUpload called, assessmentId:", assessmentId);
-
     if (!assessmentId) {
       toast.error(
         "No assessment found. Please select a field with an active assessment.",
@@ -240,22 +294,13 @@ export const DroneAnalysisTab = ({
 
     setIsUploading(true);
     try {
-      console.log("DEBUG: About to call uploadDronePdf with:", {
-        assessmentId,
-        fileName: file.name,
-        fileSize: file.size,
-      });
       const result = await assessorService.uploadDronePdf(
         assessmentId,
         file,
       );
-      toast.success("Drone analysis PDF uploaded. Processing on the server…");
+      toast.success(`Successfully uploaded ${file.name}. Pending manual extraction execution.`);
       console.log("Backend upload result:", result);
-
       await refetchAssessment();
-
-      // Start polling for analysis results (same as Starhawk)
-      startPollingForData(assessmentId);
     } catch (uploadError: any) {
       console.error("Backend upload error:", uploadError);
       toast.error(uploadError.message || "Failed to upload to backend");
@@ -293,7 +338,7 @@ export const DroneAnalysisTab = ({
           weather:
             "Risk Assessment - Manual Weather check available in Weather tab.",
         },
-        false, // showContext: false - Standalone reports should only show technical data
+        false,
       );
       toast.success("Technical report generated successfully.");
     } catch (err) {
@@ -306,7 +351,6 @@ export const DroneAnalysisTab = ({
 
   return (
     <div className="space-y-6">
-      {/* Data Source Selector */}
       {!readOnly && (
         <Card>
           <CardHeader>
@@ -332,10 +376,8 @@ export const DroneAnalysisTab = ({
         </Card>
       )}
 
-      {/* PATH 1: DRONE UPLOAD */}
       {dataSource === "drone" && (
         <>
-          {/* PDF Report Upload */}
           {!readOnly && (
           <Card>
             <CardHeader>
@@ -417,87 +459,164 @@ export const DroneAnalysisTab = ({
           </Card>
           )}
 
-          {/* Stacked reports — same pattern as crop monitoring & loss assessment */}
           <div className="space-y-6">
-            {uploadedPdfs.map((pdf, idx) => (
-              <Card key={pdf._id ?? `${pdf.pdfType}-${idx}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1 min-w-0">
-                      <CardTitle className="text-base flex flex-wrap items-center gap-2">
-                        <FileText className="h-4 w-4 text-primary shrink-0" />
-                        <span>{pdfRowLabel(uploadedPdfs, idx)}</span>
-                        <Badge
-                          variant="outline"
-                          className="text-xs bg-green-50 text-green-700 border-green-200"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Uploaded
-                        </Badge>
-                      </CardTitle>
-                      {pdf.uploadedAt && (
-                        <p className="text-xs text-muted-foreground font-normal">
-                          {new Date(pdf.uploadedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => handleDownloadReport(pdf)}
-                      >
-                        <FileText className="h-4 w-4" />
-                        Download PDF
-                      </Button>
+            {uploadedPdfs.map((pdf, idx) => {
+              const isProcessing = !!processingTypes[pdf.pdfType];
+              const hasFailed = !!failedTypes[pdf.pdfType];
+              const hasData = !!dronePayload(pdf);
 
-                      {!readOnly && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="gap-2"
-                              disabled={isCompleted}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete report
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Are you absolutely sure?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This permanently deletes &quot;
-                                {formatReportTypeLabel(pdf.pdfType)}&quot; from
-                                this assessment.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeletePdf(pdf.pdfType)}
+              return (
+                <Card key={pdf._id ?? `${pdf.pdfType}-${idx}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                          <FileText className="h-4 w-4 text-primary shrink-0" />
+                          <span>{pdfRowLabel(uploadedPdfs, idx)}</span>
+                          {hasData ? (
+                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 rounded-full font-bold">
+                              <Check className="h-3 w-3" /> Processed
+                            </Badge>
+                          ) : hasFailed ? (
+                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-rose-50 text-rose-700 border-rose-200 gap-1 rounded-full font-bold">
+                              <AlertCircle className="h-3 w-3" /> Failed
+                            </Badge>
+                          ) : isProcessing ? (
+                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-blue-50 text-blue-700 border-blue-200 gap-1 rounded-full animate-pulse font-bold">
+                              <Loader2 className="h-3 w-3 animate-spin" /> Processing...
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-amber-50 text-amber-700 border-amber-200 gap-1 rounded-full font-bold animate-pulse">
+                              <Clock className="h-3 w-3" /> Pending Process
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        {pdf.uploadedAt && (
+                          <p className="text-xs text-muted-foreground font-normal">
+                            {hasData ? "Extracted" : "Uploaded"}: {new Date(pdf.uploadedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          disabled={isProcessing}
+                          onClick={() => handleDownloadReport(pdf)}
+                        >
+                          <FileText className="h-4 w-4" />
+                          Download PDF
+                        </Button>
+
+                        {!readOnly && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="gap-2"
+                                disabled={isCompleted || isProcessing}
                               >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
+                                <Trash2 className="h-4 w-4" />
+                                Delete report
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Are you absolutely sure?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This permanently deletes &quot;
+                                  {formatReportTypeLabel(pdf.pdfType)}&quot; from
+                                  this assessment.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeletePdf(pdf.pdfType)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <DroneAnalysisView
-                    data={dronePayload(pdf)}
-                    pdfType={String(pdf.pdfType)}
-                  />
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent>
+                    {isProcessing ? (
+                      <AgremoLoadingSkeleton pdfType={pdf.pdfType} progressMessage={currentProgressPhase} />
+                    ) : hasData ? (
+                      <DroneAnalysisView
+                        data={dronePayload(pdf)}
+                        pdfType={String(pdf.pdfType)}
+                      />
+                    ) : (
+                      <div className="p-6 bg-slate-50/50 rounded-2xl border border-slate-100 space-y-6 text-center animate-in fade-in zoom-in duration-300">
+                        {hasFailed ? (
+                          <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-left flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+                            <div className="space-y-1">
+                              <p className="text-sm font-bold text-rose-950">Crop Intelligence Extraction Failed</p>
+                              <p className="text-xs text-rose-700/90 leading-relaxed font-semibold">
+                                {failedTypes[pdf.pdfType] || "An unexpected error occurred during extraction."}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-blue-50/50 border border-blue-100/50 rounded-xl text-left flex items-start gap-3">
+                            <Cpu className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                            <div className="space-y-1">
+                              <p className="text-sm font-bold text-blue-950">Pending Crop Intelligence Processing</p>
+                              <p className="text-xs text-blue-700/90 leading-relaxed font-semibold">
+                                This report has been uploaded successfully. Click the button below to manually execute AI zonation extraction and crop stress analysis.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col items-center justify-center space-y-3 pt-2">
+                          <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100">
+                            <FileText className={`h-8 w-8 ${hasFailed ? "text-rose-500 animate-bounce" : "text-emerald-600"}`} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{pdfRowLabel(uploadedPdfs, idx)}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">File URL: {pdf.pdfUrl}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-center pt-2">
+                          <Button 
+                            onClick={() => handleProcessPdf(pdf.pdfType)}
+                            className={`rounded-full px-8 py-6 font-bold shadow-lg flex items-center gap-2 text-sm transition-all duration-300 hover:scale-105 active:scale-95 ${
+                              hasFailed 
+                                ? "bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white" 
+                                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-white"
+                            }`}
+                          >
+                            {hasFailed ? (
+                              <>
+                                <RefreshCw className="h-4 w-4" />
+                                Retry Extraction
+                              </>
+                            ) : (
+                              <>
+                                <Play className="h-4 w-4 fill-white" />
+                                Process Crop Intelligence
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {uploadedPdfs.length === 0 && readOnly && (

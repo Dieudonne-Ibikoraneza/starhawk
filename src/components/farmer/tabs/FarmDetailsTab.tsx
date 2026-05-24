@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Sprout, Shield, FileWarning, 
   ClipboardList, Activity, Satellite, Hash, Loader2, 
   ChevronRight, TrendingUp, CloudRain, Droplets, Thermometer,
-  Wind, ShieldCheck, AlertTriangle, Sparkles, CheckCircle2
+  Wind, ShieldCheck, AlertTriangle, Sparkles, CheckCircle2, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -456,6 +456,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                 icon={<Activity className="h-4.5 w-4.5 text-green-600" />} 
               />
               <DetailItem label="Sowing Date" value={farm.sowingDate ? format(new Date(farm.sowingDate), "PPP") : "N/A"} icon={<Hash className="h-4.5 w-4.5 text-green-600" />} />
+              <DetailItem label="Registered At" value={farm.createdAt ? format(new Date(farm.createdAt), "PPP") : "N/A"} icon={<Calendar className="h-4.5 w-4.5 text-green-600" />} />
               <DetailItem label="Location" value={farm.locationName || "Rwanda"} icon={<MapPin className="h-4.5 w-4.5 text-green-600" />} vertical />
             </CardContent>
           </Card>

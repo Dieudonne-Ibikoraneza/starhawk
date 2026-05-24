@@ -12,6 +12,7 @@ import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, up
 import policiesApiService from "@/services/policiesApi";
 import { getUserId } from "@/services/authAPI";
 import { useToast } from "@/hooks/use-toast";
+import { getRequiredMonitoringCycles } from "@/lib/crops";
 import { MonitoringOverviewTab } from "./tabs/MonitoringOverviewTab";
 import { FieldMapWithLayers } from "./FieldMapWithLayers";
 import meteosourceApiService from "@/services/meteosourceApi";
@@ -217,19 +218,24 @@ export default function CropMonitoringSystem() {
     return monitoringHistory.filter(m => m.policyId === policyId).length;
   };
 
-  // Check if monitoring can be started (max 2 cycles)
+  // Check if monitoring can be started (dynamic cycles count based on crop type)
   const canStartMonitoring = (policyId: string): boolean => {
-    return getMonitoringCount(policyId) < 2;
+    const policy = policies.find(p => p._id === policyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    return getMonitoringCount(policyId) < requiredCycles;
   };
 
   // Handle start monitoring
   const handleStartMonitoring = async () => {
     if (!selectedPolicyId) return;
     
+    const policy = policies.find(p => p._id === selectedPolicyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    
     if (!canStartMonitoring(selectedPolicyId)) {
       toast({
         title: 'Maximum monitoring cycles reached',
-        description: 'You can only start monitoring 2 times per policy.',
+        description: `You can only start monitoring ${requiredCycles} times per policy.`,
         variant: 'destructive'
       });
       return;
@@ -244,8 +250,16 @@ export default function CropMonitoringSystem() {
       });
       setStartMonitoringDialogOpen(false);
       setSelectedPolicyId(null);
-      await loadMonitoringHistory();
-      setViewMode('monitoring');
+      
+      // Reload history and wait for it to complete
+      const history = await getMonitoringHistory();
+      const historyArray = Array.isArray(history) ? history : [];
+      setMonitoringHistory(historyArray);
+      
+      // Find the newly created cycle
+      const newMonitoring = historyArray.find((m: any) => m._id === result?._id) || result;
+      setSelectedMonitoring(newMonitoring);
+      setViewMode('detail');
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -1267,7 +1281,7 @@ export default function CropMonitoringSystem() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Monitoring Cycles:</span>
-                      <span className="text-white">{monitoringCount}/2</span>
+                      <span className="text-white">{monitoringCount}/{getRequiredMonitoringCycles(policy.cropType)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Status:</span>
@@ -1306,7 +1320,7 @@ export default function CropMonitoringSystem() {
                   
                   {!canStart && (
                     <p className="text-xs text-yellow-400 text-center mt-2">
-                      Maximum 2 monitoring cycles completed
+                      Maximum {getRequiredMonitoringCycles(policy.cropType)} monitoring cycles completed
                     </p>
                   )}
                 </CardContent>
@@ -1328,7 +1342,7 @@ export default function CropMonitoringSystem() {
             </p>
             {selectedPolicyId && (
               <div className="text-sm text-white/60">
-                Current cycles: {getMonitoringCount(selectedPolicyId)}/2
+                Current cycles: {getMonitoringCount(selectedPolicyId)}/{getRequiredMonitoringCycles(policies.find(p => p._id === selectedPolicyId)?.cropType)}
                 </div>
             )}
           </div>

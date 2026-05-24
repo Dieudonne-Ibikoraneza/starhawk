@@ -5,7 +5,7 @@ import { Sprout, MapPin, Calendar, Clock, CheckCircle2, Eye } from "lucide-react
 import { useNavigate } from "react-router-dom";
 import { FieldMapWithLayers } from "../FieldMapWithLayers";
 import { CropMonitoringRecord } from "@/lib/api/services/cropMonitoring";
-import { formatCropTypeLabel } from "@/lib/crops";
+import { formatCropTypeLabel, getRequiredMonitoringCycles } from "@/lib/crops";
 
 interface MonitoringBasicInfoTabProps {
   fieldId: string;
@@ -58,7 +58,8 @@ export const MonitoringBasicInfoTab = ({
     recommendedDateStr = fallbackRecommendedDate.toISOString();
   }
 
-  const maxReached = completedCount >= (totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || Number.MAX_SAFE_INTEGER);
+  const resolvedTotalCycles = totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || getRequiredMonitoringCycles(cropType);
+  const maxReached = completedCount >= resolvedTotalCycles;
   
   const formattedFieldId = fieldId
     ? `FLD-${fieldId.slice(0, 3).toUpperCase()}`
@@ -143,7 +144,7 @@ export const MonitoringBasicInfoTab = ({
           <CardTitle className="flex justify-between items-center text-xl">
             Monitoring Cycles
             <Badge variant="outline" className="font-normal text-xs">
-              {completedCount} / {totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || "?"} Completed
+              {completedCount} / {resolvedTotalCycles} Completed
             </Badge>
           </CardTitle>
           {!readOnly && (

@@ -13,6 +13,7 @@ import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, up
 import policiesApiService from "@/services/policiesApi";
 import { getUserId } from "@/services/authAPI";
 import { useToast } from "@/hooks/use-toast";
+import { getRequiredMonitoringCycles } from "@/lib/crops";
 import { MonitoringOverviewTab } from "../assessor/tabs/MonitoringOverviewTab";
 import { FieldMapWithLayers } from "../assessor/FieldMapWithLayers";
 import InsurerCropMonitoringDetail from "./InsurerCropMonitoringDetail";
@@ -144,6 +145,7 @@ export default function InsurerCropMonitoringSystem() {
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("basic-info");
+  const [viewMode, setViewMode] = useState<any>("policies");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -216,19 +218,24 @@ export default function InsurerCropMonitoringSystem() {
     return monitoringHistory.filter(m => m.policyId === policyId).length;
   };
 
-  // Check if monitoring can be started (max 2 cycles)
+  // Check if monitoring can be started (dynamic cycles count based on crop type)
   const canStartMonitoring = (policyId: string): boolean => {
-    return getMonitoringCount(policyId) < 2;
+    const policy = policies.find(p => p._id === policyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    return getMonitoringCount(policyId) < requiredCycles;
   };
 
   // Handle start monitoring
   const handleStartMonitoring = async () => {
     if (!selectedPolicyId) return;
     
+    const policy = policies.find(p => p._id === selectedPolicyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    
     if (!canStartMonitoring(selectedPolicyId)) {
       toast({
         title: 'Maximum monitoring cycles reached',
-        description: 'You can only start monitoring 2 times per policy.',
+        description: `You can only start monitoring ${requiredCycles} times per policy.`,
         variant: 'destructive'
       });
       return;
@@ -243,8 +250,16 @@ export default function InsurerCropMonitoringSystem() {
       });
       setStartMonitoringDialogOpen(false);
       setSelectedPolicyId(null);
-      await loadMonitoringHistory();
-      setViewMode('monitoring');
+      
+      // Reload history and wait for it to complete
+      const history = await getMonitoringHistory();
+      const historyArray = Array.isArray(history) ? history : [];
+      setMonitoringHistory(historyArray);
+      
+      // Find the newly created cycle
+      const newMonitoring = historyArray.find((m: any) => m._id === result?._id) || result;
+      setSelectedMonitoring(newMonitoring);
+      setViewMode('detail');
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -1382,6 +1397,8 @@ export default function InsurerCropMonitoringSystem() {
                         const canStart = canStartMonitoring(policy._id);
                         const farmerName = policy.farmerId?.name || policy.farmerId?.firstName || 'Unknown Farmer';
                         const policyDisplayId = policy.policyNumber || `POL-${policy._id.slice(-6).toUpperCase()}`;
+                        const requiredCycles = getRequiredMonitoringCycles(policy.cropType);
+                        const isMaxReached = monitoringCount >= requiredCycles;
 
                         return (
                           <tr key={policy._id} className="hover:bg-gray-50/50 transition-colors">
@@ -1416,18 +1433,18 @@ export default function InsurerCropMonitoringSystem() {
                                 <div className="flex-1 max-w-[100px] h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                   <div 
                                     className={`h-full rounded-full transition-all duration-500 ${
-                                      monitoringCount === 2 
+                                      isMaxReached 
                                         ? "bg-teal-500" 
-                                        : monitoringCount === 1 
+                                        : monitoringCount > 0 
                                         ? "bg-amber-500" 
                                         : "bg-gray-300"
                                     }`}
-                                    style={{ width: `${(monitoringCount / 2) * 100}%` }}
+                                    style={{ width: `${(monitoringCount / requiredCycles) * 100}%` }}
                                   />
                                 </div>
-                                <span className="text-sm font-medium text-gray-700">{monitoringCount}/2 cycles</span>
+                                <span className="text-sm font-medium text-gray-700">{monitoringCount}/{requiredCycles} cycles</span>
                               </div>
-                              {monitoringCount === 2 && (
+                              {isMaxReached && (
                                 <div className="text-xxs text-teal-600 font-medium mt-1">Completed (Max reached)</div>
                               )}
                             </td>
@@ -1496,7 +1513,7 @@ export default function InsurerCropMonitoringSystem() {
               </p>
               {selectedPolicyId && (
                 <div className="text-sm text-gray-900/60">
-                  Current cycles: {getMonitoringCount(selectedPolicyId)}/2
+                  Current cycles: {getMonitoringCount(selectedPolicyId)}/{getRequiredMonitoringCycles(policies.find(p => p._id === selectedPolicyId)?.cropType)}
                 </div>
               )}
             </div>
@@ -1966,6 +1983,19 @@ export default function InsurerCropMonitoringSystem() {
     );
   };
 
-  return renderMonitoringHistory();
+  // Render view based on mode
+  if (viewMode === "detail" || viewMode === "fieldDetail") {
+    return renderFieldDetail();
+  }
+
+  if (viewMode === "fieldSelection") {
+    return renderFieldSelection();
+  }
+
+  if (viewMode === "monitoring") {
+    return renderMonitoringHistory();
+  }
+
+  return renderPoliciesView();
 }
 

@@ -78,6 +78,8 @@ import {
   Users,
   Sprout,
   ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   ChevronRight,
   Monitor,
   Settings
@@ -289,6 +291,11 @@ export default function AssessorDashboard() {
   const [selectedFieldForCropMonitoring, setSelectedFieldForCropMonitoring] = useState<any | null>(null);
   const [cropMonitoringSearchQuery, setCropMonitoringSearchQuery] = useState("");
   const [cropMonitoringTab, setCropMonitoringTab] = useState<string>("basic");
+  
+  // Sorting and Filtering states for Crop Monitoring fields list
+  const [cropMonitoringSortBy, setCropMonitoringSortBy] = useState<"name" | "date" | "">("");
+  const [cropMonitoringSortOrder, setCropMonitoringSortOrder] = useState<"asc" | "desc">("asc");
+  const [cropMonitoringPolicyFilter, setCropMonitoringPolicyFilter] = useState<"all" | "has_policy" | "no_policy">("all");
   
   // Dialog states for crop monitoring
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -6770,14 +6777,57 @@ export default function AssessorDashboard() {
         selectedFarmerForCropMonitoring.lastName || 
         "Unknown";
 
-      // Filter fields based on search ONLY - show ALL fields regardless of processing status
-      const filteredFields = farmerFieldsList.filter((farm: any) => {
-        if (!cropMonitoringSearchQuery) return true;
-        const searchLower = cropMonitoringSearchQuery.toLowerCase();
-        const farmName = (farm.name || '').toLowerCase();
-        const cropType = (farm.cropType || farm.crop || '').toLowerCase();
-        return farmName.includes(searchLower) || cropType.includes(searchLower);
+      // Filter fields based on search & policy status
+      let processedFields = farmerFieldsList.filter((farm: any) => {
+        // 1. Text Search
+        let matchesSearch = true;
+        if (cropMonitoringSearchQuery) {
+          const searchLower = cropMonitoringSearchQuery.toLowerCase();
+          const farmName = (farm.name || '').toLowerCase();
+          const cropType = (farm.cropType || farm.crop || '').toLowerCase();
+          const displayFieldId = farm.id || farm._id ? `FLD-${String(farm.id || farm._id).slice(-3).padStart(3, '0')}` : '';
+          matchesSearch = farmName.includes(searchLower) || cropType.includes(searchLower) || displayFieldId.toLowerCase().includes(searchLower);
+        }
+
+        // 2. Policy Status Filter
+        let matchesPolicy = true;
+        const farmId = farm._id || farm.id;
+        const hasPolicy = policies.some((p: any) => {
+          const policyFarmId = p.farmId?._id || p.farmId;
+          return String(policyFarmId) === String(farmId);
+        });
+
+        if (cropMonitoringPolicyFilter === "has_policy") {
+          matchesPolicy = hasPolicy;
+        } else if (cropMonitoringPolicyFilter === "no_policy") {
+          matchesPolicy = !hasPolicy;
+        }
+
+        return matchesSearch && matchesPolicy;
       });
+
+      // Sort fields
+      if (cropMonitoringSortBy === "name") {
+        processedFields.sort((a: any, b: any) => {
+          const nameA = (a.name || '').toLowerCase();
+          const nameB = (b.name || '').toLowerCase();
+          if (cropMonitoringSortOrder === "asc") {
+            return nameA.localeCompare(nameB);
+          } else {
+            return nameB.localeCompare(nameA);
+          }
+        });
+      } else if (cropMonitoringSortBy === "date") {
+        processedFields.sort((a: any, b: any) => {
+          const dateA = new Date(a.createdAt || a.sowingDate || 0).getTime();
+          const dateB = new Date(b.createdAt || b.sowingDate || 0).getTime();
+          if (cropMonitoringSortOrder === "asc") {
+            return dateA - dateB;
+          } else {
+            return dateB - dateA;
+          }
+        });
+      }
       
     return (
       <div className="min-h-screen bg-gray-50 pt-6 pb-8">
@@ -6797,58 +6847,127 @@ export default function AssessorDashboard() {
                 Back to Farmers
               </Button>
               <h1 className="text-3xl font-bold text-gray-900">{farmerName} - Fields</h1>
-              <p className="text-gray-600 mt-1">Select a field for crop monitoring</p>
+              <p className="text-gray-600 mt-1">Select an insured field for active crop health monitoring</p>
             </div>
 
-            {/* Search and Filter */}
-            <div className="flex items-center gap-3 mb-6">
+            {/* Search and Filter Row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search fields..."
+                  placeholder="Search by field ID, farm name, crop..."
                   value={cropMonitoringSearchQuery}
                   onChange={(e) => setCropMonitoringSearchQuery(e.target.value)}
-                  className="pl-10 bg-white border-gray-300"
+                  className="pl-10 bg-white/80 border-gray-200/80 shadow-sm focus:border-green-500 focus:ring-green-500 rounded-lg text-sm transition-all backdrop-blur-sm"
                 />
               </div>
-              <Button 
-                variant="outline" 
-                className="bg-white border-gray-300"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
+              
+              {/* Segmented policy filters */}
+              <div className="flex items-center gap-2 bg-gray-105 p-1 rounded-xl shadow-sm border border-gray-200/40 backdrop-blur-sm" style={{ backgroundColor: 'rgba(243, 244, 246, 0.85)' }}>
+                <button
+                  onClick={() => setCropMonitoringPolicyFilter("all")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                    cropMonitoringPolicyFilter === "all"
+                      ? "bg-white text-gray-900 shadow-sm font-bold"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-white/40"
+                  }`}
+                >
+                  All Fields
+                </button>
+                <button
+                  onClick={() => setCropMonitoringPolicyFilter("has_policy")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 ${
+                    cropMonitoringPolicyFilter === "has_policy"
+                      ? "bg-emerald-500 text-white shadow-sm font-bold"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-white/40"
+                  }`}
+                >
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Insured ({farmerFieldsList.filter((f: any) => policies.some((p: any) => String(p.farmId?._id || p.farmId) === String(f._id || f.id))).length})
+                </button>
+                <button
+                  onClick={() => setCropMonitoringPolicyFilter("no_policy")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 ${
+                    cropMonitoringPolicyFilter === "no_policy"
+                      ? "bg-amber-500 text-white shadow-sm font-bold"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-white/40"
+                  }`}
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Uninsured ({farmerFieldsList.filter((f: any) => !policies.some((p: any) => String(p.farmId?._id || p.farmId) === String(f._id || f.id))).length})
+                </button>
+              </div>
             </div>
 
             {/* Fields Table */}
-            <Card className={`${dashboardTheme.card}`}>
+            <Card className="border border-gray-200/80 bg-white/90 shadow-lg backdrop-blur-sm rounded-2xl overflow-hidden">
               <CardContent className="p-0">
                 {isLoadingFields ? (
                   <div className="p-6">
-                    <TableSkeleton rows={5} columns={7} />
+                    <TableSkeleton rows={5} columns={8} />
                   </div>
-                ) : filteredFields.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <Sprout className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-sm font-medium text-gray-900 mb-1">No fields found</p>
-                    <p className="text-xs text-gray-500">Try adjusting your search criteria</p>
+                ) : processedFields.length === 0 ? (
+                  <div className="p-16 text-center">
+                    <Sprout className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">No fields found</h3>
+                    <p className="text-sm text-gray-500 max-w-sm mx-auto">We couldn't find any fields matching your current status filter or search parameters.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="bg-gray-50 border-b-2 border-gray-200">
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Field ID</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Farmer</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Crop</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Area (ha)</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Season</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Status</th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Actions</th>
+                        <tr className="bg-gray-50/75 border-b border-gray-200/85">
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Field ID</th>
+                          <th 
+                            onClick={() => {
+                              if (cropMonitoringSortBy === "name") {
+                                setCropMonitoringSortOrder(cropMonitoringSortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setCropMonitoringSortBy("name");
+                                setCropMonitoringSortOrder("asc");
+                              }
+                            }}
+                            className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 hover:text-gray-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              Farm Name
+                              {cropMonitoringSortBy === "name" ? (
+                                <ChevronUp className={`h-4 w-4 text-green-600 transition-transform ${cropMonitoringSortOrder === "desc" ? "rotate-180" : ""}`} />
+                              ) : (
+                                <ChevronsUpDown className="h-4 w-4 text-gray-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Crop</th>
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Area (ha)</th>
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Season</th>
+                          <th 
+                            onClick={() => {
+                              if (cropMonitoringSortBy === "date") {
+                                setCropMonitoringSortOrder(cropMonitoringSortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setCropMonitoringSortBy("date");
+                                setCropMonitoringSortOrder("desc");
+                              }
+                            }}
+                            className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider cursor-pointer hover:bg-gray-100/50 hover:text-gray-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              Registered Date
+                              {cropMonitoringSortBy === "date" ? (
+                                <ChevronUp className={`h-4 w-4 text-green-600 transition-transform ${cropMonitoringSortOrder === "desc" ? "rotate-180" : ""}`} />
+                              ) : (
+                                <ChevronsUpDown className="h-4 w-4 text-gray-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Insurance</th>
+                          <th className="text-left py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Crop Status</th>
+                          <th className="text-right py-4 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredFields.map((farm: any, index: number) => {
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {processedFields.map((farm: any, index: number) => {
                           const farmId = farm.id || farm._id;
                           const farmStatus = farm.status || 'PENDING';
                           const isProcessed = farmStatus === 'PROCESSED' || farmStatus === 'Processed' || farm.boundary;
@@ -6856,15 +6975,31 @@ export default function AssessorDashboard() {
                           const area = farm.area || 0;
                           const season = farm.season || 'A';
                           const displayFieldId = farmId ? `FLD-${String(farmId).slice(-3).padStart(3, '0')}` : `FLD-${String(index + 1).padStart(3, '0')}`;
+                          const farmName = farm.name || "Unnamed Farm";
+                          
+                          // Formatted Registered Date
+                          const registeredDate = farm.createdAt || farm.sowingDate
+                            ? new Date(farm.createdAt || farm.sowingDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })
+                            : 'N/A';
+                          
+                          // Check active policy status
+                          const hasPolicy = policies.some((p: any) => {
+                            const policyFarmId = p.farmId?._id || p.farmId;
+                            return String(policyFarmId) === String(farmId);
+                          });
                           
                           let statusBadge = "Active";
-                          let statusClass = "bg-blue-100 text-blue-800";
+                          let statusClass = "bg-blue-50 text-blue-700 border-blue-100";
                           if (isProcessed) {
                             statusBadge = "Healthy";
-                            statusClass = "bg-green-100 text-green-800";
+                            statusClass = "bg-emerald-50 text-emerald-700 border-emerald-100";
                           } else if (farmStatus === 'PENDING') {
                             statusBadge = "Pending";
-                            statusClass = "bg-yellow-100 text-yellow-800";
+                            statusClass = "bg-amber-50 text-amber-700 border-amber-100";
                           }
 
                           return (
@@ -6878,37 +7013,55 @@ export default function AssessorDashboard() {
                                   navigate(`/assessor/crop-monitoring/field/${farmId}`);
                                 }
                               }}
-                              className="hover:bg-gray-50 transition-colors cursor-pointer"
+                              className="hover:bg-slate-50/70 border-b border-gray-100 transition-all duration-150 cursor-pointer group"
                             >
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{displayFieldId}</div>
+                                <div className="text-xs font-semibold text-slate-500 bg-slate-100/80 px-2 py-1 rounded-md inline-block font-mono">{displayFieldId}</div>
                               </td>
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{farmerName}</div>
+                                <div className="text-sm font-semibold text-slate-800 group-hover:text-green-600 transition-colors">{farmName}</div>
                               </td>
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <Sprout className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                <div className="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
+                                  <Sprout className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                                   <span>{cropType}</span>
                                 </div>
                               </td>
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{area.toFixed(1)} ha</div>
+                                <div className="text-sm text-slate-700 font-medium">{area.toFixed(1)} ha</div>
                               </td>
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{season}</div>
+                                <div className="text-sm text-slate-500 font-semibold">{season}</div>
                               </td>
                               <td className="py-4 px-6 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusClass}`}>
+                                <div className="text-xs text-slate-500 flex items-center gap-1">
+                                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                  <span>{registeredDate}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-6 whitespace-nowrap">
+                                {hasPolicy ? (
+                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50 flex items-center gap-1 w-fit rounded-full px-2.5 py-0.5 shadow-sm font-semibold">
+                                    <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                                    Insured
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100/50 flex items-center gap-1 w-fit rounded-full px-2.5 py-0.5 shadow-sm font-semibold">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                                    Uninsured
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="py-4 px-6 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusClass}`}>
                                   {statusBadge}
                                 </span>
                               </td>
-                              <td className="py-4 px-6 whitespace-nowrap">
+                              <td className="py-4 px-6 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
+                                  onClick={() => {
                                     if (farmId) {
                                       setSelectedFieldForCropMonitoring(farm);
                                       setCropMonitoringViewMode("fieldDetail");
@@ -6916,9 +7069,9 @@ export default function AssessorDashboard() {
                                       navigate(`/assessor/crop-monitoring/field/${farmId}`);
                                     }
                                   }}
-                                  className="border-green-600 text-green-600 hover:bg-green-50"
+                                  className="border-slate-200 hover:border-green-600 text-slate-600 hover:text-green-600 hover:bg-green-50 shadow-sm rounded-lg text-xs transition-all font-semibold"
                                 >
-                                  <Eye className="h-4 w-4 mr-1" />
+                                  <Eye className="h-3.5 w-3.5 mr-1" />
                                   View
                                 </Button>
                               </td>
@@ -7803,6 +7956,7 @@ export default function AssessorDashboard() {
                                               <th className="text-left py-3 px-4 font-medium text-gray-700 text-xs uppercase">Crop Type</th>
                                               <th className="text-left py-3 px-4 font-medium text-gray-700 text-xs uppercase">Area (ha)</th>
                                               <th className="text-left py-3 px-4 font-medium text-gray-700 text-xs uppercase">Status</th>
+                                              <th className="text-left py-3 px-4 font-medium text-gray-700 text-xs uppercase">Registered At</th>
                                               <th className="text-left py-3 px-4 font-medium text-gray-700 text-xs uppercase">Actions</th>
                                             </tr>
                                           </thead>
@@ -7852,6 +8006,11 @@ export default function AssessorDashboard() {
                                                           {unreadFarmAlerts.length} Alert{unreadFarmAlerts.length > 1 ? 's' : ''}
                                                         </span>
                                                       )}
+                                                    </div>
+                                                  </td>
+                                                  <td className="py-3 px-4 whitespace-nowrap">
+                                                    <div className="text-sm text-gray-600">
+                                                      {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
                                                     </div>
                                                   </td>
                                                   <td className="py-3 px-4 whitespace-nowrap">

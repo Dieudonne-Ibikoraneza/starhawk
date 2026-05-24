@@ -933,6 +933,7 @@ export default function InsurerDashboard() {
               <th className="py-3 px-6 text-left">Crop · Hectares</th>
               <th className="py-3 px-6 text-center">NDVI</th>
               <th className="py-3 px-6 text-left">Risk Score</th>
+              <th className="py-3 px-6 text-center">Registered At</th>
               <th className="py-3 px-6 text-center">Status</th>
             </tr>
           </thead>
@@ -1039,6 +1040,13 @@ export default function InsurerDashboard() {
                         {risk}
                       </span>
                     </div>
+                  </td>
+
+                  {/* Registered At */}
+                  <td className="py-5 px-6 text-center">
+                    <p className="text-sm font-bold text-gray-700">
+                      {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                    </p>
                   </td>
 
                   {/* Status */}

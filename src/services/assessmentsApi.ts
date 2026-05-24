@@ -560,6 +560,25 @@ async uploadDronePDF(
     }
   }
 
+  // Process Manual Drone PDF (Assessor Only)
+  // Endpoint: POST /assessments/:id/pdfs/:pdfType/process
+  async processAssessmentPdf(assessmentId: string, pdfType: string) {
+    console.log("⚙ Processing assessment PDF:", { assessmentId, pdfType });
+
+    try {
+      const response = await this.request(`/${assessmentId}/pdfs/${pdfType}/process`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+
+      console.log("✅ PDF processed successfully:", response);
+      return response;
+    } catch (error: any) {
+      console.error("❌ Failed to process PDF:", error);
+      throw error;
+    }
+  }
+
   // Generate Full Report (Assessor Only)
   async generateReport(assessmentId: string) {
     return this.request(`/${assessmentId}/generate-report`, {
