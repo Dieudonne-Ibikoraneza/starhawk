@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { getFarmById } from "@/services/farmsApi";
+import { getUserById } from "@/services/usersApi";
 import { BasicInfoTab } from "./tabs/BasicInfoTab";
 import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
 import DroneTab from "./tabs/DroneTab";
@@ -69,6 +70,16 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
           setFarmer(farmData.farmerId);
         } else if (data.farmerId && typeof data.farmerId === 'object') {
           setFarmer(data.farmerId);
+        } else {
+          const farmerIdStr = farmData.farmerId || data.farmerId;
+          if (typeof farmerIdStr === 'string' && farmerIdStr) {
+            try {
+              const userResp = await getUserById(farmerIdStr);
+              setFarmer(userResp.data || userResp);
+            } catch (err) {
+              console.error("Failed to fetch farmer:", err);
+            }
+          }
         }
       }
     } catch (err: any) {
@@ -271,7 +282,7 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
               fieldId={farm?._id || farm?.id}
               farmerId={farmer?.id || ""}
               fieldName={farm?.name || farm?.cropType || "Unknown"}
-              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim()}
+              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim() || farm?.farmerName || ""}
               cropType={farm?.cropType || ""}
               area={farm?.area || 0}
               season={farm?.season || "B"}
