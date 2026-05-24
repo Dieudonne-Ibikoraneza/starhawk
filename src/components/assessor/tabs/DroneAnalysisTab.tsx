@@ -180,17 +180,8 @@ export const DroneAnalysisTab = ({
   initialNotes: _initialNotes,
   readOnly = false,
 }: DroneAnalysisTabProps) => {
-  const [dataSource, setDataSource] = useState<"drone" | "manual">("drone");
   const [isUploading, setIsUploading] = useState(false);
-  const [manualStress, setManualStress] = useState([17.6]);
-  const [manualMoisture, setManualMoisture] = useState([58]);
-  const [manualWeed, setManualWeed] = useState([7.3]);
-  const [manualPest, setManualPest] = useState([4.4]);
   const isCompleted = status === "SUBMITTED" || status === "APPROVED" || status === "COMPLETED";
-
-  useEffect(() => {
-    if (readOnly) setDataSource("drone");
-  }, [readOnly]);
 
   // Fetch assessment data to get uploaded PDFs
   const { data: assessmentData, refetch: refetchAssessment } =
@@ -351,33 +342,7 @@ export const DroneAnalysisTab = ({
 
   return (
     <div className="space-y-6">
-      {!readOnly && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Source</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs
-              value={dataSource}
-              onValueChange={(v) => setDataSource(v as "drone" | "manual")}
-            >
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
-                <TabsTrigger value="drone" className="gap-2">
-                  <Satellite className="h-4 w-4" />
-                  Drone Upload
-                </TabsTrigger>
-                <TabsTrigger value="manual" className="gap-2">
-                  <UserCheck className="h-4 w-4" />
-                  Manual Check
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
-
-      {dataSource === "drone" && (
-        <>
+      <>
           {!readOnly && (
           <Card>
             <CardHeader>
@@ -685,124 +650,6 @@ export const DroneAnalysisTab = ({
             </CardContent>
           </Card>
         </>
-      )}
-
-      {/* PATH 2: MANUAL CHECK */}
-      {dataSource === "manual" && (
-        <>
-          {/* Manual Assessment Date */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Manual Assessment Date</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Physical Check Date:
-                </span>
-                <Input
-                  type="date"
-                  defaultValue="2025-10-28"
-                  className="max-w-[200px]"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Manual Input Metrics */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Manual Input Metrics</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">Stress Detected</label>
-                  <span className="text-sm text-primary font-semibold">
-                    {manualStress[0]}%
-                  </span>
-                </div>
-                <Slider
-                  value={manualStress}
-                  onValueChange={setManualStress}
-                  max={100}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">Soil Moisture</label>
-                  <span className="text-sm text-primary font-semibold">
-                    {manualMoisture[0]}%
-                  </span>
-                </div>
-                <Slider
-                  value={manualMoisture}
-                  onValueChange={setManualMoisture}
-                  max={100}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">
-                    Weed Area (Estimated)
-                  </label>
-                  <span className="text-sm text-primary font-semibold">
-                    {manualWeed[0]}%
-                  </span>
-                </div>
-                <Slider
-                  value={manualWeed}
-                  onValueChange={setManualWeed}
-                  max={100}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">
-                    Pest Area (Estimated)
-                  </label>
-                  <span className="text-sm text-primary font-semibold">
-                    {manualPest[0]}%
-                  </span>
-                </div>
-                <Slider
-                  value={manualPest}
-                  onValueChange={setManualPest}
-                  max={100}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Reference Map (No Layer Controls) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Reference Map</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-[360px] w-full">
-                <FieldMapWithLayers
-                  fieldId={fieldId}
-                  showLayerControls={false}
-                  boundary={farmData?.boundary || null}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
     </div>
   );
 };

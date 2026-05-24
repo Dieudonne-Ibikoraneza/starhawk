@@ -161,20 +161,8 @@ export const DroneTab = ({
   onRefresh,
   readOnly = false,
 }: DroneTabProps) => {
-  const [dataSource, setDataSource] = useState<"drone" | "manual">("drone");
   const [isUploading, setIsUploading] = useState(false);
-  
-  // Manual metrics state
-  const [manualStress, setManualStress] = useState([15]);
-  const [manualMoisture, setManualMoisture] = useState([65]);
-  const [manualWeed, setManualWeed] = useState([5]);
-  const [manualPest, setManualPest] = useState([2]);
-
   const isCompleted = assessment?.status === "COMPLETED" || assessment?.status === "SUBMITTED";
-
-  useEffect(() => {
-    if (readOnly) setDataSource("drone");
-  }, [readOnly]);
 
   const uploadedPdfs = useMemo(() => assessment?.droneAnalysisPdfs || assessment?.dronePdfs || [], [assessment]);
   
@@ -290,20 +278,6 @@ export const DroneTab = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {!readOnly && (
-        <Tabs value={dataSource} onValueChange={(v) => setDataSource(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 bg-slate-100 rounded-xl p-1">
-            <TabsTrigger value="drone" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Satellite className="h-4 w-4" /> Drone Data
-            </TabsTrigger>
-            <TabsTrigger value="manual" className="rounded-lg gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <UserCheck className="h-4 w-4" /> Manual Check
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      )}
-
-      {dataSource === "drone" && (
         <div className="space-y-6">
           {!readOnly && !isCompleted && (
             <Card className="border-none shadow-sm overflow-hidden">
@@ -553,65 +527,6 @@ export const DroneTab = ({
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {dataSource === "manual" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-emerald-600" />
-                Physical Observation
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              {[
-                { label: "Observed Stress", value: manualStress, setter: setManualStress, color: "bg-emerald-500" },
-                { label: "Soil Moisture", value: manualMoisture, setter: setManualMoisture, color: "bg-blue-500" },
-                { label: "Weed Infestation", value: manualWeed, setter: setManualWeed, color: "bg-amber-500" },
-                { label: "Pest Activity", value: manualPest, setter: setManualPest, color: "bg-rose-500" },
-              ].map((metric, i) => (
-                <div key={i} className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{metric.label}</p>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Estimated Percentage</p>
-                    </div>
-                    <span className="text-xl font-black text-emerald-600">{metric.value[0]}%</span>
-                  </div>
-                  <Slider
-                    value={metric.value}
-                    onValueChange={metric.setter}
-                    max={100}
-                    step={1}
-                    className="py-4"
-                    disabled={isCompleted || readOnly}
-                  />
-                </div>
-              ))}
-              <Button 
-                className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 rounded-xl font-bold shadow-lg shadow-emerald-200"
-                disabled={isCompleted || readOnly}
-              >
-                Save Observations
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm overflow-hidden h-[540px]">
-             <CardHeader>
-               <CardTitle className="text-lg font-bold">Field Reference</CardTitle>
-             </CardHeader>
-             <CardContent className="p-0 h-[460px]">
-                <FieldMapWithLayers 
-                  fieldId={assessment.farmId?._id} 
-                  boundary={assessment.farmId?.boundary} 
-                  showLayerControls={false}
-                />
-             </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 };
