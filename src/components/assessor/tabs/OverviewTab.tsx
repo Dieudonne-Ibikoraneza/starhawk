@@ -301,8 +301,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   value={notes}
                   onChange={(e) => setComprehensiveNotes(e.target.value)}
                   placeholder="Write comprehensive feedback about the field assessment..."
-                  className="min-h-[200px] text-sm text-slate-700 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500"
-                  disabled={
+                  className="min-h-[200px] text-sm text-slate-900 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 disabled:opacity-100 disabled:text-slate-900"
+                  readOnly={
                     isInsurerView ||
                     assessment.status === "SUBMITTED" ||
                     assessment.status === "APPROVED" ||
