@@ -133,7 +133,7 @@ const AgremoLoadingSkeleton = ({ pdfType, progressMessage }: { pdfType: string; 
 function pdfRowLabel(pdfs: any[], idx: number): string {
   const pdf = pdfs[idx];
   if (!pdf) return "";
-  const label = pdf.pdfType === 'plant_health' || pdf.pdfType === 'flowering' ? formatReportTypeLabel(pdf.pdfType) : pdf.pdfType;
+  const label = formatReportTypeLabel(pdf.pdfType);
   const sameType = pdfs.filter((p) => p.pdfType === pdf.pdfType).length;
   if (sameType > 1) {
     const nth = pdfs.slice(0, idx + 1).filter((p) => p.pdfType === pdf.pdfType).length;
