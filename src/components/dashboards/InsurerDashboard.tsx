@@ -872,7 +872,6 @@ export default function InsurerDashboard() {
           assessmentId={selectedRiskAssessmentId}
           onBack={() => setSelectedRiskAssessmentId(null)}
           onActionComplete={() => {
-            setSelectedRiskAssessmentId(null);
             loadSubmittedAssessments();
           }}
         />
@@ -1180,7 +1179,6 @@ export default function InsurerDashboard() {
             <InsurerRiskAssessmentDetail
               onBack={() => navigate("/insurer/assessments")}
               onActionComplete={() => {
-                navigate("/insurer/assessments");
                 loadSubmittedAssessments();
               }}
             />

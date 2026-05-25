@@ -76,7 +76,8 @@ export default function InsurerRiskAssessmentDetail({
     try {
       await assessmentsApiService.approveAssessment(assessmentId);
       toast({ title: "Success", description: "Assessment approved successfully" });
-      onActionComplete();
+      await loadAssessment();
+      if (onActionComplete) onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to approve", variant: "destructive" });
     } finally {
@@ -98,7 +99,8 @@ export default function InsurerRiskAssessmentDetail({
       await assessmentsApiService.rejectAssessment(assessmentId, rejectionReason);
       toast({ title: "Success", description: "Assessment rejected successfully" });
       setShowRejectDialog(false);
-      onActionComplete();
+      await loadAssessment();
+      if (onActionComplete) onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to reject", variant: "destructive" });
     } finally {
@@ -120,7 +122,8 @@ export default function InsurerRiskAssessmentDetail({
       await assessmentsApiService.flagAssessment(assessmentId, correctionReason);
       toast({ title: "Success", description: "Assessment flagged for correction" });
       setShowFlagDialog(false);
-      onActionComplete();
+      await loadAssessment();
+      if (onActionComplete) onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to flag assessment", variant: "destructive" });
     } finally {
@@ -150,7 +153,8 @@ export default function InsurerRiskAssessmentDetail({
       );
       toast({ title: "Success", description: "Policy created successfully" });
       setShowPolicyDialog(false);
-      onActionComplete();
+      await loadAssessment();
+      if (onActionComplete) onActionComplete();
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to create policy", variant: "destructive" });
     } finally {
