@@ -604,6 +604,16 @@ async uploadDronePDF(
       }),
     });
   }
+
+  // Flag Assessment (Insurer Only)
+  async flagAssessment(assessmentId: string, correctionReason: string) {
+    return this.request(`/${assessmentId}/flag`, {
+      method: "POST",
+      body: JSON.stringify({
+        correctionReason,
+      }),
+    });
+  }
 }
 
 // Create and export a singleton instance

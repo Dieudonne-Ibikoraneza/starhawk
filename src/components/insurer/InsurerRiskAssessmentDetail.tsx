@@ -39,6 +39,11 @@ export default function InsurerRiskAssessmentDetail({
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Flag Dialog state
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false);
+  const [correctionReason, setCorrectionReason] = useState("");
+
   // Policy Creation Dialog state
   const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   const [isCreatingPolicy, setIsCreatingPolicy] = useState(false);
@@ -98,6 +103,28 @@ export default function InsurerRiskAssessmentDetail({
       toast({ title: "Error", description: err.message || "Failed to reject", variant: "destructive" });
     } finally {
       setIsRejecting(false);
+    }
+  };
+
+  const handleFlag = async () => {
+    if (!correctionReason.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Correction reason is required",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsFlagging(true);
+    try {
+      await assessmentsApiService.flagAssessment(assessmentId, correctionReason);
+      toast({ title: "Success", description: "Assessment flagged for correction" });
+      setShowFlagDialog(false);
+      onActionComplete();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to flag assessment", variant: "destructive" });
+    } finally {
+      setIsFlagging(false);
     }
   };
 
@@ -172,6 +199,10 @@ export default function InsurerRiskAssessmentDetail({
             <>
               <Button onClick={() => setShowRejectDialog(true)} disabled={isRejecting} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 rounded-xl h-10">
                 Reject
+              </Button>
+              <Button onClick={() => setShowFlagDialog(true)} disabled={isFlagging} variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50 rounded-xl h-10">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Flag
               </Button>
               <Button onClick={handleApprove} disabled={isApproving} className="bg-green-600 hover:bg-green-700 text-white rounded-xl h-10">
                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -261,8 +292,10 @@ export default function InsurerRiskAssessmentDetail({
                 <span className="font-medium text-gray-900">{farm.cropType || farm.crop || "N/A"}</span>
               </div>
               <div className="text-sm">
-                <span className="text-gray-600">Risk Score: </span>
-                <span className="font-medium text-gray-900">{assessment.riskScore !== null && assessment.riskScore !== undefined ? `${assessment.riskScore}%` : "N/A"}</span>
+                <span className="text-gray-600">Farmer: </span>
+                <span className="font-medium text-gray-900">
+                  {`${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || "N/A"}
+                </span>
               </div>
             </div>
 
@@ -303,6 +336,77 @@ export default function InsurerRiskAssessmentDetail({
                   <>
                     <AlertTriangle className="h-4 w-4 mr-2" />
                     Reject Assessment
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flag Dialog overlay */}
+      <Dialog open={showFlagDialog} onOpenChange={(open) => {
+        if (!open) {
+          setCorrectionReason("");
+        }
+        setShowFlagDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">Flag for Correction</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Please specify what corrections or additional details are needed from the assessor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-100">
+              <div className="text-sm">
+                <span className="text-orange-800">Farm: </span>
+                <span className="font-medium text-orange-900">{farm.name || "N/A"}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-orange-800">Crop: </span>
+                <span className="font-medium text-orange-900">{farm.cropType || farm.crop || "N/A"}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="correctionReason" className="text-gray-900 font-semibold">Corrections Needed *</Label>
+              <Textarea
+                id="correctionReason"
+                value={correctionReason}
+                onChange={(e) => setCorrectionReason(e.target.value)}
+                placeholder="E.g., Please provide more detailed drone imagery for the northern quadrant..."
+                className="mt-2 min-h-[100px] border-gray-300 focus-visible:ring-orange-500"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowFlagDialog(false);
+                  setCorrectionReason("");
+                }}
+                className="border-gray-300 text-gray-900 hover:bg-gray-100 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleFlag}
+                disabled={isFlagging || !correctionReason.trim()}
+                className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl"
+              >
+                {isFlagging ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Flagging...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Flag for Correction
                   </>
                 )}
               </Button>
