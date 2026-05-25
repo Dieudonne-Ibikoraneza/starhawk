@@ -202,7 +202,7 @@ export default function InsurerRiskAssessmentDetail({
               </Button>
               <Button onClick={() => setShowFlagDialog(true)} disabled={isFlagging} variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50 rounded-xl h-10">
                 <AlertTriangle className="h-4 w-4 mr-2" />
-                Flag
+                Flag for Correction
               </Button>
               <Button onClick={handleApprove} disabled={isApproving} className="bg-green-600 hover:bg-green-700 text-white rounded-xl h-10">
                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -210,8 +210,16 @@ export default function InsurerRiskAssessmentDetail({
               </Button>
             </>
           ) : (
-            <Badge className="bg-gray-100 text-gray-700 h-8 px-4 font-semibold border-none">
-              {assessment.status}
+            <Badge className={`h-8 px-4 font-semibold border-none ${
+              assessment.status === 'NEEDS_CORRECTION' 
+                ? 'bg-amber-100 text-amber-800'
+                : assessment.status === 'APPROVED'
+                ? 'bg-emerald-100 text-emerald-800'
+                : assessment.status === 'REJECTED'
+                ? 'bg-rose-100 text-rose-800'
+                : 'bg-gray-100 text-gray-700'
+            }`}>
+              {assessment.status?.replace(/_/g, ' ').replace(/\w\S*/g, (txt: string) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())}
             </Badge>
           )}
         </div>
