@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import DashboardLayout from "../layout/DashboardLayout";
 import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
 import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
@@ -28,6 +28,7 @@ import {
   FileText, Bell,
   AlertTriangle,
   CheckCircle,
+  MapPin,
   Clock,
   Phone,
   Mail,
@@ -49,7 +50,6 @@ import {
   Wind,
   X,
   Sun,
-  MapPin,
   Leaf,
   Building2,
   List
@@ -149,6 +149,9 @@ export default function FarmerDashboard() {
   const [selectedInsurerId, setSelectedInsurerId] = useState<string | null>(null);
   const [selectedInsurerName, setSelectedInsurerName] = useState<string | null>(null);
   const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
+
+  // State for Pending Dialog
+  const [pendingDialog, setPendingDialog] = useState({ open: false, farmName: "" });
 
   // State for Farm Analytics
   const [farmAnalytics, setFarmAnalytics] = useState<{
@@ -1465,7 +1468,13 @@ export default function FarmerDashboard() {
                     return (
                       <tr
                         key={farmId || index}
-                        onClick={() => loadFarmDetails(farmId)}
+                        onClick={() => {
+                          if (farm.status === 'PENDING') {
+                            setPendingDialog({ open: true, farmName: farm.name || "Unnamed Farm" });
+                          } else {
+                            loadFarmDetails(farmId);
+                          }
+                        }}
                         className="hover:bg-gray-50/50 transition-all duration-150 cursor-pointer border-b border-gray-100"
                       >
                         <td className="py-4 px-6 whitespace-nowrap">
@@ -2635,6 +2644,46 @@ export default function FarmerDashboard() {
           {renderPage()}
         </div>
       </div>
+
+      {/* Pending Farm Boundary Warning Dialog */}
+      <Dialog 
+        open={pendingDialog.open} 
+        onOpenChange={(open) => setPendingDialog(prev => ({ ...prev, open }))}
+      >
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white border border-gray-100 shadow-2xl">
+          <DialogHeader className="flex flex-col items-center text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 animate-pulse">
+              <MapPin className="h-8 w-8" />
+            </div>
+            <DialogTitle className="text-xl font-black text-gray-900">
+              Boundary Mapping Pending
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 leading-relaxed max-w-sm">
+              Your farm <strong className="text-gray-900">"{pendingDialog.farmName}"</strong> has been registered successfully but is awaiting geographical boundary mapping.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-5 p-4 rounded-xl bg-amber-50/50 border border-amber-100/50 text-xs text-amber-800 space-y-2 leading-relaxed">
+            <p className="font-bold flex items-center gap-1.5 text-amber-900">
+              <span>📌</span> Next Steps in GIS Registration:
+            </p>
+            <ul className="list-disc pl-4 space-y-1 text-gray-600">
+              <li>An assessor is assigned to physically survey your field.</li>
+              <li>Once surveyed, the boundary KML/Shapefile will be uploaded.</li>
+              <li>Full satellite monitoring (NDVI, soil moisture, local weather) and crop details will then activate automatically.</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="flex justify-center sm:justify-center pt-2">
+            <Button 
+              onClick={() => setPendingDialog(prev => ({ ...prev, open: false }))}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 py-2.5 rounded-xl shadow-lg shadow-amber-100 transition-all active:scale-[0.98]"
+            >
+              Acknowledge & Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
