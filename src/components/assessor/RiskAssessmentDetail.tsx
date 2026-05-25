@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
@@ -258,6 +259,18 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
           </Card>
         </div>
       </div>
+
+      {assessment.status === "NEEDS_CORRECTION" && assessment.correctionReason && (
+        <div className="px-6 mb-6">
+          <Alert className="bg-orange-50 border-orange-200">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertTitle className="text-orange-800 font-bold">Correction Needed</AlertTitle>
+            <AlertDescription className="text-orange-700 mt-1 whitespace-pre-wrap">
+              {assessment.correctionReason}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="px-6">
