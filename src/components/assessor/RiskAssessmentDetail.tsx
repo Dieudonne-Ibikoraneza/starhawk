@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { getFarmById } from "@/services/farmsApi";
-import { getUserById } from "@/services/usersApi";
+import { getUserById } from "@/services/usersAPI";
 import { BasicInfoTab } from "./tabs/BasicInfoTab";
 import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
 import DroneTab from "./tabs/DroneTab";
