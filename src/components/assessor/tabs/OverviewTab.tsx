@@ -269,11 +269,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Area</p>
-                <p className="text-sm font-semibold text-slate-900">{farm.area ? `${farm.area} ha` : "N/A"}</p>
+                <p className="text-sm font-semibold text-slate-900">{farm.area ? `${Number(farm.area).toFixed(2)} ha` : "N/A"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Farmer</p>
-                <p className="text-sm font-semibold text-slate-900">{farmer.firstName} {farmer.lastName}</p>
+                <p className="text-sm font-semibold text-slate-900">{`${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || farm.farmerName || farmer.name || "N/A"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Status</p>
