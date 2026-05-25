@@ -1173,7 +1173,6 @@ export default function InsurerDashboard() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={renderDashboard()} />
         <Route path="farmers" element={<InsuredFarmersDirectory />} />
-        <Route path="requests" element={renderInsuranceRequests()} />
         <Route path="assessments" element={renderSubmittedAssessments()} />
         <Route
           path="assessments/:assessmentId"
@@ -1257,7 +1256,6 @@ export default function InsurerDashboard() {
   const navigationItems = [
     { id: "dashboard", label: "Overview", icon: BarChart3 },
     { id: "farmers", label: "Farmers", icon: Users },
-    { id: "requests", label: "Requests", icon: FileBadge },
     { id: "assessments", label: "Assessments", icon: ClipboardCheck },
     { id: "policies", label: "Policies", icon: Shield },
     { id: "monitoring", label: "Monitoring", icon: Leaf },
