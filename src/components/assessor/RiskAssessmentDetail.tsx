@@ -260,17 +260,27 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
         </div>
       </div>
 
-      {assessment.status === "NEEDS_CORRECTION" && assessment.correctionReason && (
-        <div className="px-6 mb-6">
-          <Alert className="bg-orange-50 border-orange-200">
-            <AlertTriangle className="h-4 w-4 text-orange-600" />
-            <AlertTitle className="text-orange-800 font-bold">Correction Needed</AlertTitle>
-            <AlertDescription className="text-orange-700 mt-1 whitespace-pre-wrap">
-              {assessment.correctionReason}
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+      {(() => {
+        const activeCorrectionReason = assessment.correctionReason || 
+          (assessment.reportText?.includes('Correction Requested: ') 
+            ? assessment.reportText.split('Correction Requested: ').pop() 
+            : null);
+
+        if (assessment.status === "NEEDS_CORRECTION" && activeCorrectionReason) {
+          return (
+            <div className="px-6 mb-6">
+              <Alert className="bg-orange-50 border-orange-200">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertTitle className="text-orange-800 font-bold">Correction Needed</AlertTitle>
+                <AlertDescription className="text-orange-700 mt-1 whitespace-pre-wrap">
+                  {activeCorrectionReason}
+                </AlertDescription>
+              </Alert>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Tabs */}
       <div className="px-6">
