@@ -63,10 +63,9 @@ export const cropMonitoringService = {
     return apiClient.get<any>(`/crop-monitoring/${id}`);
   },
 
-  /** List all monitoring tasks for the current assessor */
-  listTasks: async (): Promise<CropMonitoringRecord[]> => {
-    const parents = await apiClient.get<any[]>("/crop-monitoring");
-    return resolveAndFlattenCycles(parents);
+  /** List all monitoring tasks (returns fields with active policies) */
+  listTasks: async (): Promise<any[]> => {
+    return apiClient.get<any[]>("/crop-monitoring");
   },
 
   /** All cycles across the platform (Admin only) */
@@ -139,6 +138,14 @@ export const cropMonitoringService = {
     return apiClient.upload<any>(
       `/crop-monitoring/${monitoringId}/upload-drone-pdf?pdfType=${pdfType}`,
       formData,
+    );
+  },
+
+  /** Process an uploaded drone PDF to extract data */
+  processDronePdf: async (monitoringId: string, pdfType: string): Promise<any> => {
+    return apiClient.post<any>(
+      `/crop-monitoring/${monitoringId}/process-drone-pdf`,
+      { pdfType }
     );
   },
 
