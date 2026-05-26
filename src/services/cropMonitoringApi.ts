@@ -134,32 +134,11 @@ class CropMonitoringApiService {
     return data?.data || data;
   }
 
-  // Get Monitoring History
+  // Get Monitoring History (now returns fields with active policies)
   // GET /crop-monitoring
   async getMonitoringHistory(): Promise<any> {
     const response = await this.request<any>('');
-    const parentsList = response?.data || response || [];
-    if (Array.isArray(parentsList)) {
-      const allCycles: any[] = [];
-      const parentsWithCycles = await Promise.all(
-        parentsList.map(async (p: any) => {
-          try {
-            return await this.getMonitoringById(p._id);
-          } catch (err) {
-            return p;
-          }
-        })
-      );
-      parentsWithCycles.forEach((parent: any) => {
-        if (parent && parent.monitoringCycles && Array.isArray(parent.monitoringCycles)) {
-          allCycles.push(...parent.monitoringCycles);
-        } else if (parent && parent.monitoringNumber) {
-          allCycles.push(parent);
-        }
-      });
-      return allCycles;
-    }
-    return [];
+    return response?.data || response || [];
   }
 
   // Get Monitoring by ID
