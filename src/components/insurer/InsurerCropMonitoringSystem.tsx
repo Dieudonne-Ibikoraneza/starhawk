@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, updateMonitoring, generateMonitoringReport } from "@/services/cropMonitoringApi";
+import { cropMonitoringService } from "@/lib/api/services/cropMonitoring";
+import { policiesService } from "@/lib/api/services/policies";
 import policiesApiService from "@/services/policiesApi";
 import { getUserId } from "@/services/authAPI";
 import { useToast } from "@/hooks/use-toast";
@@ -145,7 +147,7 @@ export default function InsurerCropMonitoringSystem() {
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("basic-info");
-  const [viewMode, setViewMode] = useState<any>("policies");
+  const [viewMode, setViewMode] = useState<any>("monitoring");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -186,18 +188,24 @@ export default function InsurerCropMonitoringSystem() {
   const loadPolicies = async () => {
     try {
       setLoading(true);
-      const response: any = await policiesApiService.getPolicies(1, 100);
-      const policiesData = response.data || response || [];
-      const policiesArray = Array.isArray(policiesData) ? policiesData : (policiesData.items || policiesData.results || []);
-      
-      setPolicies(policiesArray);
+      // Use the same modern API as the assessor
+      const data = await policiesService.listMyPolicies();
+      setPolicies(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('Failed to load policies:', err);
-      toast({
-        title: 'Error',
-        description: err.message || 'Failed to load policies',
-        variant: 'destructive'
-      });
+      // Fallback to legacy service
+      try {
+        const response: any = await policiesApiService.getPolicies(1, 100);
+        const policiesData = response.data || response || [];
+        const policiesArray = Array.isArray(policiesData) ? policiesData : (policiesData.items || policiesData.results || []);
+        setPolicies(policiesArray);
+      } catch (fallbackErr: any) {
+        console.error('Failed to load policies:', fallbackErr);
+        toast({
+          title: 'Error',
+          description: fallbackErr.message || 'Failed to load policies',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -205,11 +213,28 @@ export default function InsurerCropMonitoringSystem() {
 
   const loadMonitoringHistory = async () => {
     try {
-      const history = await getMonitoringHistory();
-      setMonitoringHistory(Array.isArray(history) ? history : []);
+      // Use the same modern cropMonitoringService as the assessor
+      const tasks = await cropMonitoringService.listTasks();
+      const tasksArray = Array.isArray(tasks) ? tasks : [];
+      // listTasks returns parent records; flatten cycles from each
+      const allCycles: any[] = [];
+      tasksArray.forEach((task: any) => {
+        if (task.monitoringCycles && Array.isArray(task.monitoringCycles)) {
+          allCycles.push(...task.monitoringCycles.map((c: any) => ({ ...c, policyId: task.policyId || c.policyId })));
+        } else if (task.monitoringNumber) {
+          allCycles.push(task);
+        }
+      });
+      setMonitoringHistory(allCycles.length > 0 ? allCycles : tasksArray);
     } catch (err: any) {
-      console.error('Failed to load monitoring history:', err);
-      setMonitoringHistory([]);
+      // Fallback to legacy
+      try {
+        const history = await getMonitoringHistory();
+        setMonitoringHistory(Array.isArray(history) ? history : []);
+      } catch {
+        console.error('Failed to load monitoring history:', err);
+        setMonitoringHistory([]);
+      }
     }
   };
 
@@ -321,16 +346,18 @@ export default function InsurerCropMonitoringSystem() {
   };
 
   // Filter monitoring history
-  const filteredMonitoring = monitoringHistory.filter(monitoring => {
+  const filteredMonitoring = monitoringHistory.filter((monitoring: any) => {
     const policyStr = typeof monitoring.policyId === "object"
       ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
       : (monitoring.policyId || "");
 
     const matchesSearch = searchQuery === "" || 
-      monitoring._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (monitoring.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       policyStr.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || monitoring.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || 
+        (statusFilter === 'IN_PROGRESS' && monitoring.hasActiveCycle) ||
+        (statusFilter === 'COMPLETED' && !monitoring.hasActiveCycle && monitoring.completedCycles > 0);
     return matchesSearch && matchesStatus;
   });
 
@@ -1039,25 +1066,11 @@ export default function InsurerCropMonitoringSystem() {
   };
 
   const renderFieldDetail = () => {
-    // Resolve active policy from selectedMonitoring
-    const activePolicy = policies.find(p => {
-      const pId = p._id || p.id;
-      const mPolicyId = typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?._id : selectedMonitoring?.policyId;
-      return pId === mPolicyId;
-    }) || {
-      _id: typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?._id : selectedMonitoring?.policyId,
-      policyNumber: typeof selectedMonitoring?.policyId === 'object' ? selectedMonitoring?.policyId?.policyNumber : selectedMonitoring?.policyId,
-      farmId: selectedMonitoring?.farmId,
-      farmerId: selectedMonitoring?.policyId?.farmerId || selectedMonitoring?.farmerId
-    };
-
-    const activeMonitoring = selectedMonitoring;
-    const field = selectedField || activePolicy?.farmId;
-    if (!field) {
+    if (!selectedMonitoring) {
       return (
         <div className="p-6 text-center text-gray-900/60">
           <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-900/40" />
-          <p>No field data available for this monitoring cycle.</p>
+          <p>No monitoring cycle selected.</p>
           <Button onClick={handleBackToList} className="mt-4 bg-teal-600 hover:bg-teal-700 text-white">
             Back to History
           </Button>
@@ -1065,163 +1078,12 @@ export default function InsurerCropMonitoringSystem() {
       );
     }
 
-    const fieldDetails = getFieldDetails(field);
-
-    const locationCoords = field?.location?.coordinates;
-    const center =
-      locationCoords && locationCoords.length >= 2
-        ? ([locationCoords[1], locationCoords[0]] as [number, number])
-        : undefined;
-
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-2 text-sm">
-          <button 
-            onClick={handleBackToList}
-            className="text-teal-400 hover:text-teal-300"
-          >
-            Crop Monitoring
-          </button>
-          <span className="text-gray-900/60">/</span>
-          <button 
-            onClick={handleBackToFields}
-            className="text-teal-400 hover:text-teal-300"
-          >
-            {fieldDetails.farmer}
-          </button>
-        </div>
-        
-        <div>
-          <h1 className="text-sm font-normal text-gray-900">
-            Field Detail View: {fieldDetails.fieldId}
-          </h1>
-          <p className="text-gray-900/70 mt-2">
-            {fieldDetails.farmer} - {fieldDetails.cropType}
-          </p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className={`${dashboardTheme.card} border border-gray-200`}>
-            <TabsTrigger 
-              value="basic-info" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 text-gray-900/70"
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Basic Info
-            </TabsTrigger>
-            <TabsTrigger 
-              value="weather" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 text-gray-900/70"
-            >
-              <CloudRain className="h-4 w-4 mr-2" />
-              Weather Analysis
-            </TabsTrigger>
-            <TabsTrigger 
-              value="crop" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 text-gray-900/70"
-            >
-              <Leaf className="h-4 w-4 mr-2" />
-              Crop Analysis
-            </TabsTrigger>
-            <TabsTrigger 
-              value="overview" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 text-gray-900/70"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="basic-info" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className={`${dashboardTheme.card}`}>
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Field Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Field ID</span>
-                    <span className="text-gray-900 font-medium">{fieldDetails.fieldId}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Field Name</span>
-                    <span className="text-gray-900 font-medium">{fieldDetails.fieldName}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Farmer</span>
-                    <span className="text-gray-900 font-medium">{fieldDetails.farmer}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Crop Type</span>
-                    <div className="flex items-center gap-2">
-                      <Leaf className="h-4 w-4 text-green-500" />
-                      <span className="text-gray-900 font-medium">{fieldDetails.cropType}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Area</span>
-                    <span className="text-gray-900 font-medium">{fieldDetails.area} hectares</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Season</span>
-                    <span className="text-gray-900 font-medium">Season {fieldDetails.season}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                    <span className="text-gray-900/70">Sowing Date</span>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-teal-500" />
-                      <span className="text-gray-900 font-medium">{fieldDetails.sowingDate}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pb-3">
-                    <span className="text-gray-900/70">Location</span>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-teal-500" />
-                      <span className="text-gray-900 font-medium">{fieldDetails.location}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={`${dashboardTheme.card}`}>
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Field Map</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[500px] p-0 overflow-hidden rounded-lg border border-gray-200">
-                  <FieldMapWithLayers
-                    fieldId={field?._id || field?.id}
-                    showLayerControls={true}
-                    boundary={field?.boundary}
-                    center={center}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="weather" className="mt-6">
-            <WeatherAnalysisTab location={fieldDetails.location} />
-          </TabsContent>
-
-          <TabsContent value="crop" className="mt-6">
-            <CropAnalysisTab fieldDetails={fieldDetails} />
-          </TabsContent>
-
-          <TabsContent value="overview" className="mt-6">
-            <MonitoringOverviewTab
-              monitoringId={activePolicy._id || activePolicy.id}
-              policyId={activePolicy.policyNumber}
-              fieldName={fieldDetails.fieldName}
-              farmerName={`${fieldDetails.farmer}`}
-              cropType={fieldDetails.cropType}
-              area={fieldDetails.area}
-              location={fieldDetails.location}
-              cycles={monitoringHistory}
-              activeCycle={activeMonitoring}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
+      <InsurerCropMonitoringDetail 
+        monitoringId={selectedMonitoring._id || selectedMonitoring.id} 
+        onBack={handleBackToList} 
+        onActionComplete={() => {}} 
+      />
     );
   };
 
@@ -1420,10 +1282,18 @@ export default function InsurerCropMonitoringSystem() {
                             {/* Coverage & Premium */}
                             <td className="py-4 px-6">
                               <div className="text-sm font-semibold text-gray-900">
-                                ${policy.coverageAmount?.toLocaleString() || 'N/A'}
+                                {policy.coverageAmount
+                                  ? `$${policy.coverageAmount.toLocaleString()}`
+                                  : policy.coverageLevel
+                                  ? policy.coverageLevel
+                                  : 'N/A'}
                               </div>
                               <div className="text-xs text-gray-400 mt-0.5">
-                                Premium: ${policy.premium?.toLocaleString() || 'N/A'}
+                                Premium: {policy.premium
+                                  ? `$${policy.premium.toLocaleString()}`
+                                  : (policy as any).premiumAmount
+                                  ? `$${(policy as any).premiumAmount.toLocaleString()}`
+                                  : 'N/A'}
                               </div>
                             </td>
 
@@ -1465,30 +1335,29 @@ export default function InsurerCropMonitoringSystem() {
 
                             {/* Actions */}
                             <td className="py-4 px-6 text-right">
-                              <Button
-                                onClick={() => {
-                                  setSelectedPolicyId(policy._id);
-                                  setStartMonitoringDialogOpen(true);
-                                }}
-                                disabled={!canStart}
-                                className={`rounded-xl text-xs font-bold px-4 h-8 shadow-none ${
-                                  canStart
-                                    ? 'bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-800'
-                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                }`}
-                              >
-                                {canStart ? (
-                                  <>
-                                    <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                    Start Monitoring
-                                  </>
+                              <div className="flex items-center justify-end gap-2">
+                                {monitoringCount > 0 ? (
+                                  <Button
+                                    onClick={async () => {
+                                      try {
+                                        const cycles = await cropMonitoringService.getByPolicy(policy._id);
+                                        const activeCycle = (cycles as any[]).find((c: any) => c.status === 'IN_PROGRESS') || (cycles as any[])[0];
+                                        setSelectedMonitoring(activeCycle);
+                                        setSelectedField(typeof policy.farmId === 'object' ? policy.farmId : { _id: policy.farmId });
+                                        setViewMode('fieldDetail');
+                                      } catch (e) {
+                                        toast({ title: 'Error', description: 'Could not load monitoring detail.', variant: 'destructive' });
+                                      }
+                                    }}
+                                    className="rounded-xl text-xs font-bold px-4 h-8 shadow-none bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                  >
+                                    <FileText className="h-3.5 w-3.5 mr-1.5" />
+                                    View Monitoring
+                                  </Button>
                                 ) : (
-                                  <>
-                                    <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                                    Max Completed
-                                  </>
+                                  <span className="text-xs text-gray-400 italic">No cycles yet</span>
                                 )}
-                              </Button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1501,43 +1370,7 @@ export default function InsurerCropMonitoringSystem() {
           </Card>
         )}
 
-        {/* Start Monitoring Dialog */}
-        <Dialog open={startMonitoringDialogOpen} onOpenChange={setStartMonitoringDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="text-gray-900">Start Crop Monitoring</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <p className="text-gray-900/70">
-                Are you sure you want to start a new monitoring cycle for this policy?
-              </p>
-              {selectedPolicyId && (
-                <div className="text-sm text-gray-900/60">
-                  Current cycles: {getMonitoringCount(selectedPolicyId)}/{getRequiredMonitoringCycles(policies.find(p => p._id === selectedPolicyId)?.cropType)}
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setStartMonitoringDialogOpen(false);
-                  setSelectedPolicyId(null);
-                }}
-                className="border-gray-200 text-gray-900 hover:bg-gray-50"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleStartMonitoring}
-                disabled={startingMonitoring}
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                {startingMonitoring ? 'Starting...' : 'Start Monitoring'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
       </div>
     );
   };
@@ -1618,35 +1451,17 @@ export default function InsurerCropMonitoringSystem() {
   };
 
   const renderMonitoringHistory = () => {
-    const totalScans = monitoringHistory.length;
-    const completedScans = monitoringHistory.filter(m => m.status === 'COMPLETED').length;
-    const inProgressScans = monitoringHistory.filter(m => m.status === 'IN_PROGRESS').length;
-    const reportsFiled = monitoringHistory.filter(m => m.reportGenerated).length;
+    const totalFarms = monitoringHistory.length;
+    const totalCycles = monitoringHistory.reduce((acc, m) => acc + (m.cyclesCount || 0), 0);
+    const inProgressScans = monitoringHistory.filter(m => m.hasActiveCycle !== undefined ? m.hasActiveCycle : m.hasMonitoring).length;
+    const completedScans = totalCycles - inProgressScans; // Approximation
+    const reportsFiled = 0; // Not available in summary
 
-    // Group individual cycle scans by policyId/assessment
-    const groupedAssessmentsMap: { [key: string]: any } = {};
-    monitoringHistory.forEach((item: any) => {
-      const pId = item.policyId?._id || item.policyId || "unknown";
-      if (!groupedAssessmentsMap[pId]) {
-        groupedAssessmentsMap[pId] = {
-          policyId: pId,
-          cycles: [],
-          latestCycle: null,
-        };
-      }
-      groupedAssessmentsMap[pId].cycles.push(item);
-    });
-
-    const groupedAssessments = Object.values(groupedAssessmentsMap).map((group: any) => {
-      group.cycles.sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
-      group.latestCycle = group.cycles[0];
-      return group;
-    });
-
-    const filteredAssessments = groupedAssessments.filter(group => {
-      if (!group.latestCycle) return false;
-      const { farmerName, cropType, policyNum } = getFarmerAndCrop(group.latestCycle);
-      const assessmentId = `ASM-${String(group.policyId).slice(-6).toUpperCase()}`;
+    const filteredAssessments = monitoringHistory.filter(monitoring => {
+      const assessmentId = `ASM-${String(monitoring.policyId).slice(-6).toUpperCase()}`;
+      const policyNum = `POL-${String(monitoring.policyId).slice(-6).toUpperCase()}`;
+      const farmerName = monitoring.name || "Unknown";
+      const cropType = monitoring.cropType || "";
 
       const matchesSearch = searchQuery === "" || 
         assessmentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1654,7 +1469,9 @@ export default function InsurerCropMonitoringSystem() {
         farmerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cropType.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = statusFilter === "all" || group.latestCycle.status === statusFilter;
+      const status = monitoring.hasMonitoring ? 'IN_PROGRESS' : 'COMPLETED';
+      const matchesStatus = statusFilter === "all" || status === statusFilter;
+      
       return matchesSearch && matchesStatus;
     });
 
@@ -1671,7 +1488,7 @@ export default function InsurerCropMonitoringSystem() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Assessor Scans</p>
-                <h3 className="mt-2 text-3xl font-bold text-gray-900">{totalScans}</h3>
+                <h3 className="mt-2 text-3xl font-bold text-gray-900">{totalFarms}</h3>
               </div>
               <div className="rounded-2xl bg-teal-50 p-3 text-teal-600">
                 <Activity className="h-6 w-6" />
@@ -1694,7 +1511,7 @@ export default function InsurerCropMonitoringSystem() {
               </div>
             </div>
             <div className="mt-3 flex items-center gap-1.5 text-xs text-green-600">
-              <span className="font-semibold">{totalScans > 0 ? Math.round((completedScans / totalScans) * 100) : 0}%</span>
+              <span className="font-semibold">{totalCycles > 0 ? Math.round((completedScans / totalCycles) * 100) : 0}%</span>
               <span className="text-gray-500">scans completed</span>
             </div>
           </Card>
@@ -1726,7 +1543,7 @@ export default function InsurerCropMonitoringSystem() {
               </div>
             </div>
             <div className="mt-3 flex items-center gap-1.5 text-xs text-blue-600">
-              <span className="font-semibold">{totalScans > 0 ? Math.round((reportsFiled / totalScans) * 100) : 0}%</span>
+              <span className="font-semibold">{totalCycles > 0 ? Math.round((reportsFiled / totalCycles) * 100) : 0}%</span>
               <span className="text-gray-500">formal reports generated</span>
             </div>
           </Card>
@@ -1775,7 +1592,6 @@ export default function InsurerCropMonitoringSystem() {
                     <tr className="border-b border-gray-150 bg-[#F8FAFC]/50 text-left">
                       <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">ASSESSMENT ID</th>
                       <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">FARMER / CROP</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">LATEST SCAN</th>
                       <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider">STATUS</th>
                       <th className="py-3.5 px-6 text-xs font-bold text-slate-400 tracking-wider text-right">ACTIONS</th>
                     </tr>
@@ -1783,7 +1599,7 @@ export default function InsurerCropMonitoringSystem() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredAssessments.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center">
+                        <td colSpan={4} className="py-12 text-center">
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <Activity className="h-8 w-8 text-gray-300 animate-pulse" />
                             <p className="text-sm font-medium text-gray-900">No monitoring assessments found</p>
@@ -1792,18 +1608,22 @@ export default function InsurerCropMonitoringSystem() {
                         </td>
                       </tr>
                     ) : (
-                      filteredAssessments.map((group) => {
-                        const monitoring = group.latestCycle;
-                        const assessmentDisplayId = `ASM-${String(group.policyId).slice(-6).toUpperCase()}`;
-                        const { farmerName, cropType, policyNum: policyDisplayId } = getFarmerAndCrop(monitoring);
+                      filteredAssessments.map((monitoring) => {
+                        const assessmentDisplayId = `ASM-${String(monitoring.policyId).slice(-6).toUpperCase()}`;
+                        const policyDisplayId = `POL-${String(monitoring.policyId).slice(-6).toUpperCase()}`;
+                        const farmerName = monitoring.name || "Unknown";
+                        const cropType = monitoring.cropType || "Unknown";
+                        const cyclesCount = monitoring.completedCycles !== undefined ? monitoring.completedCycles : (monitoring.hasMonitoring ? Math.max(0, (monitoring.cyclesCount || 0) - 1) : (monitoring.cyclesCount || 0));
+                          const status = monitoring.hasActiveCycle ? 'IN_PROGRESS' : 'COMPLETED';
 
                         return (
                           <tr 
-                            key={group.policyId} 
+                            key={monitoring.policyId} 
                             onClick={() => {
-                              const monitoringId = group.latestCycle?._id || group.latestCycle?.id;
-                              if (monitoringId) {
-                                navigate(`/insurer/monitoring/${monitoringId}`);
+                              if (monitoring.cropMonitoringId) {
+                                navigate(`/insurer/monitoring/${monitoring.cropMonitoringId}`);
+                              } else {
+                                toast({ title: 'Notice', description: 'No monitoring details found for this policy.', variant: 'default' });
                               }
                             }}
                             className="border-b border-gray-50 hover:bg-slate-50/40 cursor-pointer group transition-all duration-200"
@@ -1813,7 +1633,7 @@ export default function InsurerCropMonitoringSystem() {
                               <div className="flex items-center gap-2">
                                 <div className="font-semibold text-slate-700 text-sm">{assessmentDisplayId}</div>
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-100">
-                                  {group.cycles.length} {group.cycles.length === 1 ? 'Cycle' : 'Cycles'}
+                                  {cyclesCount} {cyclesCount === 1 ? 'Cycle' : 'Cycles'}
                                 </span>
                               </div>
                               <div className="text-xs text-slate-400 mt-0.5 font-mono">{policyDisplayId}</div>
@@ -1828,25 +1648,19 @@ export default function InsurerCropMonitoringSystem() {
                               </div>
                             </td>
 
-                            {/* LATEST SCAN DATE */}
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
-                                <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>{new Date(monitoring.monitoringDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                              </div>
-                            </td>
+
 
                             {/* STATUS */}
                             <td className="py-4 px-6">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                                monitoring.status === 'COMPLETED'
+                                status === 'COMPLETED'
                                   ? 'bg-[#EBF7EE] text-[#2E7D32]'
                                   : 'bg-[#FFF8E6] text-[#B27B00]'
                               }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${
-                                  monitoring.status === 'COMPLETED' ? 'bg-[#2E7D32]' : 'bg-[#B27B00]'
+                                  status === 'COMPLETED' ? 'bg-[#2E7D32]' : 'bg-[#B27B00]'
                                 }`} />
-                                {monitoring.status === 'COMPLETED' ? 'Completed' : 'In Progress'}
+                                {status === 'COMPLETED' ? 'Completed' : 'In Progress'}
                               </span>
                             </td>
 
@@ -1996,6 +1810,8 @@ export default function InsurerCropMonitoringSystem() {
     return renderMonitoringHistory();
   }
 
-  return renderPoliciesView();
+  return renderMonitoringHistory();
 }
+
+
 

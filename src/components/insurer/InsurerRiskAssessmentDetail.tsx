@@ -12,11 +12,24 @@ import { ArrowLeft, CheckCircle, AlertTriangle, MapPin, Download, Shield, Clock 
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import assessmentsApiService from "@/services/assessmentsApi";
-import { createPolicyFromAssessment } from "@/services/policiesApi";
+import { createPolicyFromAssessment, getPolicies } from "@/services/policiesApi";
+import { Link } from "react-router-dom";
 import OverviewTab from "../assessor/tabs/OverviewTab";
 import DroneTab from "../assessor/tabs/DroneTab";
 import { WeatherAnalysisTab } from "../assessor/tabs/WeatherAnalysisTab";
 import { BasicInfoTab } from "../assessor/tabs/BasicInfoTab";
+
+const CROP_HARVEST_DURATIONS_MONTHS: Record<string, number> = {
+  maize: 6,
+  rice: 5,
+  wheat: 6,
+  beans: 4,
+  soybeans: 5,
+  potatoes: 4,
+  coffee: 12,
+  tea: 12,
+};
+
 
 export default function InsurerRiskAssessmentDetail({ 
   assessmentId: propAssessmentId, 
@@ -50,10 +63,52 @@ export default function InsurerRiskAssessmentDetail({
   const [coverageLevel, setCoverageLevel] = useState<"BASIC" | "STANDARD" | "PREMIUM">("STANDARD");
   const [policyStartDate, setPolicyStartDate] = useState("");
   const [policyEndDate, setPolicyEndDate] = useState("");
+  const [associatedPolicy, setAssociatedPolicy] = useState<any>(null);
 
   useEffect(() => {
     loadAssessment();
   }, [assessmentId]);
+
+  useEffect(() => {
+    if (assessment && assessment.status === 'POLICY_ISSUED') {
+      getPolicies().then((res: any) => {
+        const policiesArray = Array.isArray(res?.data?.items) ? res.data.items : Array.isArray(res) ? res : res?.data || res?.items || res?.results || [];
+        const policy = policiesArray.find((p: any) => 
+          p.assessmentId === assessmentId || 
+          (p.assessmentId && (p.assessmentId._id === assessmentId || p.assessmentId.id === assessmentId))
+        );
+        if (policy) {
+          setAssociatedPolicy(policy);
+        }
+      }).catch(console.error);
+    }
+  }, [assessment, assessmentId]);
+
+  useEffect(() => {
+    if (showPolicyDialog && assessment) {
+      const today = new Date();
+      setPolicyStartDate(today.toISOString().split('T')[0]);
+
+      const farm = assessment.farmId || assessment.farm || {};
+      const cropType = (farm.cropType || farm.crop || "maize").toLowerCase();
+      
+      const durationMonths = CROP_HARVEST_DURATIONS_MONTHS[cropType] || 6;
+      
+      // Use sowingDate if available, otherwise fallback to assessment creation date or today
+      const sowingDateStr = farm.sowingDate || assessment.createdAt || today.toISOString();
+      const sowingDate = new Date(sowingDateStr);
+      
+      const endDate = new Date(sowingDate);
+      endDate.setMonth(endDate.getMonth() + durationMonths);
+      
+      // Ensure the end date is at least some days in the future, just in case
+      if (endDate <= today) {
+        endDate.setMonth(today.getMonth() + 1); // fallback to 1 month from today if already harvested
+      }
+
+      setPolicyEndDate(endDate.toISOString().split('T')[0]);
+    }
+  }, [showPolicyDialog, assessment]);
 
   const loadAssessment = async () => {
     setLoading(true);
@@ -194,7 +249,7 @@ export default function InsurerRiskAssessmentDetail({
         </div>
         
         <div className="flex items-center gap-3">
-          {assessment.status === 'APPROVED' ? (
+          {assessment.status === 'APPROVED' || assessment.status === 'POLICY_ISSUED' ? (
             <Button onClick={() => setShowPolicyDialog(true)} disabled={isCreatingPolicy} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10">
               <Shield className="h-4 w-4 mr-2" />
               {isCreatingPolicy ? "Creating..." : "Create Policy"}
@@ -214,17 +269,25 @@ export default function InsurerRiskAssessmentDetail({
               </Button>
             </>
           ) : (
-            <Badge className={`h-8 px-4 font-semibold border-none ${
-              assessment.status === 'NEEDS_CORRECTION' 
-                ? 'bg-amber-100 text-amber-800'
-                : assessment.status === 'APPROVED'
-                ? 'bg-emerald-100 text-emerald-800'
-                : assessment.status === 'REJECTED'
-                ? 'bg-rose-100 text-rose-800'
-                : 'bg-gray-100 text-gray-700'
-            }`}>
-              {assessment.status?.replace(/_/g, ' ').replace(/\w\S*/g, (txt: string) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge className={`h-8 px-4 font-semibold border-none ${
+                assessment.status === 'NEEDS_CORRECTION' 
+                  ? 'bg-amber-100 text-amber-800'
+                  : assessment.status === 'APPROVED'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : assessment.status === 'REJECTED'
+                  ? 'bg-rose-100 text-rose-800'
+                  : 'bg-gray-100 text-gray-700'
+              }`}>
+                {assessment.status?.replace(/_/g, ' ').replace(/\w\S*/g, (txt: string) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())}
+              </Badge>
+              {associatedPolicy && (
+                <Link to={`/insurer/policies/${associatedPolicy._id || associatedPolicy.id}`} className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline border border-purple-200 bg-purple-50 px-3 py-1.5 rounded-full flex items-center transition-colors">
+                  <Shield className="w-3.5 h-3.5 mr-1.5" />
+                  View Policy {associatedPolicy.policyNumber ? `#${associatedPolicy.policyNumber}` : ''}
+                </Link>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -453,20 +516,25 @@ export default function InsurerRiskAssessmentDetail({
             </div>
 
             <div>
-              <Label className="text-gray-700 font-semibold">Coverage Level *</Label>
+              <Label className="text-gray-700 font-semibold mb-2 block">Coverage Level *</Label>
               <Select 
                 value={coverageLevel} 
                 onValueChange={(val: any) => setCoverageLevel(val)}
               >
-                <SelectTrigger className="mt-2 border-gray-300">
+                <SelectTrigger className="border-gray-300 bg-white">
                   <SelectValue placeholder="Select coverage level" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]" position="popper">
                   <SelectItem value="BASIC">Basic Coverage</SelectItem>
                   <SelectItem value="STANDARD">Standard Coverage</SelectItem>
                   <SelectItem value="PREMIUM">Premium Coverage</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded-md border border-gray-100">
+                {coverageLevel === 'BASIC' && <span><strong>Basic:</strong> Covers catastrophic losses only (e.g., severe drought). Lowest premium.</span>}
+                {coverageLevel === 'STANDARD' && <span><strong>Standard:</strong> Covers most weather risks and significant yield drops. Balanced premium.</span>}
+                {coverageLevel === 'PREMIUM' && <span><strong>Premium:</strong> Comprehensive coverage including minor yield drops. Highest premium.</span>}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
