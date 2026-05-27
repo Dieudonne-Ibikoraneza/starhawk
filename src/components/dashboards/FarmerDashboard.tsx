@@ -1934,43 +1934,50 @@ export default function FarmerDashboard() {
           <form onSubmit={handleSubmitClaim} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="policyId" className="text-gray-900">Policy *</Label>
-              {policiesLoading ? (
-                <div className="text-gray-500">Loading policies...</div>
-              ) : policies.length === 0 ? (
-                <div className="text-gray-500">
-                  <p>No active policies found. You need an active policy to file a claim.</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/farmer/dashboard")}
-                    className="mt-2 border-gray-300 text-gray-900 hover:bg-gray-50 !rounded-none"
+              {(() => {
+                const activePolicies = policies.filter(p => p.status?.toUpperCase() === 'ACTIVE');
+                if (policiesLoading) {
+                  return <div className="text-gray-500">Loading policies...</div>;
+                }
+                if (activePolicies.length === 0) {
+                  return (
+                    <div className="text-gray-500">
+                      <p>No active policies found. You need an active policy to file a claim.</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate("/farmer/dashboard")}
+                        className="mt-2 border-gray-300 text-gray-900 hover:bg-gray-50 !rounded-none"
+                      >
+                        Go to Dashboard
+                      </Button>
+                    </div>
+                  );
+                }
+                return (
+                  <Select
+                    value={claimFormData.policyId}
+                    onValueChange={(value) => setClaimFormData({ ...claimFormData, policyId: value })}
+                    required
                   >
-                    Go to Dashboard
-                  </Button>
-                </div>
-              ) : (
-                <Select
-                  value={claimFormData.policyId}
-                  onValueChange={(value) => setClaimFormData({ ...claimFormData, policyId: value })}
-                  required
-                >
-                  <SelectTrigger className="bg-gray-50 border-gray-300 text-gray-900 ">
-                    <SelectValue placeholder="Select a policy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {policies.map((policy) => {
-                      const farmName = typeof policy.farmId === 'object' && policy.farmId?.name
-                        ? policy.farmId.name
-                        : (policy.cropType ? `${policy.cropType} Field` : 'Unnamed Farm');
-                      return (
-                        <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
-                          {policy.policyNumber || 'Policy'} - {farmName}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              )}
+                    <SelectTrigger className="bg-gray-50 border-gray-300 text-gray-900 ">
+                      <SelectValue placeholder="Select a policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activePolicies.map((policy) => {
+                        const farmName = typeof policy.farmId === 'object' && policy.farmId?.name
+                          ? policy.farmId.name
+                          : (policy.cropType ? `${policy.cropType} Field` : 'Unnamed Farm');
+                        return (
+                          <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
+                            {policy.policyNumber || 'Policy'} - {farmName}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
               <p className="text-xs text-gray-500">Select the policy for this claim</p>
             </div>
 
