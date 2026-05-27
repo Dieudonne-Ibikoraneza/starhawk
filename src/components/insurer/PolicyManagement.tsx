@@ -100,11 +100,12 @@ export default function PolicyManagement({
         status: (() => {
           const s = (policy.status || 'pending').toUpperCase();
           if (s === 'PENDING_ACCEPTANCE') return 'pending';
+          if (s === 'NEEDS_CORRECTION' || s === 'FLAGGED_FOR_CORRECTION') return 'needs correction';
           if (s === 'ACTIVE') return 'active';
           if (s === 'EXPIRED') return 'expired';
           if (s === 'CANCELLED' || s === 'DECLINED') return 'cancelled';
           return 'pending';
-        })() as "active" | "pending" | "expired" | "cancelled",
+        })() as any,
         location: (() => {
           const loc = policy.location || policy.farmId?.locationName || policy.farm?.location;
           if (!loc) return 'Unknown';
@@ -124,6 +125,8 @@ export default function PolicyManagement({
         deductible: policy.deductible || 0,
         createdAt: policy.createdAt || policy.created || new Date().toISOString().split('T')[0],
         coverageLevel: policy.coverageLevel || "STANDARD",
+        rejectionReason: policy.farmerRejectionReason || undefined,
+        assessmentId: policy.assessmentId || undefined,
       }));
       
       setPolicies(mappedPolicies);
@@ -459,7 +462,9 @@ export default function PolicyManagement({
                                 ? "bg-emerald-100/50 text-emerald-700"
                                 : statusLower === "expired"
                                   ? "bg-rose-100/50 text-rose-700"
-                                  : "bg-amber-100/50 text-amber-700"
+                                  : statusLower === "needs correction"
+                                    ? "bg-orange-100/50 text-orange-700"
+                                    : "bg-amber-100/50 text-amber-700"
                             }`}
                           >
                             <span
@@ -468,7 +473,9 @@ export default function PolicyManagement({
                                   ? "bg-emerald-500"
                                   : statusLower === "expired"
                                     ? "bg-rose-500"
-                                    : "bg-amber-500"
+                                    : statusLower === "needs correction"
+                                      ? "bg-orange-500"
+                                      : "bg-amber-500"
                               }`}
                             />
                             {statusLower}

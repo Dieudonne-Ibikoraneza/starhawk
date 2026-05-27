@@ -271,6 +271,14 @@ class PoliciesApiService {
       body: JSON.stringify({ reason }),
     });
   }
+
+  // Farmer flags policy for correction -> NEEDS_CORRECTION
+  async farmerFlagPolicyForCorrection(id: string, reason: string) {
+    return this.request<any>(`/${id}/farmer-flag-correction`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  }
 }
 
 // Create and export a singleton instance
@@ -305,3 +313,5 @@ export const farmerAcknowledgePolicy = (id: string) =>
   policiesApiService.farmerAcknowledgePolicy(id);
 export const farmerRejectPolicy = (id: string, reason: string) =>
   policiesApiService.farmerRejectPolicy(id, reason);
+export const farmerFlagPolicyForCorrection = (id: string, reason: string) =>
+  policiesApiService.farmerFlagPolicyForCorrection(id, reason);
