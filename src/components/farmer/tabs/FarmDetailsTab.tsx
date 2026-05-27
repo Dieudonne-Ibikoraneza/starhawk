@@ -149,6 +149,17 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
   const healthPercent = typeof ndviValue === 'number' ? Math.round(ndviValue * 100) : null;
   const cycleData = cycleAnalysis?.data || cycleAnalysis;
 
+  // Extract daily forecasts (one per day) from the 3-hourly forecast array
+  const dailyForecasts = Array.isArray(weather) ? weather.reduce((acc: any[], curr: any) => {
+    const date = new Date(curr.dt * 1000).toDateString();
+    if (!acc.find(item => new Date(item.dt * 1000).toDateString() === date)) {
+      acc.push(curr);
+    }
+    return acc;
+  }, []).slice(0, 5) : [];
+  
+  const currentWeather = dailyForecasts.length > 0 ? dailyForecasts[0] : null;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header Section */}
@@ -409,26 +420,68 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
 
           {/* Weather Forecast */}
           <Card className="border-gray-200 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CloudRain className="h-5 w-5 text-blue-500" />
-                Local Forecast
+            <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-transparent">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CloudRain className="h-5 w-5 text-blue-500" />
+                  Local Weather & Forecast
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-gray-100">
-                {[1, 2, 3, 4, 5].map((day) => (
-                  <div key={day} className="p-6 text-center space-y-3 hover:bg-gray-50 transition-colors">
-                    <span className="text-xs font-bold text-gray-400 uppercase">{format(new Date(Date.now() + day * 86400000), "EEE")}</span>
-                    <div className="mx-auto h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                      {day % 2 === 0 ? <Droplets className="h-5 w-5" /> : <CloudRain className="h-5 w-5" />}
+              {currentWeather && (
+                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-white">
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center">
+                       <img src={`http://openweathermap.org/img/wn/${currentWeather.weather[0].icon}@2x.png`} alt="weather" className="h-12 w-12 drop-shadow-sm" />
                     </div>
-                    <div className="space-y-0.5">
-                      <div className="text-lg font-black text-gray-900">24°</div>
-                      <div className="text-xs text-gray-500">18°C</div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Current Weather</h3>
+                      <div className="text-3xl font-black text-gray-900">
+                        {Math.round(currentWeather.main.temp - 273.15)}°C
+                      </div>
                     </div>
                   </div>
-                ))}
+                  <div className="flex gap-6 text-sm">
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Condition</span>
+                       <span className="font-bold text-gray-900 capitalize">{currentWeather.weather[0].description}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Humidity</span>
+                       <span className="font-bold text-gray-900">{currentWeather.main.humidity}%</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Wind</span>
+                       <span className="font-bold text-gray-900">{currentWeather.wind.speed} m/s</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-gray-100">
+                {(dailyForecasts.length > 0 ? dailyForecasts : [1, 2, 3, 4, 5]).map((day: any, idx: number) => {
+                  const isDummy = typeof day === 'number';
+                  const dateStr = isDummy ? format(new Date(Date.now() + day * 86400000), "EEE") : format(new Date(day.dt * 1000), "EEE");
+                  const tempMax = isDummy ? 24 : Math.round(day.main.temp_max - 273.15);
+                  const tempMin = isDummy ? 18 : Math.round(day.main.temp_min - 273.15);
+                  
+                  return (
+                    <div key={idx} className="p-4 md:p-6 text-center space-y-3 hover:bg-gray-50 transition-colors">
+                      <span className="text-xs font-bold text-gray-400 uppercase">{dateStr}</span>
+                      <div className="mx-auto h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
+                        {isDummy ? (
+                          idx % 2 === 0 ? <Droplets className="h-5 w-5 text-blue-500" /> : <CloudRain className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <img src={`http://openweathermap.org/img/wn/${day.weather[0].icon}.png`} alt="weather" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-lg font-black text-gray-900">{tempMax}°</div>
+                        <div className="text-xs text-gray-500">{tempMin}°C</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
