@@ -22,6 +22,7 @@ import LossAssessmentSystem from "../assessor/LossAssessmentSystem";
 import RiskAssessmentDetail from "../assessor/RiskAssessmentDetail";
 import LossAssessmentDetail from "../assessor/LossAssessmentDetail";
 import CropMonitoringDetail from "../assessor/CropMonitoringDetail";
+import CropMonitoringSystem from "../assessor/CropMonitoringSystem";
 import LeafletMap from "../common/LeafletMap";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Textarea } from "@/components/ui/textarea";
@@ -4874,7 +4875,7 @@ export default function AssessorDashboard() {
           return renderFarmerDetail();
         }
         return renderFarmersPage();
-      case "crop-monitoring": return renderCropMonitoring();
+      case "crop-monitoring": return <CropMonitoringSystem />;
       case "notifications": return <AssessorNotifications />;
       case "profile-settings": return <AssessorProfileSettings />;
       default: 
@@ -8241,8 +8242,8 @@ export default function AssessorDashboard() {
                farmerViewMode === "detail" ? renderFarmerDetail() : renderFarmersPage()
             } />
             <Route path="farmers/:id" element={renderFarmerDetail()} />
-            <Route path="crop-monitoring" element={renderCropMonitoring()} />
-            <Route path="crop-monitoring/farmer/:id" element={renderCropMonitoring()} />
+            <Route path="crop-monitoring" element={<CropMonitoringSystem />} />
+            <Route path="crop-monitoring/farmer/:id" element={<CropMonitoringSystem />} />
             <Route path="crop-monitoring/field/:id" element={<CropMonitoringDetail />} />
             <Route path="crop-monitoring/:id" element={<CropMonitoringDetail />} />
             <Route path="notifications" element={<AssessorNotifications />} />
