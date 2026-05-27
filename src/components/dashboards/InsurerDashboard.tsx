@@ -573,10 +573,10 @@ export default function InsurerDashboard() {
         return s === "SUBMITTED" || s === "PENDING";
       });
 
-      // Filter historical (approved/rejected) assessments
+      // Filter historical (approved/rejected/policy issued) assessments
       const historical = assessmentsArray.filter((assessment: any) => {
         const s = (assessment.status || "").toUpperCase();
-        return s === "APPROVED" || s === "REJECTED";
+        return s === "APPROVED" || s === "REJECTED" || s === "POLICY_ISSUED";
       });
 
       setSubmittedAssessments(pending);
