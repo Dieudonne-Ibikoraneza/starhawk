@@ -46,33 +46,22 @@ export default function CropMonitoringDetail() {
     if (!id) return;
     setLoading(true);
     try {
-      // 1. Load Farm details
-      const farmResp = await getFarmById(id);
-      const farmData = farmResp.data || farmResp;
-      setFarm(farmData);
+      // Load Crop Monitoring Details (which includes farm, policy, and nested cycles)
+      const monitoringResp = await cropMonitoringApiService.getMonitoringById(id);
+      const monitoringData = monitoringResp.data || monitoringResp;
       
-      // 2. Load Monitoring History for this field
-      const historyResp = await cropMonitoringApiService.getMonitoringHistory();
-      const allHistory = historyResp.data || historyResp || [];
-      // Filter for this specific farm
-      const fieldHistory = allHistory.filter((m: any) => 
-        (m.farmId?._id || m.farmId) === id || (m.fieldId?._id || m.fieldId) === id
-      );
-      // Sort descending by monitoringNumber so the newest is at index 0 (activeCycle)
-      const sortedHistory = [...fieldHistory].sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
-      setMonitoringHistory(sortedHistory);
-
-      // 3. Load policies to check for an active one for this farm
-      const policiesResp: any = await policiesApiService.getPolicies(1, 1000);
-      const policiesData = policiesResp.data || policiesResp || [];
-      const policiesArray = Array.isArray(policiesData) ? policiesData : (policiesData.items || policiesData.results || []);
-      
-      const matchedActivePolicy = policiesArray.find((p: any) => {
-        const pFarmId = p.farmId?._id || p.farmId;
-        const pStatus = p.status || '';
-        return String(pFarmId) === String(id) && (pStatus.toUpperCase() === 'ACTIVE');
-      });
-      setActivePolicy(matchedActivePolicy || null);
+      if (monitoringData) {
+        setFarm(monitoringData.farmId);
+        setActivePolicy(monitoringData.policyId);
+        
+        // Sort descending by monitoringNumber so the newest is at index 0 (activeCycle)
+        const cycles = monitoringData.monitoringCycles || [];
+        const sortedHistory = [...cycles].sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
+        
+        // Map policyId down to cycles if needed by downstream components
+        const enrichedCycles = sortedHistory.map(c => ({...c, policyId: monitoringData.policyId, farmId: monitoringData.farmId}));
+        setMonitoringHistory(enrichedCycles);
+      }
       
     } catch (err: any) {
       console.error("Failed to load crop monitoring details:", err);
@@ -142,9 +131,11 @@ export default function CropMonitoringDetail() {
     );
   }
 
-  const activeCycle = monitoringHistory.length > 0 ? monitoringHistory[0] : null;
-  const monitoringId = activeCycle?._id || activeCycle?.id || "";
-  const policyId = activeCycle?.policyId?._id || activeCycle?.policyId || "";
+  const activeCycle = monitoringHistory.find((c: any) => c.status === "IN_PROGRESS" || c.status === "DRAFT") || null;
+  const latestCycle = monitoringHistory.length > 0 ? monitoringHistory[0] : null;
+  const displayCycle = activeCycle || latestCycle;
+  const monitoringId = displayCycle?._id || displayCycle?.id || "";
+  const policyId = displayCycle?.policyId?._id || displayCycle?.policyId || "";
   const totalRecommendedCycles = getRequiredMonitoringCycles(farm?.cropType);
 
   const handleStartCycle = async () => {
@@ -176,15 +167,27 @@ export default function CropMonitoringDetail() {
       setIsStartingCycle(false);
     }
   };
-  
-  const farmerObj = farm?.farmerId || farm?.farmer;
-  const farmerName = typeof farmerObj === "object" && farmerObj
-    ? (farmerObj.name || `${farmerObj.firstName || ""} ${farmerObj.lastName || ""}`.trim())
-    : (farm?.farmerName || "N/A");
+    const farmerObj = activePolicy?.farmerId || farm?.farmerId || farm?.farmer;
+    let farmerName = farm?.farmerName || "N/A";
+    if (farmerObj && typeof farmerObj === 'object') {
+      farmerName = farmerObj.name || `${farmerObj.firstName || ""} ${farmerObj.lastName || ""}`.trim() || farmerName;
+    }
+    
+    // If we only got IDs and no name was found
+    if (!farmerName || farmerName.trim() === "" || farmerName === "N/A") {
+       // Since the farm belongs to a farmer, maybe the policy has it
+       if (activePolicy?.farmerName) {
+         farmerName = activePolicy.farmerName;
+       } else if (farmerObj && typeof farmerObj === 'string') {
+         farmerName = "Loading Farmer...";
+       } else {
+         farmerName = "Unknown Farmer";
+       }
+    }
 
-  const ndviValue = activeCycle?.ndvi?.average || 0.65;
-  const growthStage = activeCycle?.growthStage || "Vegetative";
-  const waterStress = activeCycle?.waterStress || "Low";
+  const ndviValue = displayCycle?.ndvi?.average || 0.65;
+  const growthStage = displayCycle?.growthStage || "Vegetative";
+  const waterStress = displayCycle?.waterStress || "Low";
   const healthStatus = ndviValue > 0.6 ? "Excellent" : ndviValue > 0.4 ? "Good" : "Poor";
 
   return (

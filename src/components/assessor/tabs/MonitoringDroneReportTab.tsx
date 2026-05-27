@@ -22,10 +22,12 @@ import {
   Satellite,
   AlertCircle,
   Trash2,
-  Download,
+  Download, Cpu, Clock, Play,
 } from "lucide-react";
 import { generateDroneDataPDF } from "@/utils/dronePdfGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   cropMonitoringService,
   CropMonitoringRecord,
@@ -63,6 +65,20 @@ export const MonitoringDroneReportTab = ({
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const [processingTypes, setProcessingTypes] = useState<Record<string, boolean>>({});
+
+  const handleProcess = async (cycleId: string, pdfType: string) => {
+    setProcessingTypes(prev => ({ ...prev, [pdfType]: true }));
+    try {
+      await cropMonitoringService.processDronePdf(cycleId, pdfType);
+      toast({ title: "Success", description: "Drone report processed successfully" });
+      onRefresh?.();
+    } catch (err: any) {
+      toast({ title: "Processing Failed", description: err.response?.data?.message || err.message || "Failed to process report", variant: "destructive" });
+    } finally {
+      setProcessingTypes(prev => ({ ...prev, [pdfType]: false }));
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isCompleted = activeCycle?.status === "COMPLETED";
@@ -89,6 +105,36 @@ export const MonitoringDroneReportTab = ({
       .replace(/\s+/g, "_")
       .toLowerCase();
     return name;
+  };
+
+  const getDisplayType = (pdf: any): string => {
+    if (pdf.pdfType && pdf.pdfType.toLowerCase() !== "unknown") {
+      return formatReportTypeLabel(pdf.pdfType);
+    }
+    
+    // Infer from extracted data if available
+    if (pdf.droneAnalysisData) {
+      const data = pdf.droneAnalysisData;
+      
+      const hasZonation = data.zonation_analysis && 
+        ((data.zonation_analysis.zones && data.zonation_analysis.zones.length > 0) || 
+         data.zonation_analysis.num_zones != null || data.zonation_analysis.tile_size != null);
+         
+      const hasStandCount = data.stand_count_analysis && 
+        (data.stand_count_analysis.plants_counted != null || data.stand_count_analysis.average_plant_density != null ||
+         data.stand_count_analysis.planned_plants != null);
+         
+      const hasRxSpraying = data.rx_spraying_analysis &&
+        ((data.rx_spraying_analysis.rates && data.rx_spraying_analysis.rates.length > 0) ||
+         data.rx_spraying_analysis.total_pesticide_amount != null);
+
+      if (hasStandCount) return "Stand Count Analysis";
+      if (hasRxSpraying) return "RX Spraying Analysis";
+      if (hasZonation) return "Zonation Analysis";
+      if (data.plant_health_analysis || data.analysis?.levels?.length > 0) return "Plant Health Analysis";
+    }
+    
+    return "Unknown Analysis";
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +222,7 @@ export const MonitoringDroneReportTab = ({
   return (
     <div className="space-y-6">
       {/* Upload Section */}
-      {!readOnly && (
+      {!readOnly && activeCycle && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
@@ -248,21 +294,25 @@ export const MonitoringDroneReportTab = ({
         <div className="space-y-8 mt-6">
           {dronePdfs.map((pdf, idx) => (
             <Card key={pdf._id || idx}>
-              <CardHeader className="pb-3 border-b border-border/50 bg-muted/10">
+              <CardHeader className={`pb-3 bg-muted/10 ${(pdf.droneAnalysisData || processingTypes[pdf.pdfType]) ? "border-b border-border/50" : ""}`}>
                 <div className="flex items-start justify-between flex-wrap gap-4">
                   <div className="space-y-1">
                     <CardTitle className="text-base flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
                       <span className="capitalize">
-                        {formatReportTypeLabel(pdf.pdfType || "unknown")}
+                        {getDisplayType(pdf)}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-green-50 text-green-700 border-green-200 ml-2"
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        Uploaded
-                      </Badge>
+                      {pdf.droneAnalysisData ? (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 ml-2">
+                          <Check className="h-3 w-3 mr-1" />
+                          Processed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 ml-2">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Uploaded
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className="font-normal text-xs ml-1">
                         Cycle #{pdf.cycleNumber || "?"}
                       </Badge>
@@ -275,41 +325,61 @@ export const MonitoringDroneReportTab = ({
                   </div>
                   
                    <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isDownloading === (pdf._id || idx.toString())}
-                      className="gap-2"
-                      title="Download PDF report"
-                      onClick={async () => {
-                        setIsDownloading(pdf._id || idx.toString());
-                        try {
-                          await generateDroneDataPDF(
-                            pdf.droneAnalysisData as any,
-                            formatReportTypeLabel(pdf.pdfType),
-                            "Monitoring Audit System",
-                            {
-                              summary: activeCycle?.notes || "Monitoring data log",
-                              weather: "Monthly monitoring cycle context.",
-                              farmName: fieldName,
-                              farmerName: farmerName,
-                              location: location,
-                              area: area,
-                              cropType: cropType
-                            },
-                            true, // showContext: true - Now that we have context, show it
-                          );
-                          toast({ title: "Success", description: "PDF report downloaded successfully" });
-                        } catch (error) {
-                          toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
-                        } finally {
-                          setIsDownloading(null);
-                        }
-                      }}
-                    >
-                      {isDownloading === (pdf._id || idx.toString()) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                      <span className="hidden sm:inline">Download PDF report</span>
-                    </Button>
+                    {pdf.droneAnalysisData ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isDownloading === (pdf._id || idx.toString())}
+                        className="gap-2"
+                        title="Download PDF report"
+                        onClick={async () => {
+                          setIsDownloading(pdf._id || idx.toString());
+                          try {
+                            await generateDroneDataPDF(
+                              pdf.droneAnalysisData as any,
+                              getDisplayType(pdf),
+                              "Monitoring Audit System",
+                              {
+                                summary: activeCycle?.notes || "Monitoring data log",
+                                weather: "Monthly monitoring cycle context.",
+                                farmName: fieldName,
+                                farmerName: farmerName,
+                                location: location,
+                                area: area,
+                                cropType: cropType
+                              },
+                              true, // showContext: true - Now that we have context, show it
+                            );
+                            toast({ title: "Success", description: "PDF report downloaded successfully" });
+                          } catch (error) {
+                            toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+                          } finally {
+                            setIsDownloading(null);
+                          }
+                        }}
+                      >
+                        {isDownloading === (pdf._id || idx.toString()) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        <span className="hidden sm:inline">Download PDF report</span>
+                      </Button>
+                    ) : (
+                      !isCompleted && pdf.cycleId === activeCycle?._id && (
+                        <Button
+                          size="sm"
+                          className="gap-2 shrink-0 rounded-full px-5 font-bold shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-white border-0"
+                          onClick={() => handleProcess(pdf.cycleId!, pdf.pdfType)}
+                          disabled={processingTypes[pdf.pdfType]}
+                        >
+                          {processingTypes[pdf.pdfType] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Play className="h-4 w-4 fill-white" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {processingTypes[pdf.pdfType] ? "Processing..." : "Process Crop Intelligence"}
+                          </span>
+                        </Button>
+                      )
+                    )}
                     
                     {!readOnly && (
                       <AlertDialog>
@@ -329,7 +399,7 @@ export const MonitoringDroneReportTab = ({
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete the "{formatReportTypeLabel(pdf.pdfType)}" PDF report from the server.
+                              This will permanently delete the "{getDisplayType(pdf)}" PDF report from the server.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -347,12 +417,44 @@ export const MonitoringDroneReportTab = ({
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-6">
-                <DroneAnalysisView
-                  data={pdf.droneAnalysisData}
-                  pdfType={pdf.pdfType}
-                />
-              </CardContent>
+              <AnimatePresence initial={false}>
+                {(pdf.droneAnalysisData || processingTypes[pdf.pdfType]) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <CardContent className="pt-6">
+                      {pdf.droneAnalysisData ? (
+                        <DroneAnalysisView
+                          data={pdf.droneAnalysisData}
+                          pdfType={pdf.pdfType}
+                        />
+                      ) : (
+                        <div className="space-y-6 animate-pulse">
+                          <div className="flex flex-col items-center justify-center mb-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                            <p className="text-sm font-medium">Analysis in progress...</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Our system is extracting data from your PDF. This may take a few moments.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                          </div>
+                          <Skeleton className="h-[250px] w-full rounded-lg" />
+                          <Skeleton className="h-32 w-full rounded-lg" />
+                        </div>
+                      )}
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           ))}
         </div>
