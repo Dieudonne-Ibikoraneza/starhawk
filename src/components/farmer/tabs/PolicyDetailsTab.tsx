@@ -10,7 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getPolicyById, updatePolicy } from "@/services/policiesApi";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { getPolicyById, updatePolicy, farmerRejectPolicy, farmerFlagPolicyForCorrection, farmerAcknowledgePolicy } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
 
 interface PolicyDetailsTabProps {
@@ -24,6 +27,14 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
+
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [flagReason, setFlagReason] = useState("");
+  const [isFlagging, setIsFlagging] = useState(false);
 
   useEffect(() => {
     loadPolicy();
@@ -49,7 +60,7 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
   const handleAccept = async () => {
     setIsAccepting(true);
     try {
-      await updatePolicy(policyId, { status: "ACTIVE" });
+      await farmerAcknowledgePolicy(policyId);
       toast({
         title: "Policy Activated",
         description: "Your insurance coverage is now active.",
@@ -66,6 +77,52 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
     }
   };
 
+  const handleReject = async () => {
+    if (!rejectReason.trim()) return;
+    setIsRejecting(true);
+    try {
+      await farmerRejectPolicy(policyId, rejectReason);
+      toast({
+        title: "Policy Rejected",
+        description: "You have declined this policy offer.",
+      });
+      setShowRejectDialog(false);
+      setRejectReason("");
+      loadPolicy();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to reject policy.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const handleFlag = async () => {
+    if (!flagReason.trim()) return;
+    setIsFlagging(true);
+    try {
+      await farmerFlagPolicyForCorrection(policyId, flagReason);
+      toast({
+        title: "Flagged for Correction",
+        description: "The insurer has been notified to correct the policy.",
+      });
+      setShowFlagDialog(false);
+      setFlagReason("");
+      loadPolicy();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to flag policy.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFlagging(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -78,6 +135,14 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
 
   const isPending = policy.status?.toUpperCase() === "PENDING_ACCEPTANCE";
   const isActive = policy.status?.toUpperCase() === "ACTIVE";
+
+  // Fallback calculation for older policies missing coverageAmount
+  const fallbackCoverage = typeof policy.premiumAmount === 'number' ? (
+    policy.coverageLevel === 'PREMIUM' ? policy.premiumAmount * 20 :
+    policy.coverageLevel === 'STANDARD' ? policy.premiumAmount * 15 :
+    policy.premiumAmount * 10
+  ) : null;
+  const coverage = policy.coverageAmount || fallbackCoverage;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -105,9 +170,15 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
                 <Badge className={
                   isActive ? "bg-green-100 text-green-700 hover:bg-green-100" :
                   isPending ? "bg-amber-100 text-amber-700 hover:bg-amber-100 animate-pulse" :
+                  policy.status?.toUpperCase() === "NEEDS_CORRECTION" ? "bg-orange-100 text-orange-700 hover:bg-orange-100" :
+                  policy.status?.toUpperCase() === "DECLINED" ? "bg-red-100 text-red-700 hover:bg-red-100" :
                   "bg-gray-100 text-gray-700"
                 }>
-                  {policy.status}
+                  {policy.status?.toUpperCase() === "PENDING_ACCEPTANCE" ? "Needs Review" : 
+                   policy.status?.toUpperCase() === "NEEDS_CORRECTION" ? "Needs Correction" : 
+                   policy.status?.toUpperCase() === "DECLINED" ? "Declined" :
+                   policy.status?.toUpperCase() === "ACTIVE" ? "Active" :
+                   policy.status}
                 </Badge>
               </div>
               <p className="text-gray-500 mt-1 flex items-center gap-2">
@@ -151,7 +222,18 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
                 {isAccepting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileCheck className="h-4 w-4 mr-2" />}
                 Accept & Activate Coverage
               </Button>
-              <Button variant="outline" className="flex-1 md:flex-none border-amber-200 text-amber-700 hover:bg-white">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowFlagDialog(true)}
+                className="flex-1 md:flex-none border-orange-200 text-orange-700 hover:bg-orange-50"
+              >
+                Flag for Correction
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowRejectDialog(true)}
+                className="flex-1 md:flex-none border-red-200 text-red-700 hover:bg-red-50"
+              >
                 Decline Offer
               </Button>
             </div>
@@ -176,7 +258,7 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Coverage</span>
                     <div className="text-4xl font-black text-gray-900 flex items-baseline gap-1">
                       <span className="text-lg font-bold text-gray-400">RWF</span>
-                      {policy.coverageAmount?.toLocaleString()}
+                      {coverage?.toLocaleString() || "N/A"}
                     </div>
                   </div>
                   
@@ -205,7 +287,8 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase">Insurer Provider</span>
                       <div className="text-sm font-bold text-gray-900">
-                        {policy.insurer?.companyName || "Verified Provider"}
+                        {policy.insurerId?.insurerProfile?.companyName || policy.insurerId?.companyName || policy.insurer?.companyName || 
+                         (policy.insurerId?.firstName || policy.insurerId?.lastName ? `${policy.insurerId.firstName || ''} ${policy.insurerId.lastName || ''}`.trim() : "Verified Provider")}
                       </div>
                     </div>
                   </div>
@@ -268,7 +351,7 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
           </Card>
 
           {/* Claims Warning */}
-          {!isPending && (
+          {isActive && (
             <Card className="bg-red-50 border-red-100 shadow-none">
               <CardContent className="p-6">
                 <div className="flex gap-4">
@@ -294,6 +377,62 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
           )}
         </div>
       </div>
+
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline Policy Offer</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for declining this policy offer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Declining</Label>
+              <Textarea
+                placeholder="e.g., Premium is too high, Coverage is too low..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleReject} disabled={isRejecting || !rejectReason.trim()}>
+              {isRejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFlagDialog} onOpenChange={setShowFlagDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Flag for Correction</DialogTitle>
+            <DialogDescription>
+              What needs to be corrected in this policy offer?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Correction Details</Label>
+              <Textarea
+                placeholder="e.g., Farm size is incorrect, Crop type is wrong..."
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFlagDialog(false)}>Cancel</Button>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleFlag} disabled={isFlagging || !flagReason.trim()}>
+              {isFlagging ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Correction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

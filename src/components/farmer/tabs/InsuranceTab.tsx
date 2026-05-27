@@ -8,6 +8,8 @@ import { getPolicies } from "@/services/policiesApi";
 import { getInsuranceRequests } from "@/services/farmsApi";
 import { getFarms } from "@/services/farmsApi";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: string) => void }) {
   const { toast } = useToast();
@@ -72,30 +74,56 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
     };
   }, [policies]);
 
-  const [reviewDialog, setReviewDialog] = useState<{ open: boolean; policy: any }>({ open: false, policy: null });
-  const [isAccepting, setIsAccepting] = useState(false);
+  const handleAction = async () => {
+    if (!actionDialog.policy || !actionDialog.type) return;
+    
+    const { policy, type } = actionDialog;
+    const id = policy._id || policy.id;
 
-  const handleAcceptPolicy = async (id: string) => {
-    setIsAccepting(true);
-    try {
-      await farmerAcknowledgePolicy(id);
-      toast({
-        title: "Success",
-        description: "Policy accepted! Your coverage is now active.",
-      });
-      setReviewDialog({ open: false, policy: null });
-      loadData();
-    } catch (err: any) {
-      console.error('Failed to accept policy:', err);
+    if ((type === "REJECT" || type === "FLAG") && reason.length < 5) {
       toast({
         title: "Error",
-        description: "Failed to accept policy. Please try again.",
+        description: "Please provide a reason of at least 5 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (type === "ACCEPT") {
+        await farmerAcknowledgePolicy(id);
+        toast({ title: "Success", description: "Policy accepted! Your coverage is now active." });
+      } else if (type === "REJECT") {
+        await farmerRejectPolicy(id, reason);
+        toast({ title: "Success", description: "Policy declined." });
+      } else if (type === "FLAG") {
+        await farmerFlagPolicyForCorrection(id, reason);
+        toast({ title: "Success", description: "Policy flagged for correction." });
+      }
+      setActionDialog({ open: false, policy: null, type: null });
+      setReason("");
+      loadData();
+    } catch (err: any) {
+      console.error(`Failed to ${type} policy:`, err);
+      toast({
+        title: "Error",
+        description: `Failed to ${type.toLowerCase()} policy. Please try again.`,
         variant: "destructive",
       });
     } finally {
-      setIsAccepting(false);
+      setIsSubmitting(false);
     }
   };
+
+  const openActionDialog = (type: "ACCEPT" | "REJECT" | "FLAG", policy: any) => {
+    setActionDialog({ open: true, policy, type });
+    setReason("");
+  };
+
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; policy: any; type: "ACCEPT" | "REJECT" | "FLAG" | null }>({ open: false, policy: null, type: null });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reason, setReason] = useState("");
 
   if (loading) {
     return (
@@ -130,136 +158,98 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-gray-200 shadow-sm bg-white">
-            <CardHeader className="pb-2 border-b border-gray-50">
-              <CardTitle className="text-lg flex items-center gap-2 text-gray-900">
-                <ShieldCheck className="h-5 w-5 text-green-600" />
-                Your Policies ({policies.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {policies.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <ShieldCheck className="h-12 w-12 mx-auto text-gray-200 mb-4" />
-                  <p>No policies found. Register your farms and request insurance to get started.</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {policyGroups.pending.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => setReviewDialog({ open: true, policy: p })} onViewDetails={onViewDetails} />
-                  ))}
-                  {policyGroups.active.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => {}} onViewDetails={onViewDetails} />
-                  ))}
-                  {policyGroups.others.map((p) => (
-                    <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onReview={() => {}} onViewDetails={onViewDetails} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card className="border-gray-200 shadow-sm bg-white">
-            <CardHeader className="pb-2 border-b border-gray-50">
-              <CardTitle className="text-lg flex items-center gap-2 text-gray-900">
-                <Hash className="h-5 w-5 text-green-600" />
-                Insurance Requests ({requests.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {requests.length === 0 ? (
-                <div className="text-sm text-gray-500 text-center py-8">
-                  No pending insurance requests.
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {requests.map((r: any) => (
-                    <li
-                      key={r._id || r.id}
-                      className="rounded-lg border border-gray-100 p-4 text-sm bg-gray-50/50 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <Badge variant="outline" className={`${
-                          r.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
-                          r.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200' :
-                          'bg-gray-50 text-gray-700 border-gray-200'
-                        }`}>
-                          {r.status}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          {r.createdAt ? format(new Date(r.createdAt), "MMM d, yyyy") : ""}
-                        </span>
-                      </div>
-                      <div className="font-medium text-gray-900 mb-1">
-                        Farm: {farmNameById.get(r.farmId?._id || r.farmId) || "Unnamed Farm"}
-                      </div>
-                      {r.notes && (
-                        <p className="text-xs text-gray-500 line-clamp-2 italic">
-                          "{r.notes}"
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <div className="space-y-6">
+        <Card className="border-gray-200 shadow-sm bg-white">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <CardTitle className="text-lg flex items-center gap-2 text-gray-900">
+              <ShieldCheck className="h-5 w-5 text-green-600" />
+              Your Policies ({policies.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {policies.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <ShieldCheck className="h-12 w-12 mx-auto text-gray-200 mb-4" />
+                <p>No policies found. Register your farms and request insurance to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {policyGroups.pending.map((p) => (
+                  <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={openActionDialog} onViewDetails={onViewDetails} />
+                ))}
+                {policyGroups.active.map((p) => (
+                  <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={() => {}} onViewDetails={onViewDetails} />
+                ))}
+                {policyGroups.others.map((p) => (
+                  <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={() => {}} onViewDetails={onViewDetails} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Review Dialog */}
-      <Dialog open={reviewDialog.open} onOpenChange={(open) => !open && setReviewDialog({ open: false, policy: null })}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Action Confirmation Dialog */}
+      <Dialog open={actionDialog.open} onOpenChange={(open) => !open && setActionDialog({ open: false, policy: null, type: null })}>
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Review Policy Offer</DialogTitle>
+            <DialogTitle>
+              {actionDialog.type === "ACCEPT" && "Confirm Policy Acceptance"}
+              {actionDialog.type === "REJECT" && "Decline Policy Offer"}
+              {actionDialog.type === "FLAG" && "Flag for Correction"}
+            </DialogTitle>
             <DialogDescription>
-              Please review the insurance terms offered for your farm.
+              {actionDialog.type === "ACCEPT" && "Are you sure you want to accept this policy? This will activate your coverage."}
+              {actionDialog.type === "REJECT" && "Please provide a reason for declining this policy offer."}
+              {actionDialog.type === "FLAG" && "What needs to be corrected in this policy offer?"}
             </DialogDescription>
           </DialogHeader>
-          {reviewDialog.policy && (
-            <div className="space-y-6 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-500 uppercase font-bold">Policy Number</span>
-                  <p className="font-medium">{reviewDialog.policy.policyNumber || "TBD"}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-500 uppercase font-bold">Farm</span>
-                  <p className="font-medium">{getPolicyFarmName(reviewDialog.policy)}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-500 uppercase font-bold">Coverage Amount</span>
-                  <p className="font-bold text-green-600">RWF {reviewDialog.policy.coverageAmount?.toLocaleString()}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-500 uppercase font-bold">Premium Amount</span>
-                  <p className="font-bold text-blue-600">RWF {reviewDialog.policy.premiumAmount?.toLocaleString()}</p>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm">
-                <h4 className="font-bold mb-1">Terms & Conditions</h4>
-                <p className="text-gray-600">
-                  By accepting this policy, you agree to the premium payment and coverage terms specified. 
-                  Coverage will be effective from {reviewDialog.policy.startDate ? format(new Date(reviewDialog.policy.startDate), "PPP") : "TBD"}.
-                </p>
-              </div>
 
-              <div className="flex gap-3 justify-end pt-2">
-                <Button variant="outline" onClick={() => setReviewDialog({ open: false, policy: null })}>
+          {actionDialog.policy && (
+            <div className="space-y-4 pt-2">
+              {(actionDialog.type === "REJECT" || actionDialog.type === "FLAG") && (
+                <div className="space-y-2">
+                  <Label className="text-gray-900 font-medium">
+                    {actionDialog.type === "REJECT" ? "Reason for Rejection *" : "Correction Details *"}
+                  </Label>
+                  <Textarea 
+                    value={reason} 
+                    onChange={(e) => setReason(e.target.value)} 
+                    placeholder={actionDialog.type === "REJECT" ? "Why are you rejecting this policy offer?" : "What needs to be corrected?"}
+                    className="resize-none"
+                    rows={3}
+                  />
+                  <p className="text-xs text-gray-500">Please provide at least 5 characters.</p>
+                </div>
+              )}
+              
+              {actionDialog.type === "ACCEPT" && (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                  <h4 className="font-bold mb-1">Terms & Conditions</h4>
+                  <p className="text-gray-600">
+                    By accepting this policy, you agree to the premium payment and coverage terms specified. 
+                    Coverage will be effective from {actionDialog.policy.startDate ? format(new Date(actionDialog.policy.startDate), "PPP") : "TBD"}.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="outline" onClick={() => setActionDialog({ open: false, policy: null, type: null })} disabled={isSubmitting}>
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => handleAcceptPolicy(reviewDialog.policy._id || reviewDialog.policy.id)} 
-                  disabled={isAccepting}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleAction} 
+                  disabled={isSubmitting || ((actionDialog.type === "REJECT" || actionDialog.type === "FLAG") && reason.length < 5)}
+                  className={
+                    actionDialog.type === "REJECT" ? "bg-red-600 hover:bg-red-700 text-white" : 
+                    actionDialog.type === "FLAG" ? "bg-amber-600 hover:bg-amber-700 text-white" : 
+                    "bg-green-600 hover:bg-green-700 text-white"
+                  }
                 >
-                  {isAccepting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                  Accept Policy
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {actionDialog.type === "REJECT" ? "Confirm Rejection" : 
+                   actionDialog.type === "FLAG" ? "Submit Correction" : 
+                   "Accept & Activate"}
                 </Button>
               </div>
             </div>
@@ -270,9 +260,17 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
   );
 }
 
-function PolicyItem({ p, farmName, onReview, onViewDetails }: { p: any; farmName: string; onReview: () => void; onViewDetails: (id: string) => void }) {
+function PolicyItem({ p, farmName, onAction, onViewDetails }: { p: any; farmName: string; onAction: (type: "ACCEPT" | "REJECT" | "FLAG", policy: any) => void; onViewDetails: (id: string) => void }) {
   const status = (p.status || "").toUpperCase();
   const premium = typeof p.premiumAmount === "number" ? p.premiumAmount.toLocaleString() : null;
+  
+  // Fallback calculation for older policies missing coverageAmount
+  const fallbackCoverage = typeof p.premiumAmount === 'number' ? (
+    p.coverageLevel === 'PREMIUM' ? p.premiumAmount * 20 :
+    p.coverageLevel === 'STANDARD' ? p.premiumAmount * 15 :
+    p.premiumAmount * 10
+  ) : null;
+  const coverage = p.coverageAmount || fallbackCoverage;
 
   return (
     <div className="rounded-xl border border-gray-100 p-5 hover:border-green-200 hover:shadow-md transition-all bg-white">
@@ -293,17 +291,32 @@ function PolicyItem({ p, farmName, onReview, onViewDetails }: { p: any; farmName
               ? "bg-green-100 text-green-700 border-green-200"
               : status === "PENDING_ACCEPTANCE"
                 ? "bg-amber-100 text-amber-700 border-amber-200"
-                : "bg-gray-100 text-gray-700 border-gray-200"
+                : status === "NEEDS_CORRECTION"
+                  ? "bg-orange-100 text-orange-700 border-orange-200"
+                  : status === "DECLINED"
+                    ? "bg-red-100 text-red-700 border-red-200"
+                    : "bg-gray-100 text-gray-700 border-gray-200"
           }`}
         >
-          {status === "PENDING_ACCEPTANCE" ? "Needs Review" : status}
+          {status === "PENDING_ACCEPTANCE" ? "Needs Review" : 
+           status === "NEEDS_CORRECTION" ? "Needs Correction" : 
+           status === "DECLINED" ? "Declined" :
+           status === "ACTIVE" ? "Active" :
+           status}
         </Badge>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4 text-xs">
+        <div className="space-y-1">
+          <div className="text-gray-400">Insurer</div>
+          <div className="font-semibold text-gray-700 truncate">
+            {p.insurerId?.insurerProfile?.companyName || p.insurerId?.companyName || p.insurer?.companyName || 
+             (p.insurerId?.firstName || p.insurerId?.lastName ? `${p.insurerId.firstName || ''} ${p.insurerId.lastName || ''}`.trim() : "Verified Provider")}
+          </div>
+        </div>
         <div className="space-y-1">
           <div className="text-gray-400">Coverage</div>
-          <div className="font-semibold text-gray-700">RWF {p.coverageAmount?.toLocaleString() || "N/A"}</div>
+          <div className="font-semibold text-gray-700">RWF {coverage?.toLocaleString() || "N/A"}</div>
         </div>
         <div className="space-y-1">
           <div className="text-gray-400">Premium</div>
@@ -320,14 +333,29 @@ function PolicyItem({ p, farmName, onReview, onViewDetails }: { p: any; farmName
       </div>
 
       <div className="flex gap-2">
-        <Button 
-          size="sm" 
-          onClick={() => status === 'PENDING_ACCEPTANCE' ? onReview() : onViewDetails(p._id || p.id)}
-          className={`flex-1 gap-2 ${status === 'PENDING_ACCEPTANCE' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
-        >
-          {status === "PENDING_ACCEPTANCE" ? "Review & Accept" : "View Details"}
-          <ArrowRight className="h-4 w-4" />
-        </Button>
+        {status === "PENDING_ACCEPTANCE" ? (
+          <>
+            <Button size="sm" variant="outline" onClick={() => onAction("REJECT", p)} className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+              Reject
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onAction("FLAG", p)} className="flex-1 border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700">
+              Flag Correction
+            </Button>
+            <Button size="sm" onClick={() => onAction("ACCEPT", p)} className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-1">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Accept
+            </Button>
+          </>
+        ) : (
+          <Button 
+            size="sm" 
+            onClick={() => onViewDetails(p._id || p.id)}
+            className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
+          >
+            View Details
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -342,4 +370,4 @@ const Hash = ({ className }: { className?: string }) => (
 );
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { farmerAcknowledgePolicy, farmerRejectPolicy } from "@/services/policiesApi";
+import { farmerAcknowledgePolicy, farmerRejectPolicy, farmerFlagPolicyForCorrection } from "@/services/policiesApi";
