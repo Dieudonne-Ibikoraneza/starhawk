@@ -227,28 +227,26 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
               )}
               
               {actionDialog.type === "ACCEPT" && (
-                <div className="space-y-4">
+                <div className="space-y-4 pt-1">
                   {actionDialog.policy.termsAndConditions ? (
-                    <div className="p-4 bg-gray-50 rounded-lg border border-amber-200 text-sm">
-                      <h4 className="font-bold mb-2 text-amber-900">Terms & Conditions</h4>
-                      <div className="bg-white p-3 rounded border border-gray-200 max-h-40 overflow-y-auto mb-4 whitespace-pre-wrap text-gray-700">
+                    <div className="text-sm">
+                      <h4 className="font-semibold text-gray-900 mb-2">Terms & Conditions</h4>
+                      <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200 max-h-48 overflow-y-auto mb-4 whitespace-pre-wrap text-gray-600 text-sm leading-relaxed">
                         {actionDialog.policy.termsAndConditions}
                       </div>
-                      <div className="flex items-start space-x-2 mt-4">
+                      <div className="flex items-center space-x-3 bg-amber-50/50 p-3 rounded-lg border border-amber-100/50 transition-colors hover:bg-amber-50">
                         <Checkbox 
                           id="modal-terms-accept" 
                           checked={termsAccepted}
                           onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                          className="mt-1"
+                          className="data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
                         />
-                        <div className="grid gap-1.5 leading-none">
-                          <label
-                            htmlFor="modal-terms-accept"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700 cursor-pointer"
-                          >
-                            I have read and accept the terms and conditions
-                          </label>
-                        </div>
+                        <label
+                          htmlFor="modal-terms-accept"
+                          className="text-sm font-medium leading-none cursor-pointer text-amber-900 select-none flex-1"
+                        >
+                          I have read and accept the terms and conditions
+                        </label>
                       </div>
                     </div>
                   ) : (
