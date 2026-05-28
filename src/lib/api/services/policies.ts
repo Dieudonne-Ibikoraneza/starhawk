@@ -16,6 +16,7 @@ export interface Policy {
   farmerAcknowledgedAt?: string;
   farmerRejectedAt?: string;
   farmerRejectionReason?: string;
+  termsAndConditions?: string;
   [key: string]: unknown;
 }
 

@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { getPolicyById, updatePolicy, farmerRejectPolicy, farmerFlagPolicyForCorrection, farmerAcknowledgePolicy } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +28,7 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -212,11 +214,40 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
               Your insurer has proposed these terms. Review the coverage and premium below to activate your insurance.
             </CardDescription>
           </CardHeader>
+          <CardContent className="px-6 pb-6">
+            {policy.termsAndConditions && (
+              <div className="mb-6 space-y-4">
+                <h4 className="font-semibold text-amber-900">Terms and Conditions</h4>
+                <div className="bg-white p-4 rounded-md border border-amber-200 h-40 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap">
+                  {policy.termsAndConditions}
+                </div>
+                <div className="flex items-start space-x-2">
+                  <Checkbox 
+                    id="terms-accept" 
+                    checked={termsAccepted}
+                    onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    className="mt-1"
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <label
+                      htmlFor="terms-accept"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      I have read and accept the terms and conditions
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      You must accept the terms and conditions to activate this policy.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
           <CardFooter className="bg-amber-50/50 border-t border-amber-100 pt-6 pb-6">
             <div className="flex gap-4 w-full md:w-auto">
               <Button 
                 onClick={handleAccept} 
-                disabled={isAccepting}
+                disabled={isAccepting || (policy.termsAndConditions && !termsAccepted)}
                 className="flex-1 md:flex-none bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-200 font-bold px-8"
               >
                 {isAccepting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileCheck className="h-4 w-4 mr-2" />}

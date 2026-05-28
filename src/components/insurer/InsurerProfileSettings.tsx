@@ -51,7 +51,8 @@ export default function InsurerProfileSettings() {
     bio: "",
     website: "",
     licenseNumber: "",
-    officialEmail: ""
+    officialEmail: "",
+    termsAndConditions: ""
   });
 
   const [cropperData, setCropperData] = useState<{
@@ -99,7 +100,8 @@ export default function InsurerProfileSettings() {
           bio: user.insurerProfile?.bio || "",
           website: user.insurerProfile?.website || "",
           licenseNumber: user.insurerProfile?.licenseNumber || "",
-          officialEmail: user.insurerProfile?.officialEmail || ""
+          officialEmail: user.insurerProfile?.officialEmail || "",
+          termsAndConditions: user.insurerProfile?.termsAndConditions || ""
         });
       }
     } catch (err: any) {
@@ -231,7 +233,8 @@ export default function InsurerProfileSettings() {
         phoneNumber: profileData.phone,
         insurerProfile: {
           companyName: profileData.companyName,
-          contactPerson: profileData.contactPerson
+          contactPerson: profileData.contactPerson,
+          termsAndConditions: profileData.termsAndConditions
         }
       });
 
@@ -553,6 +556,17 @@ export default function InsurerProfileSettings() {
               onChange={(e) => handleProfileUpdate("bio", e.target.value)}
               placeholder="Describe your insurance agency's history and mission..."
               className="min-h-[120px] border-gray-300"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="termsAndConditions" className="text-gray-700 font-medium">Standard Terms and Conditions</Label>
+            <Textarea
+              id="termsAndConditions"
+              value={profileData.termsAndConditions}
+              onChange={(e) => handleProfileUpdate("termsAndConditions", e.target.value)}
+              placeholder="Enter the terms and conditions that farmers must agree to when accepting your policies..."
+              className="min-h-[200px] border-gray-300"
             />
           </div>
         </CardContent>
