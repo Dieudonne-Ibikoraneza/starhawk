@@ -10,6 +10,7 @@ import { getFarms } from "@/services/farmsApi";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: string) => void }) {
   const { toast } = useToast();
@@ -119,11 +120,13 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
   const openActionDialog = (type: "ACCEPT" | "REJECT" | "FLAG", policy: any) => {
     setActionDialog({ open: true, policy, type });
     setReason("");
+    setTermsAccepted(false);
   };
 
   const [actionDialog, setActionDialog] = useState<{ open: boolean; policy: any; type: "ACCEPT" | "REJECT" | "FLAG" | null }>({ open: false, policy: null, type: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   if (loading) {
     return (
@@ -224,12 +227,39 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
               )}
               
               {actionDialog.type === "ACCEPT" && (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm">
-                  <h4 className="font-bold mb-1">Terms & Conditions</h4>
-                  <p className="text-gray-600">
-                    By accepting this policy, you agree to the premium payment and coverage terms specified. 
-                    Coverage will be effective from {actionDialog.policy.startDate ? format(new Date(actionDialog.policy.startDate), "PPP") : "TBD"}.
-                  </p>
+                <div className="space-y-4">
+                  {actionDialog.policy.termsAndConditions ? (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-amber-200 text-sm">
+                      <h4 className="font-bold mb-2 text-amber-900">Terms & Conditions</h4>
+                      <div className="bg-white p-3 rounded border border-gray-200 max-h-40 overflow-y-auto mb-4 whitespace-pre-wrap text-gray-700">
+                        {actionDialog.policy.termsAndConditions}
+                      </div>
+                      <div className="flex items-start space-x-2 mt-4">
+                        <Checkbox 
+                          id="modal-terms-accept" 
+                          checked={termsAccepted}
+                          onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                          className="mt-1"
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <label
+                            htmlFor="modal-terms-accept"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700 cursor-pointer"
+                          >
+                            I have read and accept the terms and conditions
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                      <h4 className="font-bold mb-1">Terms & Conditions</h4>
+                      <p className="text-gray-600">
+                        By accepting this policy, you agree to the premium payment and coverage terms specified. 
+                        Coverage will be effective from {actionDialog.policy.startDate ? format(new Date(actionDialog.policy.startDate), "PPP") : "TBD"}.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -239,7 +269,11 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
                 </Button>
                 <Button 
                   onClick={handleAction} 
-                  disabled={isSubmitting || ((actionDialog.type === "REJECT" || actionDialog.type === "FLAG") && reason.length < 5)}
+                  disabled={
+                    isSubmitting || 
+                    ((actionDialog.type === "REJECT" || actionDialog.type === "FLAG") && reason.length < 5) ||
+                    (actionDialog.type === "ACCEPT" && actionDialog.policy.termsAndConditions && !termsAccepted)
+                  }
                   className={
                     actionDialog.type === "REJECT" ? "bg-red-600 hover:bg-red-700 text-white" : 
                     actionDialog.type === "FLAG" ? "bg-amber-600 hover:bg-amber-700 text-white" : 
