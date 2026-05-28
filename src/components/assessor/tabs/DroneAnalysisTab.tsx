@@ -48,6 +48,7 @@ import {
 import { Farm } from "@/lib/api/types";
 import { formatReportTypeLabel, getAgremoTitle } from "@/lib/crops";
 import { generateDroneDataPDF } from "@/utils/dronePdfGenerator";
+import { usePdfValidator } from "@/hooks/usePdfValidator";
 
 interface DroneAnalysisTabProps {
   fieldId: string;
@@ -181,6 +182,8 @@ export const DroneAnalysisTab = ({
   readOnly = false,
 }: DroneAnalysisTabProps) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
+  const { validating, validate } = usePdfValidator();
   const isCompleted = status === "SUBMITTED" || status === "APPROVED" || status === "COMPLETED";
 
   // Fetch assessment data to get uploaded PDFs
@@ -271,6 +274,9 @@ export const DroneAnalysisTab = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset file input so the same file can be retried after rejection
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       toast.error("Please upload a PDF file");
       return;
@@ -282,6 +288,18 @@ export const DroneAnalysisTab = ({
       );
       return;
     }
+
+    // ── AI Relevance Check ──────────────────────────────────────────────
+    setRejectionMessage(null);
+    const validation = await validate(file, 'drone_analysis');
+    if (!validation.relevant) {
+      setRejectionMessage(
+        `"${file.name}" appears to be a ${validation.documentType}. ${validation.reason}`
+      );
+      toast.error("Incompatible PDF — please upload a drone analysis report.");
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────
 
     setIsUploading(true);
     try {
@@ -376,19 +394,36 @@ export const DroneAnalysisTab = ({
                 <div
                   className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
                 >
-                  {isUploading ? (
+                  {validating ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="relative">
+                        <Loader2 className="h-12 w-12 text-violet-500 animate-spin" />
+                      </div>
+                      <p className="text-sm font-semibold text-violet-700">AI is verifying your document…</p>
+                      <p className="text-xs text-muted-foreground">Checking if this PDF is a valid drone analysis report</p>
+                    </div>
+                  ) : isUploading ? (
                     <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
                   ) : (
                     <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   )}
-                  <p className="text-sm font-medium mb-2">
-                    {isUploading
-                      ? "Uploading to server..."
-                      : "Upload drone analysis PDF"}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Upload Agremo (or similar) reports as PDFs. Each file appears below, like crop monitoring and loss assessment.
-                  </p>
+                  {!validating && (
+                    <>
+                      <p className="text-sm font-medium mb-2">
+                        {isUploading ? "Uploading to server..." : "Upload drone analysis PDF"}
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Upload Agremo (or similar) reports as PDFs. Each file appears below, like crop monitoring and loss assessment.
+                      </p>
+                    </>
+                  )}
+
+                  {rejectionMessage && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex items-start gap-2 text-left">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{rejectionMessage}</span>
+                    </div>
+                  )}
 
                   {isCompleted && (
                     <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm flex items-center gap-2">
@@ -407,16 +442,16 @@ export const DroneAnalysisTab = ({
                       disabled={isCompleted}
                     />
                     <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading || isCompleted}
+                      onClick={() => { setRejectionMessage(null); fileInputRef.current?.click(); }}
+                      disabled={isUploading || validating || isCompleted}
                       className="flex items-center gap-2"
                     >
-                      {isUploading ? (
+                      {(isUploading || validating) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Upload className="h-4 w-4" />
                       )}
-                      {isUploading ? "Uploading..." : "Select PDF File"}
+                      {validating ? "Verifying..." : isUploading ? "Uploading..." : "Select PDF File"}
                     </Button>
                   </div>
                 </div>

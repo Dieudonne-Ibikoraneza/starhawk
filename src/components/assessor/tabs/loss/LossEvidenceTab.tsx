@@ -26,6 +26,7 @@ import { Claim, claimsService } from "@/lib/api/services/claims";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAssessmentById, useClaimPdfs } from "@/lib/api/hooks/useClaims";
+import { usePdfValidator } from "@/hooks/usePdfValidator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,8 @@ export const LossEvidenceTab = ({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
+  const { validating, validate } = usePdfValidator();
 
   // Fetch assessment data for context if needed
   const assessmentId =
@@ -88,11 +91,29 @@ export const LossEvidenceTab = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
     // Use filename as pdfType (clean it up)
     const pdfType = file.name
       .split(".")[0]
       .toUpperCase()
-      .replace(/[^A-Z0-0]/g, "_");
+      .replace(/[^A-Z0-9]/g, "_");
+
+    // ── AI Relevance Check ──────────────────────────────────────────────
+    setRejectionMessage(null);
+    const validation = await validate(file, 'loss_evidence');
+    if (!validation.relevant) {
+      setRejectionMessage(
+        `"${file.name}" appears to be a ${validation.documentType}. ${validation.reason}`
+      );
+      toast({
+        title: "Incompatible Document",
+        description: "Please upload a loss or damage assessment report.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────
 
     setIsUploading(true);
     try {
@@ -230,32 +251,50 @@ export const LossEvidenceTab = ({
             </CardHeader>
             <CardContent className="space-y-4">
               {!isCompleted ? (
-                <div className="p-6 border-2 border-dashed rounded-lg text-center hover:bg-muted/50 transition-colors cursor-pointer group relative">
+                <div className="p-6 border-2 border-dashed rounded-lg text-center hover:bg-muted/50 transition-colors group relative">
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    className="hidden"
                     onChange={handlePdfUpload}
-                    disabled={isUploading}
+                    disabled={isUploading || validating}
                   />
                   <div className="space-y-2">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto group-hover:bg-primary/20 transition-colors">
-                      {isUploading ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      {(isUploading || validating) ? (
+                        <Loader2 className={`h-5 w-5 animate-spin ${validating ? 'text-violet-500' : 'text-primary'}`} />
                       ) : (
                         <Upload className="h-5 w-5 text-primary" />
                       )}
                     </div>
                     <p className="font-medium">
-                      {isUploading
-                        ? "Uploading..."
-                        : "Click to upload drone PDF"}
+                      {validating ? "AI is verifying your document…" : isUploading ? "Uploading..." : "Click to upload drone PDF"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Supports Plant Stress, Waterlogging, Stand Count, etc.
-                    </p>
+                    {validating ? (
+                      <p className="text-xs text-violet-600">Checking if this PDF is a valid loss assessment report</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Supports Plant Stress, Waterlogging, Stand Count, etc.
+                      </p>
+                    )}
+                    {rejectionMessage && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-xs flex items-start gap-2 text-left">
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>{rejectionMessage}</span>
+                      </div>
+                    )}
                   </div>
+                  <Button
+                    className="mt-4"
+                    size="sm"
+                    variant="outline"
+                    disabled={isUploading || validating}
+                    onClick={() => { setRejectionMessage(null); fileInputRef.current?.click(); }}
+                  >
+                    {(isUploading || validating) ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                    {validating ? "Verifying..." : isUploading ? "Uploading..." : "Select PDF"}
+                  </Button>
                 </div>
               ) : (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
