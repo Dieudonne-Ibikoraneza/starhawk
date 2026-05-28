@@ -231,9 +231,10 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
                   {actionDialog.policy.termsAndConditions ? (
                     <div className="text-sm">
                       <h4 className="font-semibold text-gray-900 mb-2">Terms & Conditions</h4>
-                      <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200 max-h-48 overflow-y-auto mb-4 whitespace-pre-wrap text-gray-600 text-sm leading-relaxed">
-                        {actionDialog.policy.termsAndConditions}
-                      </div>
+                      <div 
+                        className="max-h-60 overflow-y-auto mb-4 prose prose-sm prose-amber max-w-none text-gray-700"
+                        dangerouslySetInnerHTML={{ __html: actionDialog.policy.termsAndConditions }}
+                      />
                       <div className="flex items-center space-x-3 bg-amber-50/50 p-3 rounded-lg border border-amber-100/50 transition-colors hover:bg-amber-50">
                         <Checkbox 
                           id="modal-terms-accept" 

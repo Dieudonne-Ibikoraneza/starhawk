@@ -218,9 +218,10 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
             {policy.termsAndConditions && (
               <div className="mb-6 space-y-4">
                 <h4 className="font-semibold text-amber-900">Terms and Conditions</h4>
-                <div className="bg-white p-4 rounded-md border border-amber-200 h-40 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap">
-                  {policy.termsAndConditions}
-                </div>
+                <div 
+                  className="bg-transparent h-40 overflow-y-auto text-sm text-gray-700 prose prose-sm prose-amber max-w-none"
+                  dangerouslySetInnerHTML={{ __html: policy.termsAndConditions }}
+                />
                 <div className="flex items-start space-x-2">
                   <Checkbox 
                     id="terms-accept" 

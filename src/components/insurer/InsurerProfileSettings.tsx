@@ -13,6 +13,8 @@ import { getUserProfile, updateUserProfile } from "@/services/usersAPI";
 import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
 import { photosService } from "@/lib/api/services/photos";
 import ImageCropper from "@/components/ui/image-cropper";
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import {
   User,
   Shield,
@@ -561,13 +563,26 @@ export default function InsurerProfileSettings() {
 
           <div className="space-y-2">
             <Label htmlFor="termsAndConditions" className="text-gray-700 font-medium">Standard Terms and Conditions</Label>
-            <Textarea
-              id="termsAndConditions"
-              value={profileData.termsAndConditions}
-              onChange={(e) => handleProfileUpdate("termsAndConditions", e.target.value)}
-              placeholder="Enter the terms and conditions that farmers must agree to when accepting your policies..."
-              className="min-h-[200px] border-gray-300"
-            />
+            <div className="prose-sm">
+              {/* @ts-ignore */}
+              <ReactQuill 
+                theme="snow"
+                value={profileData.termsAndConditions || ''}
+                onChange={(value: string) => handleProfileUpdate("termsAndConditions", value)}
+                placeholder="Enter the terms and conditions that farmers must agree to when accepting your policies..."
+                className="bg-white rounded-md mb-12"
+                style={{ height: '200px' }}
+                modules={{
+                  toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['link'],
+                    ['clean']
+                  ],
+                }}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
