@@ -251,6 +251,7 @@ class UsersApiService {
       licenseNumber?: string;
       registrationDate?: string;
       companyLogoUrl?: string;
+      termsAndConditions?: string;
     };
     [key: string]: any;
   }) {
@@ -280,8 +281,16 @@ const usersApiService = new UsersApiService();
 
 // Export convenience functions
 export const getUserProfile = () => usersApiService.getUserProfile();
-export const updateUserProfile = (profileData: UpdateUserData) =>
-  usersApiService.updateUserProfile(profileData);
+export const updateUserProfile = (data: any) => {
+  const { farmerProfile, assessorProfile, insurerProfile, ...baseData } = data;
+  const flatData = {
+    ...baseData,
+    ...(farmerProfile || {}),
+    ...(assessorProfile || {}),
+    ...(insurerProfile || {})
+  };
+  return usersApiService.updateUserProfile(flatData);
+};
 export const getAllUsers = () => usersApiService.getAllUsers();
 export const getUserById = (userId: string) =>
   usersApiService.getUserById(userId);
@@ -325,6 +334,7 @@ export const createUser = (userData: {
     licenseNumber?: string;
     registrationDate?: string;
     companyLogoUrl?: string;
+    termsAndConditions?: string;
   };
   [key: string]: any;
 }) => usersApiService.createUser(userData);
