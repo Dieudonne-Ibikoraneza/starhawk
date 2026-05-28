@@ -128,7 +128,6 @@ export default function FarmerDashboard() {
     lossDescription: "",
     damagePhotos: [] as string[],
     eventDate: "",
-    estimatedLoss: ""
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
@@ -1170,23 +1169,14 @@ export default function FarmerDashboard() {
       return;
     }
 
-    if (!claimFormData.estimatedLoss || isNaN(parseFloat(claimFormData.estimatedLoss))) {
-      toast({
-        title: 'Validation Error',
-        description: 'Estimated loss is required and must be a valid number',
-        variant: 'destructive'
-      });
-      return;
-    }
 
     setIsSubmittingClaim(true);
     try {
-      const claimData: any = {
+      const claimData = {
         policyId: claimFormData.policyId,
         eventType: claimFormData.lossEventType.toUpperCase(),
         eventDate: new Date(claimFormData.eventDate).toISOString(),
         description: claimFormData.lossDescription,
-        estimatedLoss: parseFloat(claimFormData.estimatedLoss),
         damagePhotos: claimFormData.damagePhotos || []
       };
       
@@ -1204,7 +1194,6 @@ export default function FarmerDashboard() {
         lossDescription: "",
         damagePhotos: [],
         eventDate: "",
-        estimatedLoss: ""
       });
       setUploadedFiles([]);
       
@@ -2018,22 +2007,6 @@ export default function FarmerDashboard() {
                 max={new Date().toISOString().split('T')[0]}
               />
               <p className="text-xs text-gray-500">Date when the loss event occurred</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="estimatedLoss" className="text-gray-900">Estimated Loss (RWF) *</Label>
-              <Input
-                id="estimatedLoss"
-                type="number"
-                step="0.01"
-                min="0"
-                value={claimFormData.estimatedLoss}
-                onChange={(e) => setClaimFormData({ ...claimFormData, estimatedLoss: e.target.value })}
-                placeholder="500000"
-                required
-                className="bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-              />
-              <p className="text-xs text-gray-500">Estimated financial loss in Rwandan Francs</p>
             </div>
 
             <div className="space-y-2">

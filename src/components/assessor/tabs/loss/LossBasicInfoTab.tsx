@@ -37,9 +37,7 @@ export const LossBasicInfoTab = ({
   const dateFiled = claim.filedAt || claim.filedDate || claim.createdAt;
   const lossEventDate = claim.lossEventDate || claim.incidentDate;
   const lossDescription = claim.lossDescription || claim.description;
-  const estimatedLoss = claim.estimatedLoss !== undefined && claim.estimatedLoss !== null 
-    ? claim.estimatedLoss 
-    : (claim.claimAmount || claim.amount || undefined);
+
   const damagePhotos = claim.damagePhotos || (claim as any).photos || [];
 
   const formatSowingDate = (sowingDate?: string): string => {
@@ -213,12 +211,6 @@ export const LossBasicInfoTab = ({
                     {claim.status.replace("_", " ")}
                   </Badge>
                 </div>
-                {estimatedLoss !== undefined && estimatedLoss !== null && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Estimated Loss</p>
-                    <p className="font-black text-xl text-amber-600">{estimatedLoss.toLocaleString()} RWF</p>
-                  </div>
-                )}
               </div>
 
               {lossDescription && (

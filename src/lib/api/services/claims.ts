@@ -52,7 +52,6 @@ export interface Claim {
   lossDescription?: string;
   damagePhotos: string[];
   lossEventDate?: string;
-  estimatedLoss?: number;
   status: string;
   filedAt: string;
   payoutAmount?: number;

@@ -11,7 +11,6 @@ interface ClaimData {
   lossDescription?: string; // backward compatibility
   description?: string; // new format
   eventDate?: string; // ISO date string
-  estimatedLoss?: number; // Estimated loss amount
   damagePhotos?: string[]; // Array of photo URLs
   [key: string]: any; // Allow additional fields for backward compatibility
 }
@@ -138,7 +137,7 @@ class ClaimsApiService {
 
   // Create Claim
   // POST /claims
-  // Request: { policyId, eventType, eventDate, description, estimatedLoss, damagePhotos }
+  // Request: { policyId, eventType, eventDate, description, damagePhotos }
   async createClaim(claimData: ClaimData) {
     // Validate required fields
     if (!claimData.policyId) {
@@ -166,10 +165,6 @@ class ClaimsApiService {
     // Add optional fields if provided
     if (claimData.eventDate) {
       requestBody.eventDate = claimData.eventDate;
-    }
-    
-    if (claimData.estimatedLoss !== undefined && claimData.estimatedLoss !== null) {
-      requestBody.estimatedLoss = claimData.estimatedLoss;
     }
     
     if (claimData.damagePhotos && claimData.damagePhotos.length > 0) {

@@ -251,7 +251,6 @@ export default function ClaimsTab({ onFileClaim }: ClaimsTabProps) {
                     <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Farm Name</th>
                     <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Loss Type</th>
                     <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Event Date</th>
-                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estimated Loss</th>
                     <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Payout</th>
                     <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="py-4 px-6 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -278,9 +277,7 @@ export default function ClaimsTab({ onFileClaim }: ClaimsTabProps) {
                             ? new Date(claim.filedAt).toLocaleDateString()
                             : "N/A"}
                       </td>
-                      <td className="py-4 px-6 font-bold text-gray-800">
-                        {claim.estimatedLoss ? `${claim.estimatedLoss.toLocaleString()} RWF` : "N/A"}
-                      </td>
+
                       <td className="py-4 px-6 font-extrabold text-emerald-700">
                         {claim.payoutAmount ? `${claim.payoutAmount.toLocaleString()} RWF` : "—"}
                       </td>
@@ -428,10 +425,7 @@ export default function ClaimsTab({ onFileClaim }: ClaimsTabProps) {
                         {selectedClaim.lossEventDate ? new Date(selectedClaim.lossEventDate).toLocaleDateString() : "N/A"}
                       </span>
                     </div>
-                    <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                      <span className="text-gray-500">Estimated Loss</span>
-                      <span className="font-bold text-amber-600">{selectedClaim.estimatedLoss?.toLocaleString() || "0"} RWF</span>
-                    </div>
+
                     <div className="flex justify-between">
                       <span className="text-gray-500">Approved Payout</span>
                       <span className="font-extrabold text-emerald-700">{selectedClaim.payoutAmount ? `${selectedClaim.payoutAmount.toLocaleString()} RWF` : "Pending Assessment"}</span>

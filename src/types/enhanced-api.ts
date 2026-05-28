@@ -180,7 +180,6 @@ export interface ClaimRequest {
   disasterType: 'drought' | 'flood' | 'pest_attack' | 'disease_outbreak' | 'hail' | 'fire' | 'theft';
   incidentDate: string;
   description: string;
-  estimatedLoss: number;
   affectedArea: number; // hectares
   coordinates: [number, number];
   priority: 'low' | 'medium' | 'high' | 'critical';

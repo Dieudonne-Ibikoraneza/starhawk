@@ -7390,10 +7390,10 @@ export const AdminDashboard = () => {
                   },
                   {
                     key: "amount",
-                    label: "Estimated Loss",
+                    label: "Claim Amount",
                     render: (_, row) => (
                       <span className="text-gray-900">
-                        RWF {(row.estimatedLoss || row.payoutAmount || row.amount || row.claimAmount || 0).toLocaleString()}
+                        RWF {(row.payoutAmount || row.amount || row.claimAmount || 0).toLocaleString()}
                       </span>
                     ),
                   },
