@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { approveClaim as approveClaimApi, rejectClaim as rejectClaimApi, getClaimById, getClaims } from "@/services/claimsApi";
+import { approveClaim as approveClaimApi, rejectClaim as rejectClaimApi, flagClaim as flagClaimApi, getClaimById, getClaims } from "@/services/claimsApi";
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import { 
@@ -62,6 +62,8 @@ export default function ClaimReviewPage() {
   const [activeTab, setActiveTab] = useState("info");
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [isRejectionDialogOpen, setIsRejectionDialogOpen] = useState(false);
+  const [isFlagDialogOpen, setIsFlagDialogOpen] = useState(false);
+  const [correctionReason, setCorrectionReason] = useState("");
 
   // AI States
   const [aiRiskAnalysis, setAiRiskAnalysis] = useState<any>(null);
@@ -230,9 +232,9 @@ export default function ClaimReviewPage() {
         setIsApprovalDialogOpen(false);
       } else if (reviewDecision === "reject") {
         if (!reviewComments) {
-           toast({ title: "Error", description: "Please provide rejection reason", variant: "destructive" });
-           setIsSubmitting(false);
-           return;
+          toast({ title: "Error", description: "Please provide a rejection reason", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
         }
         await rejectClaimApi(selectedClaimId, reviewComments);
         toast({
@@ -241,18 +243,27 @@ export default function ClaimReviewPage() {
           variant: "default",
         });
         setIsRejectionDialogOpen(false);
+      } else if (reviewDecision === "flag") {
+        if (!correctionReason) {
+          toast({ title: "Error", description: "Please provide a correction reason", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+        await flagClaimApi(selectedClaimId, correctionReason);
+        toast({
+          title: "Success",
+          description: "Claim flagged for correction successfully",
+          variant: "default",
+        });
+        setIsFlagDialogOpen(false);
       }
       
-      // Reload data
+      await loadClaimDetails(selectedClaimId);
       loadClaims();
-      if (selectedClaimId) {
-        loadClaimDetails(selectedClaimId);
-      }
     } catch (err: any) {
-      console.error('Failed to submit review:', err);
       toast({
         title: "Error",
-        description: err.message || 'Failed to submit review',
+        description: err.message || "Failed to submit review",
         variant: "destructive",
       });
     } finally {
@@ -260,6 +271,7 @@ export default function ClaimReviewPage() {
       setReviewDecision("");
       setReviewComments("");
       setApprovedAmount("");
+      setCorrectionReason("");
     }
   };
 
@@ -534,7 +546,6 @@ export default function ClaimReviewPage() {
     </Card>
   );
 
-  // This function is replaced by Dialogs
   const renderDecisionDialogs = () => (
     <>
       {/* Approval Dialog */}
@@ -594,29 +605,29 @@ export default function ClaimReviewPage() {
 
       {/* Rejection Dialog */}
       <Dialog open={isRejectionDialogOpen} onOpenChange={setIsRejectionDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="h-5 w-5" />
               Reject Claim
             </DialogTitle>
             <DialogDescription>
-              Provide a detailed reason for rejecting this claim.
+              Please provide a reason for rejecting this claim. This will be visible to the farmer and assessor.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="rejReason" className="text-xs font-bold text-gray-500 uppercase">Rejection Reason</Label>
+              <Label htmlFor="rejectReason" className="text-xs font-bold text-gray-500 uppercase">Rejection Reason</Label>
               <Textarea
-                id="rejReason"
+                id="rejectReason"
                 value={reviewComments}
                 onChange={(e) => setReviewComments(e.target.value)}
-                placeholder="Explain the reason for rejection..."
-                className="rounded-xl min-h-[120px]"
+                placeholder="Explain why this claim is being rejected..."
+                className="min-h-[100px] resize-none"
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setIsRejectionDialogOpen(false)}>Cancel</Button>
             <Button 
               onClick={() => {
@@ -624,10 +635,50 @@ export default function ClaimReviewPage() {
                 handleSubmitReview();
               }}
               disabled={isSubmitting || !reviewComments}
-              variant="destructive"
+              className="bg-red-600 hover:bg-red-700"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
               Confirm Rejection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFlagDialogOpen} onOpenChange={setIsFlagDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Flag for Correction
+            </DialogTitle>
+            <DialogDescription>
+              Please provide instructions for the assessor on what needs to be corrected or verified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="correctionReason" className="text-xs font-bold text-gray-500 uppercase">Correction Reason</Label>
+              <Textarea
+                id="correctionReason"
+                value={correctionReason}
+                onChange={(e) => setCorrectionReason(e.target.value)}
+                placeholder="What should the assessor review or correct?"
+                className="min-h-[100px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsFlagDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                setReviewDecision("flag");
+                handleSubmitReview();
+              }}
+              disabled={isSubmitting || !correctionReason}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
+              Flag for Correction
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -680,21 +731,30 @@ export default function ClaimReviewPage() {
            ) : (
              (currentClaim?.status?.toLowerCase() === 'pending' || 
               currentClaim?.status?.toLowerCase() === 'pending_review' || 
+              currentClaim?.status?.toLowerCase() === 'submitted' || 
               currentClaim?.status?.toLowerCase() === 'in_progress') && (
-               <div className="flex gap-2">
+               <div className="flex gap-2 flex-wrap">
                   <Button 
                     onClick={() => setIsApprovalDialogOpen(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 px-6 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95"
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 px-4 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-1.5" />
                     Approve
+                  </Button>
+                  <Button 
+                    onClick={() => setIsFlagDialogOpen(true)}
+                    variant="outline"
+                    className="border-amber-200 text-amber-600 hover:bg-amber-50 font-bold h-10 px-4 rounded-xl transition-all hover:scale-105 active:scale-95"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1.5" />
+                    Flag for Correction
                   </Button>
                   <Button 
                     onClick={() => setIsRejectionDialogOpen(true)}
                     variant="outline"
-                    className="border-red-200 text-red-600 hover:bg-red-50 font-bold h-10 px-6 rounded-xl transition-all hover:scale-105 active:scale-95"
+                    className="border-red-200 text-red-600 hover:bg-red-50 font-bold h-10 px-4 rounded-xl transition-all hover:scale-105 active:scale-95"
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-1.5" />
                     Reject
                   </Button>
                </div>

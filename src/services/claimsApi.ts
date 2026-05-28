@@ -249,6 +249,16 @@ class ClaimsApiService {
     });
   }
 
+  async flagClaim(id: string, correctionReason: string) {
+    if (!correctionReason) {
+      throw new Error('Correction reason is required');
+    }
+    return this.request<any>(`/${id}/flag`, {
+      method: 'PUT',
+      body: JSON.stringify({ correctionReason }),
+    });
+  }
+
   // Assign Assessor to Claim (Insurer Only)
   async assignAssessor(id: string, assessorId: string) {
     return this.request<any>(`/${id}/assign`, {
@@ -290,9 +300,9 @@ export const getClaims = (page?: number, size?: number, status?: string) => clai
 export const getClaimById = (id: string) => claimsApiService.getClaimById(id);
 export const updateClaim = (id: string, updateData: UpdateClaimData) => claimsApiService.updateClaim(id, updateData);
 export const deleteClaim = (id: string) => claimsApiService.deleteClaim(id);
-export const approveClaim = (id: string, approvedAmount?: number, notes?: string) => claimsApiService.approveClaim(id, approvedAmount, notes);
+export const approveClaim = (id: string, payoutAmount?: number, approvedAmount?: number, notes?: string) => claimsApiService.approveClaim(id, payoutAmount, approvedAmount, notes);
 export const rejectClaim = (id: string, reason: string) => claimsApiService.rejectClaim(id, reason);
+export const flagClaim = (id: string, reason: string) => claimsApiService.flagClaim(id, reason);
 export const assignAssessor = (id: string, assessorId: string) => claimsApiService.assignAssessor(id, assessorId);
 export const updateClaimAssessment = (id: string, assessmentData: any) => claimsApiService.updateClaimAssessment(id, assessmentData);
 export const submitAssessment = (id: string, assessmentData?: any) => claimsApiService.submitAssessment(id, assessmentData);
-
