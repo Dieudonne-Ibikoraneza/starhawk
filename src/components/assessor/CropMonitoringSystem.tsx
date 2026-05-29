@@ -17,6 +17,10 @@ import { getRequiredMonitoringCycles } from "@/lib/crops";
 import { MonitoringOverviewTab } from "./tabs/MonitoringOverviewTab";
 import { FieldMapWithLayers } from "./FieldMapWithLayers";
 import meteosourceApiService from "@/services/meteosourceApi";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format, addDays, isWithinInterval } from "date-fns";
+import { DateRange } from "react-day-picker";
 import { 
   MapPin,
   Search,
@@ -139,6 +143,8 @@ export default function CropMonitoringSystem() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
   const [fullMonitoringDetails, setFullMonitoringDetails] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
@@ -324,21 +330,57 @@ export default function CropMonitoringSystem() {
     }
   };
 
-  // Filter monitoring history
-  const filteredMonitoring = monitoringHistory.filter((monitoring: any) => {
-    const policyStr = typeof monitoring.policyId === "object"
-      ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
-      : (monitoring.policyId || "");
+  const calculateNextRecommendedDate = (monitoring: any) => {
+    if (monitoring.lastMonitoringDate) {
+      return addDays(new Date(monitoring.lastMonitoringDate), 30);
+    }
+    if (monitoring.sowingDate) {
+      return addDays(new Date(monitoring.sowingDate), 30);
+    }
+    return null;
+  };
 
-    const matchesSearch = searchQuery === "" || 
-      (monitoring.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      policyStr.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === 'IN_PROGRESS' && monitoring.hasMonitoring) ||
-      (statusFilter === 'COMPLETED' && monitoring.cyclesCount > 0);
-    return matchesSearch && matchesStatus;
-  });
+  const filteredMonitoring = monitoringHistory
+    .map((monitoring: any) => ({
+      ...monitoring,
+      nextRecommendedDate: calculateNextRecommendedDate(monitoring)
+    }))
+    .filter((monitoring: any) => {
+      const policyStr = typeof monitoring.policyId === "object"
+        ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
+        : (monitoring.policyId || "");
+
+      const matchesSearch = searchQuery === "" || 
+        (monitoring.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        policyStr.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === 'IN_PROGRESS' && monitoring.hasActiveCycle) ||
+        (statusFilter === 'COMPLETED' && monitoring.completedCycles > 0) ||
+        (statusFilter === 'PENDING' && !monitoring.hasMonitoring);
+      
+      let matchesDateRange = true;
+      if (dateRange?.from) {
+        if (!monitoring.nextRecommendedDate) {
+          matchesDateRange = false;
+        } else {
+          const checkDate = monitoring.nextRecommendedDate;
+          if (dateRange.to) {
+            matchesDateRange = isWithinInterval(checkDate, { start: dateRange.from, end: dateRange.to });
+          } else {
+            matchesDateRange = format(checkDate, 'yyyy-MM-dd') === format(dateRange.from, 'yyyy-MM-dd');
+          }
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesDateRange;
+    })
+    .sort((a: any, b: any) => {
+      if (!a.nextRecommendedDate) return sortOrder === "asc" ? 1 : -1;
+      if (!b.nextRecommendedDate) return sortOrder === "asc" ? -1 : 1;
+      const diff = a.nextRecommendedDate.getTime() - b.nextRecommendedDate.getTime();
+      return sortOrder === "asc" ? diff : -diff;
+    });
 
   // Legacy mock data (kept for backward compatibility with old components)
   const monitorings: any[] = [
@@ -471,11 +513,7 @@ export default function CropMonitoringSystem() {
   };
 
   const handleViewFieldDetails = (field: any) => {
-    if (!field.cropMonitoringId) {
-       toast({ title: 'No Monitoring', description: 'This field has no active monitoring cycle.', variant: 'destructive' });
-       return;
-    }
-    navigate(`/assessor/crop-monitoring/${field.cropMonitoringId}`);
+    navigate(`/assessor/crop-monitoring/${field.cropMonitoringId || field.farmId}`);
   };
 
   const handleMonitoringClick = (monitoring: MonitoringSummary) => {
@@ -1389,6 +1427,48 @@ export default function CropMonitoringSystem() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Monitoring History</h2>
         <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={`justify-start text-left font-normal ${!dateRange && "text-muted-foreground"} ${dashboardTheme.input} border-gray-300 w-[240px]`}
+              >
+                <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <span className="text-gray-700">
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </span>
+                  ) : (
+                    <span className="text-gray-700">{format(dateRange.from, "LLL dd, y")}</span>
+                  )
+                ) : (
+                  <span className="text-gray-500">Filter by Next Cycle...</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Button
+            variant="outline"
+            className={`${dashboardTheme.input} border-gray-300 w-[180px] text-gray-700`}
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+            title="Sort by Next Recommended Date"
+          >
+            Next Cycle: {sortOrder === "asc" ? "Earliest" : "Latest"}
+          </Button>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
@@ -1404,6 +1484,7 @@ export default function CropMonitoringSystem() {
             </SelectTrigger>
             <SelectContent className={dashboardTheme.card}>
               <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="PENDING">Pending Monitoring</SelectItem>
               <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
               <SelectItem value="COMPLETED">Completed</SelectItem>
             </SelectContent>
@@ -1420,6 +1501,7 @@ export default function CropMonitoringSystem() {
                     <th className="text-left py-4 px-6 font-medium text-gray-600">Farm Name</th>
                     <th className="text-left py-4 px-6 font-medium text-gray-600">Crop Type</th>
                     <th className="text-left py-4 px-6 font-medium text-gray-600">Cycles Count</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Next Cycle</th>
                     <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
                     <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
                   </tr>
@@ -1431,13 +1513,14 @@ export default function CropMonitoringSystem() {
                           <td className="py-4 px-6"><div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div></td>
                           <td className="py-4 px-6"><div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div></td>
                           <td className="py-4 px-6"><div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div></td>
+                          <td className="py-4 px-6"><div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div></td>
                           <td className="py-4 px-6"><div className="h-6 w-24 bg-gray-200 animate-pulse rounded-full"></div></td>
                           <td className="py-4 px-6"><div className="h-8 w-24 bg-gray-200 animate-pulse rounded"></div></td>
                         </tr>
                       ))
                     ) : filteredMonitoring.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-gray-500">
+                      <td colSpan={6} className="py-12 text-center text-gray-500">
                         No monitored fields found.
                       </td>
                     </tr>
@@ -1452,18 +1535,20 @@ export default function CropMonitoringSystem() {
                         <td className="py-4 px-6 text-gray-900">{field.name}</td>
                         <td className="py-4 px-6 text-gray-900">{field.cropType}</td>
                         <td className="py-4 px-6 text-gray-600">{field.cyclesCount} cycles</td>
+                        <td className="py-4 px-6 text-gray-600">
+                          {field.nextRecommendedDate ? format(field.nextRecommendedDate, 'MMM dd, yyyy') : 'N/A'}
+                        </td>
                         <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block border ${
                             field.hasMonitoring
-                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                              : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
-                            {field.hasMonitoring ? 'Active Monitoring' : 'No Monitoring'}
+                            {field.hasMonitoring ? 'Active Monitoring' : 'Pending Monitoring'}
                           </span>
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex gap-2">
-                            {field.hasMonitoring && (
                               <Button
                                 size="sm"
                                 onClick={() => handleViewFieldDetails(field)}
@@ -1471,7 +1556,6 @@ export default function CropMonitoringSystem() {
                               >
                                 View Details
                               </Button>
-                            )}
                           </div>
                         </td>
                       </tr>
