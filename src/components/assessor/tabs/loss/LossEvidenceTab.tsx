@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -83,9 +83,17 @@ export const LossEvidenceTab = ({
     "COMPLETED",
   ].includes(claim.status);
 
-  const { data: dronePdfs = [], isLoading: isAssessmentLoading } = useClaimPdfs(
+  const { data: rawDronePdfs = [], isLoading: isAssessmentLoading } = useClaimPdfs(
     claim._id,
   );
+
+  const dronePdfs = useMemo(() => {
+    return [...rawDronePdfs].sort((a: any, b: any) => {
+      const dateA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+      const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+      return dateB - dateA; // Newest first
+    });
+  }, [rawDronePdfs]);
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

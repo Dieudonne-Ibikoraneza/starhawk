@@ -214,7 +214,14 @@ export const DroneAnalysisTab = ({
   });
 
   const uploadedPdfs = useMemo(
-    () => assessmentData?.droneAnalysisPdfs || [],
+    () => {
+      const pdfs = [...(assessmentData?.droneAnalysisPdfs || [])];
+      return pdfs.sort((a, b) => {
+        const dateA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+        const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+        return dateB - dateA; // Newest first
+      });
+    },
     [assessmentData],
   );
 
