@@ -213,9 +213,9 @@ export default function InsurerDashboard() {
 
     setLoadingSummary(true);
     try {
-      const [claimsResp, policiesResp] = await Promise.allSettled([
+      const [policiesResp, claimsResp] = await Promise.allSettled([
+        getPolicies(1, 1000),
         getClaims(),
-        getPolicies(),
       ]);
 
       if (claimsResp.status === "fulfilled") {
@@ -959,6 +959,15 @@ export default function InsurerDashboard() {
                 farm.locationName?.split(",")[0] || farm.district || "N/A";
               const id = assessment._id || assessment.id || "0000";
 
+              // Find associated policy
+              const policy = recentPolicies.find((p: any) => p.assessmentId === id || (p.assessmentId && (p.assessmentId._id === id || p.assessmentId.id === id)));
+              let displayStatus = statusLower;
+              if (statusLower === 'policy_issued' && policy) {
+                displayStatus = policy.status.toLowerCase();
+              }
+              if (displayStatus === 'pending_acceptance') displayStatus = 'pending acceptance';
+              if (displayStatus === 'needs_correction') displayStatus = 'needs correction';
+
               return (
                 <tr
                   key={id || index}
@@ -1052,23 +1061,23 @@ export default function InsurerDashboard() {
                   <td className="py-5 px-6 text-center">
                     <Badge
                       className={`shadow-none border-0 rounded-full px-4 py-1 gap-2 font-bold capitalize ${
-                        statusLower === "approved"
+                        displayStatus === "approved" || displayStatus === "active"
                           ? "bg-emerald-100/50 text-emerald-700"
-                          : statusLower === "rejected"
+                          : displayStatus === "rejected" || displayStatus === "declined"
                             ? "bg-rose-100/50 text-rose-700"
                             : "bg-amber-100/50 text-amber-700"
                       }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          statusLower === "approved"
+                          displayStatus === "approved" || displayStatus === "active"
                             ? "bg-emerald-500"
-                            : statusLower === "rejected"
+                            : displayStatus === "rejected" || displayStatus === "declined"
                               ? "bg-rose-500"
                               : "bg-amber-500"
                         }`}
                       />
-                      {statusLower}
+                      {displayStatus}
                     </Badge>
                   </td>
                 </tr>

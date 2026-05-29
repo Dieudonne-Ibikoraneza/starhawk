@@ -326,7 +326,13 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
           </TabsContent>
 
           <TabsContent value="drone">
-            <DroneTab assessment={assessment} onRefresh={loadData} />
+            <DroneTab 
+              assessment={assessment} 
+              farm={farm}
+              farmer={farmer}
+              onRefresh={loadData} 
+              readOnly={readOnly}
+            />
           </TabsContent>
 
           <TabsContent value="overview">

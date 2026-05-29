@@ -12,7 +12,7 @@ import { ArrowLeft, CheckCircle, AlertTriangle, MapPin, Download, Shield, Clock 
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import assessmentsApiService from "@/services/assessmentsApi";
-import { createPolicyFromAssessment, getPolicies } from "@/services/policiesApi";
+import { createPolicyFromAssessment, getPolicies, updatePolicy } from "@/services/policiesApi";
 import { Link } from "react-router-dom";
 import OverviewTab from "../assessor/tabs/OverviewTab";
 import DroneTab from "../assessor/tabs/DroneTab";
@@ -70,7 +70,7 @@ export default function InsurerRiskAssessmentDetail({
   }, [assessmentId]);
 
   useEffect(() => {
-    if (assessment && assessment.status === 'POLICY_ISSUED') {
+    if (assessment && (assessment.status === 'POLICY_ISSUED' || assessment.status === 'APPROVED')) {
       getPolicies().then((res: any) => {
         const policiesArray = Array.isArray(res?.data?.items) ? res.data.items : Array.isArray(res) ? res : res?.data || res?.items || res?.results || [];
         const policy = policiesArray.find((p: any) => 
@@ -86,6 +86,12 @@ export default function InsurerRiskAssessmentDetail({
 
   useEffect(() => {
     if (showPolicyDialog && assessment) {
+      if (associatedPolicy) {
+        setCoverageLevel(associatedPolicy.coverageLevel || "STANDARD");
+        setPolicyStartDate(associatedPolicy.startDate ? new Date(associatedPolicy.startDate).toISOString().split('T')[0] : "");
+        setPolicyEndDate(associatedPolicy.endDate ? new Date(associatedPolicy.endDate).toISOString().split('T')[0] : "");
+        return;
+      }
       const today = new Date();
       setPolicyStartDate(today.toISOString().split('T')[0]);
 
@@ -200,13 +206,22 @@ export default function InsurerRiskAssessmentDetail({
       // Convert dates to ISO format
       const startDateISO = new Date(policyStartDate + 'T00:00:00Z').toISOString();
       const endDateISO = new Date(policyEndDate + 'T23:59:59Z').toISOString();
-      await createPolicyFromAssessment(
-        assessmentId,
-        coverageLevel,
-        startDateISO,
-        endDateISO
-      );
-      toast({ title: "Success", description: "Policy created successfully" });
+      if (associatedPolicy) {
+        await updatePolicy(associatedPolicy._id || associatedPolicy.id, {
+          coverageLevel,
+          startDate: startDateISO,
+          endDate: endDateISO
+        });
+        toast({ title: "Success", description: associatedPolicy.status === 'DECLINED' ? "New policy issued successfully" : "Policy revised successfully" });
+      } else {
+        await createPolicyFromAssessment(
+          assessmentId,
+          coverageLevel,
+          startDateISO,
+          endDateISO
+        );
+        toast({ title: "Success", description: "Policy created successfully" });
+      }
       setShowPolicyDialog(false);
       await loadAssessment();
       if (onActionComplete) onActionComplete();
@@ -249,7 +264,7 @@ export default function InsurerRiskAssessmentDetail({
         </div>
         
         <div className="flex items-center gap-3">
-          {assessment.status === 'APPROVED' || assessment.status === 'POLICY_ISSUED' ? (
+          {assessment.status === 'APPROVED' && !associatedPolicy ? (
             <Button onClick={() => setShowPolicyDialog(true)} disabled={isCreatingPolicy} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10">
               <Shield className="h-4 w-4 mr-2" />
               {isCreatingPolicy ? "Creating..." : "Create Policy"}
@@ -281,12 +296,17 @@ export default function InsurerRiskAssessmentDetail({
               }`}>
                 {assessment.status?.replace(/_/g, ' ').replace(/\w\S*/g, (txt: string) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())}
               </Badge>
-              {associatedPolicy && (
+              {associatedPolicy && (associatedPolicy.status === 'NEEDS_CORRECTION' || associatedPolicy.status === 'DECLINED') ? (
+                <Button onClick={() => setShowPolicyDialog(true)} className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl h-10">
+                  <Shield className="h-4 w-4 mr-2" />
+                  {associatedPolicy.status === 'DECLINED' ? "Issue New Policy" : "Revise Policy"}
+                </Button>
+              ) : associatedPolicy ? (
                 <Link to={`/insurer/policies/${associatedPolicy._id || associatedPolicy.id}`} className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline border border-purple-200 bg-purple-50 px-3 py-1.5 rounded-full flex items-center transition-colors">
                   <Shield className="w-3.5 h-3.5 mr-1.5" />
                   View Policy {associatedPolicy.policyNumber ? `#${associatedPolicy.policyNumber}` : ''}
                 </Link>
-              )}
+              ) : null}
             </div>
           )}
         </div>
@@ -494,9 +514,17 @@ export default function InsurerRiskAssessmentDetail({
       <Dialog open={showPolicyDialog} onOpenChange={(open) => setShowPolicyDialog(open)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="text-gray-900">Create Policy from Assessment</DialogTitle>
+            <DialogTitle className="text-gray-900">
+              {associatedPolicy && associatedPolicy.status === 'DECLINED' ? "Issue New Policy" :
+               associatedPolicy ? "Revise Policy" : "Create Policy from Assessment"}
+            </DialogTitle>
             <DialogDescription className="text-gray-600">
-              Create an insurance policy based on the submitted assessment
+              {associatedPolicy && associatedPolicy.status === 'DECLINED' 
+                ? "Issue a new policy to replace the declined one"
+                : associatedPolicy 
+                ? "Revise the existing policy based on farmer feedback"
+                : "Create an insurance policy based on the submitted assessment"
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
@@ -576,12 +604,14 @@ export default function InsurerRiskAssessmentDetail({
                 {isCreatingPolicy ? (
                   <>
                     <Clock className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
+                    {associatedPolicy && associatedPolicy.status === 'DECLINED' ? "Issuing..." :
+                     associatedPolicy ? "Revising..." : "Creating..."}
                   </>
                 ) : (
                   <>
                     <Shield className="h-4 w-4 mr-2" />
-                    Create Policy
+                    {associatedPolicy && associatedPolicy.status === 'DECLINED' ? "Issue New Policy" :
+                     associatedPolicy ? "Revise Policy" : "Create Policy"}
                   </>
                 )}
               </Button>

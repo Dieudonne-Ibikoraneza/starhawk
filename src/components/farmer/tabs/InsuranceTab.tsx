@@ -183,6 +183,9 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
                 {policyGroups.active.map((p) => (
                   <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={() => {}} onViewDetails={onViewDetails} />
                 ))}
+                {policyGroups.declined.map((p) => (
+                  <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={() => {}} onViewDetails={onViewDetails} />
+                ))}
                 {policyGroups.others.map((p) => (
                   <PolicyItem key={p._id || p.id} p={p} farmName={getPolicyFarmName(p)} onAction={() => {}} onViewDetails={onViewDetails} />
                 ))}

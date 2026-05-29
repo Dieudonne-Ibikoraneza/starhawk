@@ -17,6 +17,7 @@ import {
   getUserProfile,
   updateUserProfile,
   getInsurers,
+  getAssessors,
 } from "@/services/usersAPI";
 import {
   getSystemStatistics,
@@ -6920,7 +6921,7 @@ export const AdminDashboard = () => {
                 <div>
                   <Label className="text-gray-900/80">Select Farmer</Label>
                   <Select
-                    value={policyFormData.farmerId || undefined}
+                    value={policyFormData.farmerId}
                     onValueChange={(value) => {
                       const selectedFarmer = systemUsers.find((u: any) => {
                         const role = u.role?.toLowerCase() || "";
@@ -7737,91 +7738,91 @@ export const AdminDashboard = () => {
   // Load assessors for assessment creation and assignment
   const loadAssessors = async () => {
     try {
-      console.log("🔄 Loading assessors...");
-      // Fetch all users and filter for assessors
-      const response: any = await getAllUsers();
-      console.log("✅ All users API response:", response);
+      console.log("🔄 Loading assessors via dedicated endpoint...");
+      const response = await getAssessors(0, 100);
+      console.log("✅ Assessors API response:", response);
 
-      let allUsers: any[] = [];
+      let assessorUsers: any[] = [];
 
       // Handle different response structures
       if (Array.isArray(response)) {
-        allUsers = response;
+        assessorUsers = response;
       } else if (response && typeof response === "object") {
-        // Try multiple possible response structures
-        if (Array.isArray(response.users)) {
-          allUsers = response.users;
-        } else if (Array.isArray(response.data)) {
-          allUsers = response.data;
-        } else if (Array.isArray(response.results)) {
-          allUsers = response.results;
-        } else if (Array.isArray(response.items)) {
-          allUsers = response.items;
-        } else if (Array.isArray(response.list)) {
-          allUsers = response.list;
-        } else if (response.data) {
-          if (Array.isArray(response.data)) {
-            allUsers = response.data;
-          } else if (response.data.data && Array.isArray(response.data.data)) {
-            allUsers = response.data.data;
-          } else if (
-            response.data.users &&
-            Array.isArray(response.data.users)
-          ) {
-            allUsers = response.data.users;
-          } else if (
-            response.data.results &&
-            Array.isArray(response.data.results)
-          ) {
-            allUsers = response.data.results;
-          } else if (
-            response.data.items &&
-            Array.isArray(response.data.items)
-          ) {
-            allUsers = response.data.items;
-          } else if (response.data.list && Array.isArray(response.data.list)) {
-            allUsers = response.data.list;
-          }
-        } else {
-          // Try to find any array property
-          const keys = Object.keys(response);
+        assessorUsers =
+          response.data?.items ||
+          response.data?.content ||
+          response.items ||
+          response.content ||
+          response.data ||
+          response.users ||
+          response.results ||
+          response.list ||
+          [];
+          
+        if (!Array.isArray(assessorUsers)) {
+          const keys = Object.keys(response.data || response);
           for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              allUsers = response[key];
+            const target = response.data || response;
+            if (Array.isArray(target[key])) {
+              assessorUsers = target[key];
               break;
             }
           }
         }
       }
 
-      // Ensure allUsers is an array
-      if (!Array.isArray(allUsers)) {
-        console.warn("⚠️ allUsers is not an array, converting:", allUsers);
-        allUsers = [];
+      // Ensure assessorUsers is an array
+      if (!Array.isArray(assessorUsers)) {
+        console.warn("⚠️ assessorUsers is not an array, converting:", assessorUsers);
+        assessorUsers = [];
       }
 
-      // Filter users by role to get only assessors
-      const assessorUsers = allUsers.filter((user: any) => {
+      // Filter as fallback just in case some other roles got in,
+      // but also handle directly returned assessor lists
+      const filtered = assessorUsers.filter((user: any) => {
         const role = user.role || "";
         return role.toUpperCase() === "ASSESSOR" || role === "Assessor";
       });
 
-      setAssessors(assessorUsers);
-      console.log(
-        `✅ Filtered ${assessorUsers.length} assessors from ${allUsers.length} total users`,
-      );
-      if (assessorUsers.length > 0) {
-        console.log("📊 Sample assessor:", assessorUsers[0]);
-      }
+      const finalAssessors = filtered.length > 0 ? filtered : assessorUsers;
+
+      setAssessors(finalAssessors);
+      console.log(`✅ Loaded ${finalAssessors.length} assessors`);
     } catch (err: any) {
-      console.error("❌ Failed to load assessors:", err);
-      setAssessors([]);
-      toast({
-        title: "Warning",
-        description:
-          "Could not load assessors. Please try refreshing the page.",
-        variant: "default",
-      });
+      console.error("❌ Failed to load assessors via dedicated endpoint, falling back to getAllUsers:", err);
+      // Fallback: use getAllUsers and filter
+      try {
+        const response: any = await getAllUsers();
+        let allUsers: any[] = [];
+        if (Array.isArray(response)) {
+          allUsers = response;
+        } else if (response && typeof response === "object") {
+          allUsers =
+            response.data?.items ||
+            response.data?.content ||
+            response.items ||
+            response.content ||
+            response.data ||
+            response.users ||
+            response.results ||
+            [];
+          if (!Array.isArray(allUsers)) allUsers = [];
+        }
+        const filtered = allUsers.filter((user: any) => {
+          const role = user.role || "";
+          return role.toUpperCase() === "ASSESSOR" || role === "Assessor";
+        });
+        setAssessors(filtered);
+        console.log(`✅ Fallback: Filtered ${filtered.length} assessors from ${allUsers.length} users`);
+      } catch (fallbackErr: any) {
+        console.error("❌ Fallback also failed:", fallbackErr);
+        setAssessors([]);
+        toast({
+          title: "Warning",
+          description: "Could not load assessors. Please try refreshing the page.",
+          variant: "default",
+        });
+      }
     }
   };
 
@@ -7887,7 +7888,15 @@ export const AdminDashboard = () => {
         if (Array.isArray(usersResponse)) {
           allUsers = usersResponse;
         } else if (usersResponse && typeof usersResponse === "object") {
-          allUsers = usersResponse.data || usersResponse.users || usersResponse.items || usersResponse.results || [];
+          allUsers =
+            usersResponse.data?.items ||
+            usersResponse.data?.content ||
+            usersResponse.items ||
+            usersResponse.content ||
+            usersResponse.data ||
+            usersResponse.users ||
+            usersResponse.results ||
+            [];
           if (!Array.isArray(allUsers)) allUsers = [];
         }
         const filtered = allUsers.filter((user: any) => {
@@ -8373,10 +8382,16 @@ export const AdminDashboard = () => {
                             </td>
                             <td className="py-3 px-6 text-gray-900">
                               {(() => {
-                                const prefInsurerId = farm.insurerId || farm.preferredInsurerId;
-                                if (!prefInsurerId) return <span className="text-gray-400 text-xs italic">None preferred</span>;
+                                const prefInsurerIdVal = farm.insurerId || farm.preferredInsurerId;
+                                if (!prefInsurerIdVal) return <span className="text-gray-400 text-xs italic">None preferred</span>;
                                 
-                                const insurer = insurers.find(i => (i.id || i._id) === prefInsurerId);
+                                const prefInsurerIdStr = typeof prefInsurerIdVal === "object"
+                                  ? (prefInsurerIdVal._id || prefInsurerIdVal.id || "")
+                                  : String(prefInsurerIdVal);
+                                  
+                                if (!prefInsurerIdStr) return <span className="text-gray-400 text-xs italic">None preferred</span>;
+                                
+                                const insurer = insurers.find(i => (i.id || i._id) === prefInsurerIdStr);
                                 if (insurer) {
                                   const companyName = insurer.insurerProfile?.companyName;
                                   const personalName = (insurer.firstName && insurer.lastName) 
@@ -8392,17 +8407,21 @@ export const AdminDashboard = () => {
                                     </div>
                                   );
                                 }
-                                return <span className="text-gray-500 text-xs">ID: {prefInsurerId.substring(0, 8)}...</span>;
+                                return <span className="text-gray-500 text-xs">ID: {prefInsurerIdStr.substring(0, 8)}...</span>;
                               })()}
                             </td>
                             <td className="py-3 px-6">
                               <Button
                                 onClick={() => {
                                   if (farm && farmId) {
+                                    const prefInsurerIdVal = farm.insurerId || farm.preferredInsurerId;
+                                    const prefInsurerIdStr = prefInsurerIdVal
+                                      ? (typeof prefInsurerIdVal === "object" ? (prefInsurerIdVal._id || prefInsurerIdVal.id || "") : String(prefInsurerIdVal))
+                                      : "";
                                     setSelectedFarmForAssignment(farm);
                                     setAssignFormData({
                                       assessorId: "",
-                                      insurerId: farm.insurerId || farm.preferredInsurerId || "",
+                                      insurerId: prefInsurerIdStr,
                                     });
                                     setShowAssignDialog(true);
                                   } else {
@@ -9013,11 +9032,11 @@ export const AdminDashboard = () => {
                   Insurer *
                 </Label>
                 <Select
-                  value={assignFormData.insurerId || "none-insurer"}
+                  value={assignFormData.insurerId}
                   onValueChange={(value) =>
                     setAssignFormData({
                       ...assignFormData,
-                      insurerId: value === "none-insurer" ? "" : value,
+                      insurerId: value,
                     })
                   }
                   disabled={!!(selectedFarmForAssignment?.insurerId || selectedFarmForAssignment?.preferredInsurerId)}
@@ -9042,8 +9061,8 @@ export const AdminDashboard = () => {
                         const insurerName = (() => {
                           const companyName = insurer.insurerProfile?.companyName;
                           const personalName = (insurer.firstName && insurer.lastName) 
-                            ? `${insurer.firstName} ${insurer.lastName}` 
-                            : insurer.firstName || insurer.lastName || "";
+                             ? `${insurer.firstName} ${insurer.lastName}` 
+                             : insurer.firstName || insurer.lastName || "";
                           
                           if (companyName) {
                             return personalName ? `${companyName} (${personalName})` : companyName;
@@ -9080,8 +9099,7 @@ export const AdminDashboard = () => {
                   disabled={
                     assigningAssessor ||
                     !assignFormData.assessorId ||
-                    !assignFormData.insurerId ||
-                    assignFormData.insurerId === "none-insurer"
+                    !assignFormData.insurerId
                   }
                   className="bg-green-600 hover:bg-green-700"
                 >
