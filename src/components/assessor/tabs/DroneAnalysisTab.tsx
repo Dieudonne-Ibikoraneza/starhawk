@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -498,16 +499,42 @@ export const DroneAnalysisTab = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          disabled={isProcessing}
-                          onClick={() => handleDownloadReport(pdf)}
-                        >
-                          <FileText className="h-4 w-4" />
-                          Download PDF
-                        </Button>
+                        {hasData ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            disabled={isProcessing}
+                            onClick={() => handleDownloadReport(pdf)}
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span className="hidden sm:inline">Download PDF</span>
+                          </Button>
+                        ) : (
+                          !isCompleted && (
+                            <Button
+                              size="sm"
+                              className={`gap-2 shrink-0 rounded-full px-5 font-bold shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 border-0 ${
+                                hasFailed
+                                  ? "bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white"
+                                  : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-white"
+                              }`}
+                              onClick={() => handleProcessPdf(pdf.pdfType)}
+                              disabled={isProcessing}
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : hasFailed ? (
+                                <RefreshCw className="h-4 w-4" />
+                              ) : (
+                                <Play className="h-4 w-4 fill-white" />
+                              )}
+                              <span className="hidden sm:inline">
+                                {isProcessing ? "Processing..." : hasFailed ? "Retry Extraction" : "Process Crop Intelligence"}
+                              </span>
+                            </Button>
+                          )
+                        )}
 
                         {!readOnly && (
                           <AlertDialog>
@@ -519,7 +546,7 @@ export const DroneAnalysisTab = ({
                                 disabled={isCompleted || isProcessing}
                               >
                                 <Trash2 className="h-4 w-4" />
-                                Delete report
+                                <span className="hidden sm:inline">Delete</span>
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -547,73 +574,38 @@ export const DroneAnalysisTab = ({
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    {isProcessing ? (
-                      <AgremoLoadingSkeleton pdfType={pdf.pdfType} progressMessage={currentProgressPhase} />
-                    ) : hasData ? (
-                      <DroneAnalysisView
-                        data={dronePayload(pdf)}
-                        pdfType={String(pdf.pdfType)}
-                      />
-                    ) : (
-                      <div className="p-6 bg-slate-50/50 rounded-2xl border border-slate-100 space-y-6 text-center animate-in fade-in zoom-in duration-300">
-                        {hasFailed ? (
-                          <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-left flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
-                            <div className="space-y-1">
-                              <p className="text-sm font-bold text-rose-950">Crop Intelligence Extraction Failed</p>
-                              <p className="text-xs text-rose-700/90 leading-relaxed font-semibold">
-                                {failedTypes[pdf.pdfType] || "An unexpected error occurred during extraction."}
-                              </p>
+                  <AnimatePresence initial={false}>
+                    {(hasData || isProcessing || hasFailed) && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <CardContent className="pt-6">
+                          {isProcessing ? (
+                            <AgremoLoadingSkeleton pdfType={pdf.pdfType} progressMessage={currentProgressPhase} />
+                          ) : hasData ? (
+                            <DroneAnalysisView
+                              data={dronePayload(pdf)}
+                              pdfType={String(pdf.pdfType)}
+                            />
+                          ) : hasFailed ? (
+                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-left flex items-start gap-3">
+                              <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+                              <div className="space-y-1">
+                                <p className="text-sm font-bold text-rose-950">Crop Intelligence Extraction Failed</p>
+                                <p className="text-xs text-rose-700/90 leading-relaxed font-semibold">
+                                  {failedTypes[pdf.pdfType] || "An unexpected error occurred during extraction."}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="p-4 bg-blue-50/50 border border-blue-100/50 rounded-xl text-left flex items-start gap-3">
-                            <Cpu className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                            <div className="space-y-1">
-                              <p className="text-sm font-bold text-blue-950">Pending Crop Intelligence Processing</p>
-                              <p className="text-xs text-blue-700/90 leading-relaxed font-semibold">
-                                This report has been uploaded successfully. Click the button below to manually execute AI zonation extraction and crop stress analysis.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex flex-col items-center justify-center space-y-3 pt-2">
-                          <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100">
-                            <FileText className={`h-8 w-8 ${hasFailed ? "text-rose-500 animate-bounce" : "text-emerald-600"}`} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">{pdfRowLabel(uploadedPdfs, idx)}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">File URL: {pdf.pdfUrl}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-center pt-2">
-                          <Button 
-                            onClick={() => handleProcessPdf(pdf.pdfType)}
-                            className={`rounded-full px-8 py-6 font-bold shadow-lg flex items-center gap-2 text-sm transition-all duration-300 hover:scale-105 active:scale-95 ${
-                              hasFailed 
-                                ? "bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white" 
-                                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-white"
-                            }`}
-                          >
-                            {hasFailed ? (
-                              <>
-                                <RefreshCw className="h-4 w-4" />
-                                Retry Extraction
-                              </>
-                            ) : (
-                              <>
-                                <Play className="h-4 w-4 fill-white" />
-                                Process Crop Intelligence
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
+                          ) : null}
+                        </CardContent>
+                      </motion.div>
                     )}
-                  </CardContent>
+                  </AnimatePresence>
                 </Card>
               );
             })}
