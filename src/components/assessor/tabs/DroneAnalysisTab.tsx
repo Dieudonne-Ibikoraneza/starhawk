@@ -393,65 +393,63 @@ export const DroneAnalysisTab = ({
               </div>
 
                 <div
-                  className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer bg-muted/10 group mb-6"
+                  onClick={() => { if (!validating && !isUploading) fileInputRef.current?.click(); }}
                 >
                   {validating ? (
                     <div className="flex flex-col items-center gap-3">
                       <div className="relative">
-                        <Loader2 className="h-12 w-12 text-violet-500 animate-spin" />
+                        <Loader2 className="h-10 w-10 text-violet-500 animate-spin mx-auto" />
                       </div>
-                      <p className="text-sm font-semibold text-violet-700">AI is verifying your document…</p>
-                      <p className="text-xs text-muted-foreground">Checking if this PDF is a valid drone analysis report</p>
+                      <p className="text-base font-semibold text-violet-700">AI is verifying your document…</p>
+                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">Checking if this PDF is a valid drone analysis report</p>
                     </div>
                   ) : isUploading ? (
-                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
+                    <Loader2 className="h-10 w-10 mx-auto mb-3 text-primary animate-spin" />
                   ) : (
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground group-hover:text-primary transition-colors" />
                   )}
+                  
                   {!validating && (
                     <>
-                      <p className="text-sm font-medium mb-2">
-                        {isUploading ? "Uploading to server..." : "Upload drone analysis PDF"}
+                      <p className="text-base font-semibold mb-1">
+                        {isUploading ? "Uploading to server..." : "Upload Drone Analysis PDF"}
                       </p>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Upload Agremo (or similar) reports as PDFs. Each file appears below, like crop monitoring and loss assessment.
+                      <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                        Upload any Agremo analysis report PDF. Each file appears below.
                       </p>
                     </>
                   )}
 
                   {rejectionMessage && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex items-start gap-2 text-left">
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm flex items-start gap-2 text-left max-w-md mx-auto">
                       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                       <span>{rejectionMessage}</span>
                     </div>
                   )}
 
                   {isCompleted && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm flex items-center gap-2">
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm flex items-center gap-2 max-w-sm mx-auto">
                       <AlertTriangle className="h-4 w-4" />
                       Assessment is finalized. No further uploads allowed.
                     </div>
                   )}
 
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      ref={fileInputRef}
-                      onChange={handlePdfUpload}
-                      disabled={isCompleted}
-                    />
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={handlePdfUpload}
+                    disabled={isCompleted || validating || isUploading}
+                  />
+                  <div className="flex items-center justify-center gap-4">
                     <Button
-                      onClick={() => { setRejectionMessage(null); fileInputRef.current?.click(); }}
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); setRejectionMessage(null); fileInputRef.current?.click(); }}
                       disabled={isUploading || validating || isCompleted}
-                      className="flex items-center gap-2"
+                      className="group-hover:bg-primary group-hover:text-primary-foreground transition-all"
                     >
-                      {(isUploading || validating) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4" />
-                      )}
                       {validating ? "Verifying..." : isUploading ? "Uploading..." : "Select PDF File"}
                     </Button>
                   </div>
@@ -468,33 +466,33 @@ export const DroneAnalysisTab = ({
 
               return (
                 <Card key={pdf._id ?? `${pdf.pdfType}-${idx}`}>
-                  <CardHeader className="pb-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                  <CardHeader className={`pb-3 bg-muted/10 ${(hasData || isProcessing || hasFailed) ? "border-b border-border/50" : ""}`}>
+                    <div className="flex items-start justify-between flex-wrap gap-4">
+                      <div className="space-y-1">
+                        <CardTitle className="text-base flex items-center gap-2">
                           <FileText className="h-4 w-4 text-primary shrink-0" />
-                          <span>{pdfRowLabel(uploadedPdfs, idx)}</span>
+                          <span className="capitalize">{pdfRowLabel(uploadedPdfs, idx)}</span>
                           {hasData ? (
-                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 rounded-full font-bold">
-                              <Check className="h-3 w-3" /> Processed
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 ml-2">
+                              <Check className="h-3 w-3 mr-1" /> Processed
                             </Badge>
                           ) : hasFailed ? (
-                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-rose-50 text-rose-700 border-rose-200 gap-1 rounded-full font-bold">
-                              <AlertCircle className="h-3 w-3" /> Failed
+                            <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200 ml-2">
+                              <AlertCircle className="h-3 w-3 mr-1" /> Failed
                             </Badge>
                           ) : isProcessing ? (
-                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-blue-50 text-blue-700 border-blue-200 gap-1 rounded-full animate-pulse font-bold">
-                              <Loader2 className="h-3 w-3 animate-spin" /> Processing...
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 ml-2 animate-pulse">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing...
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] py-0 px-2.5 h-5 bg-amber-50 text-amber-700 border-amber-200 gap-1 rounded-full font-bold animate-pulse">
-                              <Clock className="h-3 w-3" /> Pending Process
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 ml-2">
+                              <Clock className="h-3 w-3 mr-1" /> Uploaded
                             </Badge>
                           )}
                         </CardTitle>
                         {pdf.uploadedAt && (
-                          <p className="text-xs text-muted-foreground font-normal">
-                            {hasData ? "Extracted" : "Uploaded"}: {new Date(pdf.uploadedAt).toLocaleString()}
+                          <p className="text-xs text-muted-foreground font-normal ml-6">
+                            {new Date(pdf.uploadedAt).toLocaleString()}
                           </p>
                         )}
                       </div>
@@ -508,7 +506,7 @@ export const DroneAnalysisTab = ({
                             onClick={() => handleDownloadReport(pdf)}
                           >
                             <FileText className="h-4 w-4" />
-                            <span className="hidden sm:inline">Download PDF</span>
+                            <span className="hidden sm:inline">Download PDF report</span>
                           </Button>
                         ) : (
                           !isCompleted && (
@@ -542,7 +540,7 @@ export const DroneAnalysisTab = ({
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                className="gap-2"
+                                className="gap-2 shrink-0"
                                 disabled={isCompleted || isProcessing}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -563,6 +561,7 @@ export const DroneAnalysisTab = ({
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90 text-white"
                                   onClick={() => handleDeletePdf(pdf.pdfType)}
                                 >
                                   Delete
@@ -585,7 +584,23 @@ export const DroneAnalysisTab = ({
                       >
                         <CardContent className="pt-6">
                           {isProcessing ? (
-                            <AgremoLoadingSkeleton pdfType={pdf.pdfType} progressMessage={currentProgressPhase} />
+                            <div className="space-y-6 animate-pulse">
+                              <div className="flex flex-col items-center justify-center mb-2">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                                <p className="text-sm font-medium">Analysis in progress...</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {currentProgressPhase || "Our system is extracting data from your PDF. This may take a few moments."}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="h-20 w-full rounded-lg bg-slate-200/50" />
+                                <div className="h-20 w-full rounded-lg bg-slate-200/50" />
+                                <div className="h-20 w-full rounded-lg bg-slate-200/50" />
+                                <div className="h-20 w-full rounded-lg bg-slate-200/50" />
+                              </div>
+                              <div className="h-[250px] w-full rounded-lg bg-slate-200/50" />
+                              <div className="h-32 w-full rounded-lg bg-slate-200/50" />
+                            </div>
                           ) : hasData ? (
                             <DroneAnalysisView
                               data={dronePayload(pdf)}
