@@ -34,7 +34,7 @@ crop development stages, monitoring cycle results, or agronomic field observatio
 `,
 };
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBIWpqYUml_hDfqjJvNJnMI8kA2pgJWNMU';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 async function callGemini(text: string, context: PdfValidationContext): Promise<PdfValidationResult> {
@@ -117,9 +117,9 @@ export function usePdfValidator() {
         console.warn('usePdfValidator: PDF text extraction failed:', extractErr);
         // If we can't extract text (e.g. scanned image PDF), be permissive
         return {
-          relevant: true,
-          documentType: 'Scanned/Image PDF',
-          reason: 'Could not extract text from this PDF (it may be a scanned image). Proceeding with upload.',
+          relevant: false,
+          documentType: 'Unreadable PDF',
+          reason: 'Could not extract text. If this is a valid drone report, it might be an image-only scan.',
         };
       }
 
@@ -135,7 +135,7 @@ export function usePdfValidator() {
       // Step 3: Ask Gemini
       if (!GEMINI_API_KEY) {
         console.warn('usePdfValidator: No VITE_GEMINI_API_KEY set. Skipping validation.');
-        return { relevant: true, documentType: 'Unknown', reason: 'AI validation not configured.' };
+        return { relevant: false, documentType: 'Unknown', reason: 'AI API key is missing. Contact support.' };
       }
 
       return await callGemini(pdfText, context);
