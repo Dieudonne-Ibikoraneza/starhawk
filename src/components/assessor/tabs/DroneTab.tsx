@@ -43,6 +43,7 @@ import { toast } from "sonner";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { formatReportTypeLabel } from "@/lib/crops";
 import { generateDroneDataPDF } from "@/utils/dronePdfGenerator";
+import { usePdfValidator } from "@/hooks/usePdfValidator";
 
 interface DroneTabProps {
   assessment: any;
@@ -163,8 +164,16 @@ export const DroneTab = ({
 }: DroneTabProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const isCompleted = assessment?.status === "COMPLETED" || assessment?.status === "SUBMITTED";
+  const { validating, validate } = usePdfValidator();
 
-  const uploadedPdfs = useMemo(() => assessment?.droneAnalysisPdfs || assessment?.dronePdfs || [], [assessment]);
+  const uploadedPdfs = useMemo(() => {
+    const pdfs = [...(assessment?.droneAnalysisPdfs || assessment?.dronePdfs || [])];
+    return pdfs.sort((a, b) => {
+      const dateA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+      const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [assessment]);
   
   const getFullPdfUrl = (url?: string) => {
     if (!url) return "";
@@ -233,6 +242,19 @@ export const DroneTab = ({
     }
 
     setIsUploading(true);
+
+    try {
+      const validation = await validate(file, 'drone_analysis');
+      if (!validation.relevant) {
+        toast.error(`"${file.name}" appears to be a ${validation.documentType}. ${validation.reason}`);
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    } catch (err: any) {
+      console.error("Validation error:", err);
+      // Proceed even if validation fails
+    }
     try {
       // Format pdfType from filename: remove .pdf extension, replace spaces/special chars with underscores, lowercase
       const pdfType = file.name
@@ -293,7 +315,7 @@ export const DroneTab = ({
                   onDragOver={(e) => e.preventDefault()}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  {isUploading ? (
+                  {isUploading || validating ? (
                     <Loader2 className="h-12 w-12 mx-auto mb-4 text-emerald-600 animate-spin" />
                   ) : (
                     <div className="bg-emerald-100 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -301,7 +323,7 @@ export const DroneTab = ({
                     </div>
                   )}
                   <p className="text-sm font-bold mb-1">
-                    {isUploading ? "Uploading & Analyzing..." : `Upload Drone Report`}
+                    {validating ? "AI Analyzing Relevance..." : isUploading ? "Uploading & Analyzing..." : `Upload Drone Report`}
                   </p>
                   <p className="text-xs text-slate-500 mb-4">Drag and drop or click to select Agremo PDF report</p>
                   <input
