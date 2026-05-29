@@ -1,3 +1,5 @@
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
 /**
  * Extracts plain text from a PDF File object using pdfjs-dist.
  * Runs entirely in the browser — no server call required.
@@ -7,12 +9,10 @@ export async function extractTextFromPdf(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
 
   // Point the worker at the bundled worker file served by Vite
-  // Using a CDN fallback that matches the installed version to avoid worker version mismatches
-  const pdfjsVersion = pdfjsLib.version;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
   const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
   const pdf = await loadingTask.promise;
 
   const textParts: string[] = [];
