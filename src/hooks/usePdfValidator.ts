@@ -10,6 +10,7 @@ export interface PdfValidationResult {
   relevant: boolean;
   reason: string;
   documentType: string;
+  warning?: boolean;
 }
 
 const CONTEXT_PROMPTS: Record<PdfValidationContext, string> = {
@@ -19,22 +20,28 @@ The user is in the "Drone Analysis" section, where assessors upload drone/aerial
 (e.g., Agremo reports, Sentera reports, or similar precision agriculture PDF reports).
 These documents typically contain: crop health indices (NDVI, NDRE, GNDVI), field zone maps,
 vegetation stress analysis, growth stage assessments, or multi-spectral imagery analysis results.
+
+CRITICAL INSTRUCTION: You MUST reject (relevant: false) any drone manuals, user guides, marketing materials, general specifications, or equipment manuals. Only accept actual agricultural analysis reports of a specific farm.
 `,
   loss_evidence: `
 You are a validator for an agricultural crop insurance platform in Rwanda.
 The user is in the "Loss Evidence" section, where assessors upload field loss assessment reports.
 These documents typically contain: crop damage descriptions, percentage of crop loss, field survey data,
 disaster/event descriptions (drought, flood, pest), or loss quantification for insurance claims.
+
+CRITICAL INSTRUCTION: You MUST reject (relevant: false) general manuals, articles, marketing materials, or unrelated documents.
 `,
   crop_monitoring: `
 You are a validator for an agricultural crop insurance platform in Rwanda.
 The user is in the "Crop Monitoring" section, where assessors upload crop monitoring cycle reports.
 These documents typically contain: crop growth monitoring data, vegetation indices over time,
 crop development stages, monitoring cycle results, or agronomic field observations.
+
+CRITICAL INSTRUCTION: You MUST reject (relevant: false) general manuals, articles, marketing materials, or unrelated documents.
 `,
 };
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBIWpqYUml_hDfqjJvNJnMI8kA2pgJWNMU';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 async function callGemini(text: string, context: PdfValidationContext): Promise<PdfValidationResult> {
@@ -70,7 +77,26 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no expl
   });
 
   if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
+    console.warn(`Gemini API error: ${response.status}`);
+    const errorBody = await response.text().catch(() => '');
+    
+    // Check if it's a quota error (429 Too Many Requests)
+    if (response.status === 429 || errorBody.includes('quota') || errorBody.includes('RESOURCE_EXHAUSTED')) {
+      return {
+        relevant: true,
+        documentType: 'Unvalidated PDF',
+        reason: 'AI validation is currently unavailable due to quota limits. Proceeding with upload without validation.',
+        warning: true,
+      };
+    }
+    
+    // Generic fallback for other API errors
+    return {
+      relevant: true,
+      documentType: 'Unvalidated PDF',
+      reason: `AI validation failed (Error ${response.status}). Proceeding with upload.`,
+      warning: true,
+    };
   }
 
   const data = await response.json();
@@ -113,13 +139,14 @@ export function usePdfValidator() {
       let pdfText = '';
       try {
         pdfText = await extractTextFromPdf(file);
-      } catch (extractErr) {
+      } catch (extractErr: any) {
         console.warn('usePdfValidator: PDF text extraction failed:', extractErr);
         // If we can't extract text (e.g. scanned image PDF), be permissive
         return {
-          relevant: false,
+          relevant: true,
           documentType: 'Unreadable PDF',
-          reason: 'Could not extract text. If this is a valid drone report, it might be an image-only scan.',
+          reason: `Could not extract text (${extractErr?.message || 'Unknown error'}). Proceeding with upload as it might be an image-only scan.`,
+          warning: true,
         };
       }
 
@@ -129,6 +156,7 @@ export function usePdfValidator() {
           relevant: true,
           documentType: 'Sparse PDF',
           reason: 'Not enough text content to validate. Proceeding with upload.',
+          warning: true,
         };
       }
 
