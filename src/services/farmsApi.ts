@@ -444,6 +444,14 @@ class FarmsApiService {
     const queryString = params.toString() ? `?${params.toString()}` : '';
     return this.request<any>(`/${farmId}/indices/trend${queryString}`);
   }
+
+  // Renew Farm Cycle
+  async renewFarmCycle(farmId: string, cropType: string, sowingDate: string) {
+    return this.request<any>(`/${farmId}/renew`, {
+      method: 'POST',
+      body: JSON.stringify({ cropType, sowingDate }),
+    });
+  }
 }
 
 // Create and export a singleton instance
@@ -466,4 +474,4 @@ export const getAccumulatedWeather = (farmId: string, startDate?: string, endDat
 export const getVegetationStats = (farmId: string, startDate?: string, endDate?: string, indices?: string) => farmsApiService.getVegetationStats(farmId, startDate, endDate, indices);
 export const getNDVITimeSeries = (farmId: string, startDate?: string, endDate?: string) => farmsApiService.getNDVITimeSeries(farmId, startDate, endDate);
 export const getFieldTrend = (farmId: string, index?: string, startDate?: string, endDate?: string) => farmsApiService.getFieldTrend(farmId, index, startDate, endDate);
-
+export const renewFarmCycle = (farmId: string, cropType: string, sowingDate: string) => farmsApiService.renewFarmCycle(farmId, cropType, sowingDate);

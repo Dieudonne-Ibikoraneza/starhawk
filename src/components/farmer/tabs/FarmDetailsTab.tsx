@@ -16,6 +16,11 @@ import { getFarmerSuggestions, getMonitoringCycle, getInsight } from "@/services
 import { useToast } from "@/hooks/use-toast";
 import { AiChatInterface } from "@/components/common/AiChatInterface";
 import { FieldMapWithLayers } from "@/components/assessor/FieldMapWithLayers";
+import { renewFarmCycle } from "@/services/farmsApi";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface FarmDetailsTabProps {
   farmId: string;
@@ -38,6 +43,12 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
   const [aiLoading, setAiLoading] = useState(false);
   const [cycleAnalysis, setCycleAnalysis] = useState<any>(null);
   const [cycleLoading, setCycleLoading] = useState(false);
+
+  // Renew Cycle State
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [renewCropType, setRenewCropType] = useState("");
+  const [renewSowingDate, setRenewSowingDate] = useState("");
+  const [renewLoading, setRenewLoading] = useState(false);
 
   useEffect(() => {
     loadFarmData();
@@ -135,6 +146,24 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
     }
   };
 
+  const handleRenewSubmit = async () => {
+    if (!renewCropType || !renewSowingDate) {
+      toast({ title: "Error", description: "Please select crop type and sowing date.", variant: "destructive" });
+      return;
+    }
+    setRenewLoading(true);
+    try {
+      await renewFarmCycle(farmId, renewCropType, renewSowingDate);
+      toast({ title: "Success", description: "New crop cycle started successfully!" });
+      setRenewDialogOpen(false);
+      onBack();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to start new cycle.", variant: "destructive" });
+    } finally {
+      setRenewLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -203,10 +232,19 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
             <Satellite className="h-4 w-4" />
             Update Map
           </Button>
-          {farm.status !== 'INSURED' && (
+          {farm.status !== 'INSURED' && farm.status !== 'ARCHIVED' && (
             <Button className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200">
               <ShieldCheck className="h-4 w-4 mr-2" />
               Get Insured
+            </Button>
+          )}
+          {farm.status !== 'ARCHIVED' && (
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"
+              onClick={() => setRenewDialogOpen(true)}
+            >
+              <Sprout className="h-4 w-4 mr-2" />
+              Start New Season
             </Button>
           )}
         </div>
@@ -564,6 +602,54 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
           </Card>
         </div>
       </div>
+
+      {/* Renew Cycle Dialog */}
+      <Dialog open={renewDialogOpen} onOpenChange={setRenewDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Start New Season</DialogTitle>
+            <DialogDescription>
+              Archive the current crop and register a new crop on this exact piece of land. You will not need to re-upload boundaries.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cropType">New Crop Type</Label>
+              <Select onValueChange={setRenewCropType} value={renewCropType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select crop" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MAIZE">Maize</SelectItem>
+                  <SelectItem value="BEANS">Beans</SelectItem>
+                  <SelectItem value="WHEAT">Wheat</SelectItem>
+                  <SelectItem value="RICE">Rice</SelectItem>
+                  <SelectItem value="POTATOES">Potatoes</SelectItem>
+                  <SelectItem value="CASSAVA">Cassava</SelectItem>
+                  <SelectItem value="SOYBEANS">Soybeans</SelectItem>
+                  <SelectItem value="SORGHUM">Sorghum</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sowingDate">New Sowing Date</Label>
+              <Input
+                id="sowingDate"
+                type="date"
+                value={renewSowingDate}
+                onChange={(e) => setRenewSowingDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRenewSubmit} disabled={renewLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {renewLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sprout className="h-4 w-4 mr-2" />}
+              Start Season
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
