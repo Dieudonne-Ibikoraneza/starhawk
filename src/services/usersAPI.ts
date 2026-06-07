@@ -184,6 +184,14 @@ class UsersApiService {
     });
   }
 
+  // Upload Signature
+  async uploadSignature(signatureBase64: string) {
+    return this.request<any>("/profile/signature", {
+      method: "POST",
+      body: JSON.stringify({ signature: signatureBase64 }),
+    });
+  }
+
   // ========================================================
   // ADMIN ENDPOINTS
   // ========================================================
@@ -291,6 +299,28 @@ export const updateUserProfile = (data: any) => {
   };
   return usersApiService.updateUserProfile(flatData);
 };
+export const uploadSignature = (signatureBase64: string) => usersApiService.uploadSignature(signatureBase64);
+
+export const fetchPrivatePhotoBlob = async (photoIdOrUrl: string): Promise<string | null> => {
+  if (!photoIdOrUrl) return null;
+  if (photoIdOrUrl.startsWith('http') || photoIdOrUrl.startsWith('data:')) return photoIdOrUrl;
+  
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_BASE_URL}/photos/blob/${photoIdOrUrl}`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    if (!response.ok) throw new Error("Failed to fetch photo blob");
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.error("Error fetching private photo:", error);
+    return null;
+  }
+};
+
 export const getAllUsers = () => usersApiService.getAllUsers();
 export const getUserById = (userId: string) =>
   usersApiService.getUserById(userId);
