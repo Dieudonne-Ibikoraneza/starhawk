@@ -2,6 +2,8 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import SignatureCaptureModal from "@/components/common/SignatureCaptureModal";
+import { useState } from "react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,6 +12,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [signatureCollected, setSignatureCollected] = useState(false);
 
   if (isLoading) {
     return (
@@ -45,5 +48,15 @@ export default function ProtectedRoute({ children, allowedRole }: ProtectedRoute
     return <Navigate to={targetRoute} replace />;
   }
 
-  return <>{children}</>;
+  // Check if Farmer needs to provide a signature
+  const needsSignature = userRole === "FARMER" && !user.signatureUrl && !signatureCollected;
+
+  return (
+    <>
+      {children}
+      {needsSignature && (
+        <SignatureCaptureModal onSuccess={() => setSignatureCollected(true)} />
+      )}
+    </>
+  );
 }
