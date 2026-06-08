@@ -165,8 +165,8 @@ export default function DroneTab({
         });
       } else {
         toast({
-          title: "Upload Successful",
-          description: `"${file.name}" uploaded. Ready for crop intelligence extraction.`,
+          title: `Upload Successful: ${validation.documentType}`,
+          description: validation.reason ? `AI verified: ${validation.reason}` : `"${file.name}" uploaded. Ready for crop intelligence extraction.`,
         });
       }
       onRefresh?.();

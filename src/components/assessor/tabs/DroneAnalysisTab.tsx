@@ -315,7 +315,10 @@ export const DroneAnalysisTab = ({
         assessmentId,
         file,
       );
-      toast.success(`Successfully uploaded ${file.name}. Pending manual extraction execution.`);
+      toast.success(
+        `Upload Successful: ${validation.documentType}`,
+        { description: validation.reason ? `AI verified: ${validation.reason}` : `Successfully uploaded ${file.name}. Pending manual extraction execution.` }
+      );
       console.log("Backend upload result:", result);
       await refetchAssessment();
     } catch (uploadError: any) {
