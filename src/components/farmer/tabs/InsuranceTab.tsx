@@ -11,13 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/AuthContext";
+import SignatureCaptureModal from "@/components/common/SignatureCaptureModal";
+
 
 export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: string) => void }) {
   const { toast } = useToast();
+  const { user, syncAuth } = useAuth();
   const [policies, setPolicies] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [farms, setFarms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -90,30 +95,64 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
       return;
     }
 
+    if (type === "ACCEPT") {
+      if (!user?.signatureUrl) {
+        setShowSignatureModal(true);
+        return;
+      }
+      submitAcceptance(id);
+    } else {
+      setIsSubmitting(true);
+      try {
+        if (type === "REJECT") {
+          await farmerRejectPolicy(id, reason);
+          toast({ title: "Success", description: "Policy declined." });
+        } else if (type === "FLAG") {
+          await farmerFlagPolicyForCorrection(id, reason);
+          toast({ title: "Success", description: "Policy flagged for correction." });
+        }
+        setActionDialog({ open: false, policy: null, type: null });
+        setReason("");
+        loadData();
+      } catch (err: any) {
+        console.error(`Failed to ${type} policy:`, err);
+        toast({
+          title: "Error",
+          description: `Failed to ${type.toLowerCase()} policy. Please try again.`,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const submitAcceptance = async (policyId: string) => {
     setIsSubmitting(true);
     try {
-      if (type === "ACCEPT") {
-        await farmerAcknowledgePolicy(id);
-        toast({ title: "Success", description: "Policy accepted! Your coverage is now active." });
-      } else if (type === "REJECT") {
-        await farmerRejectPolicy(id, reason);
-        toast({ title: "Success", description: "Policy declined." });
-      } else if (type === "FLAG") {
-        await farmerFlagPolicyForCorrection(id, reason);
-        toast({ title: "Success", description: "Policy flagged for correction." });
-      }
+      await farmerAcknowledgePolicy(policyId);
+      toast({ title: "Success", description: "Policy accepted! Your coverage is now active." });
       setActionDialog({ open: false, policy: null, type: null });
       setReason("");
       loadData();
     } catch (err: any) {
-      console.error(`Failed to ${type} policy:`, err);
+      console.error(`Failed to accept policy:`, err);
       toast({
         title: "Error",
-        description: `Failed to ${type.toLowerCase()} policy. Please try again.`,
+        description: `Failed to accept policy. Please try again.`,
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSignatureSuccess = async () => {
+    setShowSignatureModal(false);
+    if (actionDialog.policy) {
+      syncAuth(); // Make sure user context is updated with the new signatureUrl
+      const id = actionDialog.policy._id || actionDialog.policy.id;
+      await submitAcceptance(id);
     }
   };
 
@@ -285,13 +324,17 @@ export default function InsuranceTab({ onViewDetails }: { onViewDetails: (id: st
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {actionDialog.type === "REJECT" ? "Confirm Rejection" : 
                    actionDialog.type === "FLAG" ? "Submit Correction" : 
-                   "Accept & Activate"}
+                   "Accept & Attach my signature"}
                 </Button>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {showSignatureModal && (
+        <SignatureCaptureModal onSuccess={handleSignatureSuccess} />
+      )}
     </div>
   );
 }

@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPolicyById, updatePolicy, farmerRejectPolicy, farmerFlagPolicyForCorrection, farmerAcknowledgePolicy } from "@/services/policiesApi";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { generatePolicyContractPDF } from "@/utils/policyPdfGenerator";
 
 interface PolicyDetailsTabProps {
   policyId: string;
@@ -25,6 +27,7 @@ interface PolicyDetailsTabProps {
 
 export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: PolicyDetailsTabProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
@@ -122,6 +125,26 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
       });
     } finally {
       setIsFlagging(false);
+    }
+  };
+
+  const [isDownloading, setIsDownloading] = useState(false);
+  const handleDownloadContract = async () => {
+    setIsDownloading(true);
+    try {
+      await generatePolicyContractPDF(policy, user);
+      toast({
+        title: "Download Complete",
+        description: "Your policy contract has been downloaded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Could not generate your policy contract PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -374,9 +397,23 @@ export default function PolicyDetailsTab({ policyId, onBack, onFileClaim }: Poli
               <QuickDetail label="Insured Crop" value={policy.cropType || "Maize"} icon={<Sprout className="h-4 w-4" />} />
               <Separator />
               <div className="pt-2">
-                <Button variant="ghost" className="w-full justify-between text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold group">
-                  Download PDF Certificate
-                  <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold group"
+                  onClick={handleDownloadContract}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Generating Contract...
+                    </>
+                  ) : (
+                    <>
+                      Download PDF Contract
+                      <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
