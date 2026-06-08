@@ -42,7 +42,7 @@ CRITICAL INSTRUCTION: You MUST reject (relevant: false) general manuals, article
 };
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 async function callGemini(text: string, context: PdfValidationContext): Promise<PdfValidationResult> {
   const contextDescription = CONTEXT_PROMPTS[context];
@@ -71,7 +71,7 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no expl
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 256,
+        maxOutputTokens: 2048,
       },
     }),
   });
