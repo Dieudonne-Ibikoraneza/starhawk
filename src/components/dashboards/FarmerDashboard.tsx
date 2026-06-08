@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import DashboardLayout from "../layout/DashboardLayout";
 import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
-import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
+import { getUserProfile, updateUserProfile, getInsurers, fetchPrivatePhotoBlob } from "@/services/usersAPI";
 import { photosService } from "@/lib/api/services/photos";
 import ImageCropper from "@/components/ui/image-cropper";
 import { Progress } from "@/components/ui/progress";
@@ -167,6 +167,7 @@ export default function FarmerDashboard() {
 
   // State for Profile
   const [farmerProfile, setFarmerProfile] = useState<any>(null);
+  const [signatureBlobUrl, setSignatureBlobUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   
   // State for Profile Form (from registration page)
@@ -467,6 +468,15 @@ export default function FarmerDashboard() {
       const profile = await getUserProfile();
       const profileData = profile.data || profile;
       setFarmerProfile(profileData);
+      
+      if (profileData?.signatureUrl) {
+        try {
+          const blobUrl = await fetchPrivatePhotoBlob(profileData.signatureUrl);
+          setSignatureBlobUrl(blobUrl);
+        } catch (e) {
+          console.error("Failed to fetch signature", e);
+        }
+      }
       
       // Pre-populate form data if profile exists
       if (profileData) {
@@ -2332,6 +2342,23 @@ export default function FarmerDashboard() {
                           <Input value={profileFormData.village || "N/A"} disabled className="!rounded-none bg-gray-50 border-dashed cursor-not-allowed text-gray-500" />
                         </div>
                       </div>
+                    </div>
+                    
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Digital Signature</h3>
+                      {signatureBlobUrl ? (
+                        <div className="border border-gray-200 rounded-lg p-4 bg-white inline-block">
+                          <img 
+                            src={signatureBlobUrl} 
+                            alt="Farmer Signature" 
+                            className="h-24 object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 italic p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50 inline-block">
+                          No signature attached to this profile.
+                        </div>
+                      )}
                     </div>
                   </>
 

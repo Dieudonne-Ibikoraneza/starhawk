@@ -133,8 +133,8 @@ export const LossEvidenceTab = ({
         queryKey: ["claims", "pdfs", claim._id],
       });
       toast({
-        title: "Report Uploaded",
-        description: `"${file.name}" has been processed.`,
+        title: `Report Uploaded: ${validation.documentType}`,
+        description: validation.reason ? `AI verified: ${validation.reason}` : `"${file.name}" has been processed.`,
       });
     } catch (err: any) {
       toast({
