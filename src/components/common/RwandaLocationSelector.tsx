@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import rwandaApiService from '@/services/rwandaApi';
@@ -53,6 +53,16 @@ export default function RwandaLocationSelector({
     villages: false,
     cells: false
   });
+  const levelsKey = levels.join('|');
+  const onLocationChangeRef = useRef(onLocationChange);
+  const lastLoadedProvinceRef = useRef('');
+  const lastLoadedDistrictRef = useRef('');
+  const lastLoadedSectorRef = useRef('');
+  const lastLoadedVillageRef = useRef('');
+
+  useEffect(() => {
+    onLocationChangeRef.current = onLocationChange;
+  }, [onLocationChange]);
 
   // Load provinces on component mount
   useEffect(() => {
@@ -61,47 +71,51 @@ export default function RwandaLocationSelector({
 
   // Load districts when province changes
   useEffect(() => {
-    if (selectedProvince && levels.includes('district')) {
+    if (selectedProvince && levels.includes('district') && lastLoadedProvinceRef.current !== selectedProvince) {
+      lastLoadedProvinceRef.current = selectedProvince;
       loadDistricts(selectedProvince);
     } else {
       setDistricts([]);
       setSelectedDistrict('');
     }
-  }, [selectedProvince, levels]);
+  }, [selectedProvince, levelsKey]);
 
   // Load sectors when district changes
   useEffect(() => {
-    if (selectedDistrict && levels.includes('sector')) {
+    if (selectedDistrict && levels.includes('sector') && lastLoadedDistrictRef.current !== selectedDistrict) {
+      lastLoadedDistrictRef.current = selectedDistrict;
       loadSectors(selectedDistrict);
     } else {
       setSectors([]);
       setSelectedSector('');
     }
-  }, [selectedDistrict, levels]);
+  }, [selectedDistrict, levelsKey]);
 
   // Load villages when sector changes
   useEffect(() => {
-    if (selectedSector && levels.includes('village')) {
+    if (selectedSector && levels.includes('village') && lastLoadedSectorRef.current !== selectedSector) {
+      lastLoadedSectorRef.current = selectedSector;
       loadVillages(selectedSector);
     } else {
       setVillages([]);
       setSelectedVillage('');
     }
-  }, [selectedSector, levels]);
+  }, [selectedSector, levelsKey]);
 
   // Load cells when village changes
   useEffect(() => {
-    if (selectedVillage && levels.includes('cell')) {
+    if (selectedVillage && levels.includes('cell') && lastLoadedVillageRef.current !== selectedVillage) {
+      lastLoadedVillageRef.current = selectedVillage;
       loadCells(selectedVillage);
     } else {
       setCells([]);
       setSelectedCell('');
     }
-  }, [selectedVillage, levels]);
+  }, [selectedVillage, levelsKey]);
 
   // Notify parent component when location changes
   useEffect(() => {
-    if (onLocationChange) {
+    if (onLocationChangeRef.current) {
       const location = {
         province: provinces.find(p => p.id === selectedProvince),
         district: districts.find(d => d.id === selectedDistrict),
@@ -109,9 +123,9 @@ export default function RwandaLocationSelector({
         village: villages.find(v => v.id === selectedVillage),
         cell: cells.find(c => c.id === selectedCell)
       };
-      onLocationChange(location);
+      onLocationChangeRef.current(location);
     }
-  }, [selectedProvince, selectedDistrict, selectedSector, selectedVillage, selectedCell, provinces, districts, sectors, villages, cells, onLocationChange]);
+  }, [selectedProvince, selectedDistrict, selectedSector, selectedVillage, selectedCell, provinces, districts, sectors, villages, cells]);
 
   // Helper function to ensure data is an array
   const ensureArray = (data: any): LocationData[] => {
@@ -149,18 +163,22 @@ export default function RwandaLocationSelector({
     try {
       const data = await rwandaApiService.getProvinces();
       console.log('Provinces API response:', data);
-      const provincesArray = ensureArray(data);
+      const provincesArray = ensureArray(data).map((province: any) => ({
+        ...province,
+        id: province.id || province.slug || province.code || '',
+        name: province.name || province.label || '',
+      })).filter((province: LocationData) => province.id && province.name);
       console.log('Processed provinces array:', provincesArray);
       
       if (provincesArray.length === 0) {
         console.warn('No provinces found, using fallback mock data');
         // Use mock data as fallback
         setProvinces([
-          { id: '1', name: 'Kigali City' },
-          { id: '2', name: 'Northern Province' },
-          { id: '3', name: 'Southern Province' },
-          { id: '4', name: 'Eastern Province' },
-          { id: '5', name: 'Western Province' }
+          { id: 'kigali', name: 'City of Kigali' },
+          { id: 'north', name: 'Northern Province' },
+          { id: 'south', name: 'Southern Province' },
+          { id: 'east', name: 'Eastern Province' },
+          { id: 'west', name: 'Western Province' }
         ]);
       } else {
         setProvinces(provincesArray);
@@ -169,11 +187,11 @@ export default function RwandaLocationSelector({
       console.error('Failed to load provinces:', error);
       // Use mock data on error
       setProvinces([
-        { id: '1', name: 'Kigali City' },
-        { id: '2', name: 'Northern Province' },
-        { id: '3', name: 'Southern Province' },
-        { id: '4', name: 'Eastern Province' },
-        { id: '5', name: 'Western Province' }
+        { id: 'kigali', name: 'City of Kigali' },
+        { id: 'north', name: 'Northern Province' },
+        { id: 'south', name: 'Southern Province' },
+        { id: 'east', name: 'Eastern Province' },
+        { id: 'west', name: 'Western Province' }
       ]);
     } finally {
       setLoading(prev => ({ ...prev, provinces: false }));
@@ -238,6 +256,10 @@ export default function RwandaLocationSelector({
     setSelectedSector('');
     setSelectedVillage('');
     setSelectedCell('');
+    lastLoadedProvinceRef.current = '';
+    lastLoadedDistrictRef.current = '';
+    lastLoadedSectorRef.current = '';
+    lastLoadedVillageRef.current = '';
   };
 
   const handleDistrictChange = (value: string) => {
@@ -245,17 +267,23 @@ export default function RwandaLocationSelector({
     setSelectedSector('');
     setSelectedVillage('');
     setSelectedCell('');
+    lastLoadedDistrictRef.current = '';
+    lastLoadedSectorRef.current = '';
+    lastLoadedVillageRef.current = '';
   };
 
   const handleSectorChange = (value: string) => {
     setSelectedSector(value);
     setSelectedVillage('');
     setSelectedCell('');
+    lastLoadedSectorRef.current = '';
+    lastLoadedVillageRef.current = '';
   };
 
   const handleVillageChange = (value: string) => {
     setSelectedVillage(value);
     setSelectedCell('');
+    lastLoadedVillageRef.current = '';
   };
 
   const handleCellChange = (value: string) => {

@@ -1,151 +1,205 @@
-// Rwanda Administrative API Service
-const RAPIDAPI_KEY = '9f48ad82c6msh098f90f39b10139p116d6djsnc81534a14605';
-const RAPIDAPI_HOST = 'rwanda.p.rapidapi.com';
-const BASE_URL = 'https://rwanda.p.rapidapi.com';
+import { API_BASE_URL } from '@/config/api';
+
+const BASE_URL = API_BASE_URL;
+let treePromise = null;
+
+function buildUrl(endpoint) {
+  return new URL(`${BASE_URL}${endpoint}`).toString();
+}
+
+function normalizeText(value) {
+  return `${value || ''}`
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function normalizeProvince(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return '';
+  if (normalized.includes('kigali')) return 'kigali';
+  if (normalized.includes('east')) return 'east';
+  if (normalized.includes('west')) return 'west';
+  if (normalized.includes('north')) return 'north';
+  if (normalized.includes('south')) return 'south';
+  return normalized;
+}
+
+function unwrapTree(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (data && Array.isArray(data.provinces)) {
+    return data.provinces;
+  }
+
+  return [];
+}
+
+function clone(node) {
+  return node ? JSON.parse(JSON.stringify(node)) : node;
+}
+
+function matches(node, query) {
+  if (!query) return true;
+  const q = normalizeText(query);
+  return (
+    normalizeText(node.id).includes(q) ||
+    normalizeText(node.slug).includes(q) ||
+    normalizeText(node.name).includes(q)
+  );
+}
+
+function findProvince(tree, provinceId) {
+  const key = normalizeProvince(provinceId);
+  return tree.find((province) => normalizeText(province.slug) === key || normalizeText(province.id) === key || matches(province, key));
+}
+
+function findDistrict(tree, districtId, provinceId) {
+  const provinces = provinceId ? [findProvince(tree, provinceId)].filter(Boolean) : tree;
+  const q = normalizeText(districtId);
+  for (const province of provinces) {
+    const district = (province.children || []).find((item) => {
+      const slug = normalizeText(item.slug);
+      return slug === q || normalizeText(item.id) === q || matches(item, q);
+    });
+    if (district) return district;
+  }
+  return null;
+}
+
+function findSector(tree, sectorId, districtId, provinceId) {
+  const districts = [];
+  const provinces = provinceId ? [findProvince(tree, provinceId)].filter(Boolean) : tree;
+  for (const province of provinces) {
+    if (districtId) {
+      const district = (province.children || []).find((item) => normalizeText(item.slug) === normalizeText(districtId) || normalizeText(item.id) === normalizeText(districtId) || matches(item, districtId));
+      if (district) {
+        districts.push(district);
+      }
+    } else {
+      districts.push(...(province.children || []));
+    }
+  }
+
+  const q = normalizeText(sectorId);
+  for (const district of districts) {
+    const sector = (district.children || []).find((item) => normalizeText(item.slug) === q || normalizeText(item.id) === q || matches(item, q));
+    if (sector) return sector;
+  }
+  return null;
+}
+
+function listChildren(nodes, query) {
+  return (nodes || []).filter((node) => matches(node, query)).map(clone);
+}
 
 class RwandaApiService {
-  constructor() {
-    this.headers = {
-      'x-rapidapi-host': RAPIDAPI_HOST,
-      'x-rapidapi-key': RAPIDAPI_KEY,
-      'Content-Type': 'application/json'
-    };
-  }
-
-  async makeRequest(endpoint) {
-    try {
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+  async loadTree() {
+    if (!treePromise) {
+      treePromise = fetch(buildUrl('/tree'), {
         method: 'GET',
-        headers: this.headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Rwanda API request failed:', error);
-      throw error;
-    }
-  }
-
-  // Get all provinces
-  async getProvinces() {
-    try {
-      return await this.makeRequest('/provinces');
-    } catch (error) {
-      console.warn('Rwanda API not available, using mock data:', error);
-      // Return mock data if API fails
-      return [
-        { id: '1', name: 'Kigali City' },
-        { id: '2', name: 'Northern Province' },
-        { id: '3', name: 'Southern Province' },
-        { id: '4', name: 'Eastern Province' },
-        { id: '5', name: 'Western Province' }
-      ];
-    }
-  }
-
-  // Get districts by province
-  async getDistricts(provinceId) {
-    return this.makeRequest(`/provinces/${provinceId}/districts`);
-  }
-
-  // Get sectors by district
-  async getSectors(districtId) {
-    return this.makeRequest(`/districts/${districtId}/sectors`);
-  }
-
-  // Get villages by sector
-  async getVillages(sectorId) {
-    return this.makeRequest(`/sectors/${sectorId}/villages`);
-  }
-
-  // Get cells by village
-  async getCells(villageId) {
-    return this.makeRequest(`/villages/${villageId}/cells`);
-  }
-
-  // Get all administrative levels for a specific location
-  async getLocationHierarchy(provinceId, districtId, sectorId, villageId) {
-    try {
-      const [provinces, districts, sectors, villages] = await Promise.all([
-        this.getProvinces(),
-        districtId ? this.getDistricts(provinceId) : null,
-        sectorId ? this.getSectors(districtId) : null,
-        villageId ? this.getVillages(sectorId) : null
-      ]);
-
-      return {
-        provinces,
-        districts,
-        sectors,
-        villages
-      };
-    } catch (error) {
-      console.error('Failed to fetch location hierarchy:', error);
-      throw error;
-    }
-  }
-
-  // Search locations by name
-  async searchLocations(query, type = 'all') {
-    try {
-      const allProvinces = await this.getProvinces();
-      const results = [];
-
-      // Ensure allProvinces is an array
-      if (!Array.isArray(allProvinces)) {
-        console.warn('Provinces data is not an array:', allProvinces);
-        return [];
-      }
-
-      // Search in provinces
-      if (type === 'all' || type === 'provinces') {
-        const provinceMatches = allProvinces.filter(province =>
-          province.name && province.name.toLowerCase().includes(query.toLowerCase())
-        );
-        results.push(...provinceMatches.map(p => ({ ...p, type: 'province' })));
-      }
-
-      // Search in districts (if we have a province context)
-      if (type === 'all' || type === 'districts') {
-        for (const province of allProvinces) {
-          try {
-            const districts = await this.getDistricts(province.id);
-            const districtMatches = districts.filter(district =>
-              district.name.toLowerCase().includes(query.toLowerCase())
-            );
-            results.push(...districtMatches.map(d => ({ ...d, type: 'district', provinceId: province.id })));
-          } catch (error) {
-            // Continue if district fetch fails
-            console.warn(`Failed to fetch districts for province ${province.id}:`, error);
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
-        }
-      }
 
-      return results;
-    } catch (error) {
-      console.error('Location search failed:', error);
-      throw error;
+          const data = await response.json();
+          return unwrapTree(data);
+        })
+        .catch((error) => {
+          treePromise = null;
+          throw error;
+        });
     }
+
+    return treePromise;
   }
 
-  // Get location details by coordinates (if the API supports it)
-  async getLocationByCoordinates(latitude, longitude) {
-    // This would depend on the API's reverse geocoding capabilities
-    // For now, we'll implement a basic search
-    try {
-      const searchResults = await this.searchLocations(`${latitude},${longitude}`);
-      return searchResults[0] || null;
-    } catch (error) {
-      console.error('Failed to get location by coordinates:', error);
-      throw error;
+  async getProvinces() {
+    const tree = await this.loadTree();
+    return tree.map(clone);
+  }
+
+  async getDistricts(provinceId, query = undefined) {
+    const tree = await this.loadTree();
+    const province = findProvince(tree, provinceId);
+    return listChildren(province?.children, query);
+  }
+
+  async getSectors(districtId, provinceId = undefined, query = undefined) {
+    const tree = await this.loadTree();
+    const district = findDistrict(tree, districtId, provinceId);
+    return listChildren(district?.children, query);
+  }
+
+  async getVillages(sectorId, districtId = undefined, provinceId = undefined, query = undefined) {
+    const tree = await this.loadTree();
+    const sector = findSector(tree, sectorId, districtId, provinceId);
+    return listChildren(sector?.children, query);
+  }
+
+  async getCells(villageId, sectorId = undefined, districtId = undefined, provinceId = undefined, query = undefined) {
+    const tree = await this.loadTree();
+    const sector = findSector(tree, sectorId, districtId, provinceId);
+    const village = (sector?.children || []).find((item) => normalizeText(item.slug) === normalizeText(villageId) || normalizeText(item.id) === normalizeText(villageId) || matches(item, villageId));
+    return listChildren(village?.children, query);
+  }
+
+  async getLocationHierarchy(provinceId, districtId, sectorId, villageId) {
+    const [provinces, districts, sectors, villages, cells] = await Promise.all([
+      this.getProvinces(),
+      provinceId ? this.getDistricts(provinceId) : Promise.resolve([]),
+      districtId ? this.getSectors(districtId, provinceId) : Promise.resolve([]),
+      sectorId ? this.getVillages(sectorId, districtId, provinceId) : Promise.resolve([]),
+      villageId ? this.getCells(villageId, sectorId, districtId, provinceId) : Promise.resolve([]),
+    ]);
+
+    return { provinces, districts, sectors, villages, cells };
+  }
+
+  async searchLocations(query, type = 'all') {
+    const normalized = `${query || ''}`.trim();
+    if (!normalized) {
+      return [];
     }
+
+    const tree = await this.loadTree();
+    const results = [];
+
+    const addResults = (items, level) => {
+      items.filter((item) => matches(item, normalized)).forEach((item) => {
+        results.push({ ...clone(item), type: level });
+      });
+    };
+
+    if (type === 'all' || type === 'provinces') addResults(tree, 'province');
+    if (type === 'all' || type === 'districts') tree.forEach((p) => addResults(p.children || [], 'district'));
+    if (type === 'all' || type === 'sectors') tree.forEach((p) => (p.children || []).forEach((d) => addResults(d.children || [], 'sector')));
+    if (type === 'all' || type === 'villages') tree.forEach((p) => (p.children || []).forEach((d) => (d.children || []).forEach((s) => addResults(s.children || [], 'village'))));
+    if (type === 'all' || type === 'cells') tree.forEach((p) => (p.children || []).forEach((d) => (d.children || []).forEach((s) => (s.children || []).forEach((v) => addResults(v.children || [], 'cell')))));
+
+    const seen = new Set();
+    return results.filter((item) => {
+      const key = `${item.type}:${item.id || item.slug || item.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  async getLocationByCoordinates(latitude, longitude) {
+    const searchResults = await this.searchLocations(`${latitude},${longitude}`);
+    return searchResults[0] || null;
   }
 }
 
-// Create and export a singleton instance
 const rwandaApiService = new RwandaApiService();
 export default rwandaApiService;
