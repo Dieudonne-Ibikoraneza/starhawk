@@ -41,7 +41,7 @@ export default function ProtectedRoute({ children, allowedRole }: ProtectedRoute
       INSURER: "/insurer/dashboard",
       ASSESSOR: "/assessor/dashboard",
       ADMIN: "/admin/dashboard",
-      GOVERNMENT: "/government-analytics",
+      GOVERNMENT: "/government/dashboard",
     };
 
     const targetRoute = dashboardRoutes[userRole] || "/role-selection";
