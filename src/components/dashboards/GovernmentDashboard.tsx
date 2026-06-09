@@ -15,6 +15,14 @@ import {
   LayoutDashboard, Trophy, ReceiptText, ShieldCheck, AlertTriangle,
   Satellite, LogOut, X, ChevronLeft, ChevronRight, ChevronDown,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { crops, seasons } from "@/components/government/gov-data";
 
 // Page components — one file per page
 import {
@@ -71,6 +79,10 @@ export const GovernmentDashboard = () => {
   const [governmentProfile, setGovernmentProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const governmentName = governmentEmail || governmentPhone || "Government Official";
+
+  // Global filters
+  const [crop, setCrop] = useState<string>("All Crops");
+  const [season, setSeason] = useState<string>("Season A 2026");
 
   useEffect(() => { document.documentElement.classList.remove("dark"); }, []);
   useEffect(() => { localStorage.setItem("govSidebarCollapsed", String(collapsed)); }, [collapsed]);
@@ -238,17 +250,43 @@ export const GovernmentDashboard = () => {
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{meta.title}</h1>
               <p className="mt-0.5 text-sm text-gray-500">{meta.description}</p>
             </div>
-            <button className="hidden sm:flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 shrink-0 transition-colors">
-              Season A 2026
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            </button>
+            <div className="flex items-center gap-3 shrink-0">
+              {activePage === "leaderboard" && (
+                <div className="hidden sm:block">
+                  <Select value={crop} onValueChange={setCrop}>
+                    <SelectTrigger className="w-[150px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
+                      <SelectValue placeholder="Crop" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {crops.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="hidden sm:block">
+                <Select value={season} onValueChange={setSeason}>
+                  <SelectTrigger className="w-[170px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
+                    <SelectValue placeholder="Season" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {seasons.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {/* Page content */}
           <main className="flex-1 overflow-auto bg-gray-50">
             <CustomScrollbar className="h-full">
               <div className="px-6 py-6">
-                {renderPage(activePage)}
+                {activePage === "leaderboard" 
+                  ? <GovLeaderboardPage crop={crop} season={season} /> 
+                  : renderPage(activePage)}
               </div>
             </CustomScrollbar>
           </main>
