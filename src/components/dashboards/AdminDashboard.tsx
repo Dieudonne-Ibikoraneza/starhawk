@@ -2176,6 +2176,22 @@ export const AdminDashboard = () => {
     });
   }, [systemUsers, searchQuery, appliedFilters, sortBy]);
 
+  const isCreateUserFormValid = useMemo(() => {
+    if (!newUserData.nationalId || !newUserData.email || !newUserData.phoneNumber || !newUserData.role) {
+      return false;
+    }
+    if (newUserData.role === "GOVERNMENT") {
+      const gov = newUserData.governmentProfile;
+      if (!gov.title?.trim()) return false;
+      if (gov.level !== "COUNTRY" && !gov.province?.trim()) return false;
+      if (["DISTRICT", "SECTOR", "CELL", "VILLAGE"].includes(gov.level) && !gov.district?.trim()) return false;
+      if (["SECTOR", "CELL", "VILLAGE"].includes(gov.level) && !gov.sector?.trim()) return false;
+      if (["CELL", "VILLAGE"].includes(gov.level) && !gov.cell?.trim()) return false;
+      if (gov.level === "VILLAGE" && !gov.village?.trim()) return false;
+    }
+    return true;
+  }, [newUserData]);
+
   // User Management Page
   const renderUserManagement = () => (
     <div className="space-y-4 pt-6 pr-6">
@@ -2469,8 +2485,8 @@ export const AdminDashboard = () => {
               </Button>
               <Button
                 onClick={handleCreateUser}
-                disabled={creatingUser}
-                className="bg-red-600 hover:bg-red-700 text-gray-900"
+                disabled={creatingUser || !isCreateUserFormValid}
+                className={`text-white ${creatingUser || !isCreateUserFormValid ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
               >
                 {creatingUser ? (
                   <>

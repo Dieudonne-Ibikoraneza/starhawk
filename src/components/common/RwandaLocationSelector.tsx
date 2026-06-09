@@ -203,7 +203,7 @@ export default function RwandaLocationSelector({
     <div className={`space-y-4 ${className}`}>
       {levels.includes('province') && (
         <div className="space-y-2">
-          <Label htmlFor="province">Province</Label>
+          <Label htmlFor="province">Province *</Label>
           <Select value={selectedProvince} onValueChange={handleProvinceChange}>
             <SelectTrigger>
               <SelectValue placeholder={loading.provinces ? 'Loading provinces...' : 'Select province'} />
@@ -225,7 +225,7 @@ export default function RwandaLocationSelector({
 
       {levels.includes('district') && selectedProvince && (
         <div className="space-y-2">
-          <Label htmlFor="district">District</Label>
+          <Label htmlFor="district">District *</Label>
           <Select value={selectedDistrict} onValueChange={handleDistrictChange}>
             <SelectTrigger>
               <SelectValue placeholder={loading.districts ? 'Loading districts...' : 'Select district'} />
@@ -243,7 +243,7 @@ export default function RwandaLocationSelector({
 
       {levels.includes('sector') && selectedDistrict && (
         <div className="space-y-2">
-          <Label htmlFor="sector">Sector</Label>
+          <Label htmlFor="sector">Sector *</Label>
           <Select value={selectedSector} onValueChange={handleSectorChange}>
             <SelectTrigger>
               <SelectValue placeholder={loading.sectors ? 'Loading sectors...' : 'Select sector'} />
@@ -261,7 +261,7 @@ export default function RwandaLocationSelector({
 
       {levels.includes('cell') && selectedSector && (
         <div className="space-y-2">
-          <Label htmlFor="cell">Cell</Label>
+          <Label htmlFor="cell">Cell *</Label>
           <Select value={selectedCell} onValueChange={handleCellChange}>
             <SelectTrigger>
               <SelectValue placeholder={loading.cells ? 'Loading cells...' : 'Select cell'} />
@@ -279,7 +279,7 @@ export default function RwandaLocationSelector({
 
       {levels.includes('village') && selectedCell && (
         <div className="space-y-2">
-          <Label htmlFor="village">Village</Label>
+          <Label htmlFor="village">Village *</Label>
           <Select value={selectedVillage} onValueChange={handleVillageChange}>
             <SelectTrigger>
               <SelectValue placeholder={loading.villages ? 'Loading villages...' : 'Select village'} />
