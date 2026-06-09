@@ -48,7 +48,7 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
   dashboard:   { title: "National Overview",  description: "Agricultural insurance overview across all provinces" },
   leaderboard: { title: "Leaderboard",        description: "Regional crop health & insurance ranking" },
   policies:    { title: "Policy Registry",    description: "Population financial protection overview — read-only oversight" },
-  claims:      { title: "Claims & Losses",    description: "Disaster claims monitoring and payout tracking" },
+  claims:      { title: "Claims & Losses",    description: "District disaster monitoring & insurer payout oversight" },
   invoicing:   { title: "Subsidies",          description: "Government subsidy budget and utilization" },
 };
 

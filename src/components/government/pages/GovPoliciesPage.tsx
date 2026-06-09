@@ -133,7 +133,7 @@ export function GovPoliciesPage() {
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Gender Donut Chart */}
-        <Panel title="Adoption by Gender" description="Equitable access tracking" className="lg:col-span-1">
+        <Panel title="Adoption by Gender" subtitle="Equitable access tracking" className="lg:col-span-1">
           <div className="flex h-[280px] flex-col items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -179,7 +179,7 @@ export function GovPoliciesPage() {
         </Panel>
 
         {/* Age Bar Chart */}
-        <Panel title="Adoption by Age Group" description="Policy adoption rate (%)" className="lg:col-span-2">
+        <Panel title="Adoption by Age Group" subtitle="Policy adoption rate (%)" className="lg:col-span-2">
           <div className="h-[280px] w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
               <RechartsBarChart data={ageData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -222,7 +222,7 @@ export function GovPoliciesPage() {
       </div>
 
       {/* Active Policy Registry Table */}
-      <Panel title="Active Policy Registry" description="8 policies shown">
+      <Panel title="Active Policy Registry" subtitle="8 policies shown">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
