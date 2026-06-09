@@ -91,27 +91,27 @@ export default function RwandaLocationSelector({
     }
   }, [selectedDistrict, levelsKey]);
 
-  // Load villages when sector changes
+  // Load cells when sector changes
   useEffect(() => {
-    if (selectedSector && levels.includes('village') && lastLoadedSectorRef.current !== selectedSector) {
+    if (selectedSector && levels.includes('cell') && lastLoadedSectorRef.current !== selectedSector) {
       lastLoadedSectorRef.current = selectedSector;
-      loadVillages(selectedSector);
-    } else {
-      setVillages([]);
-      setSelectedVillage('');
-    }
-  }, [selectedSector, levelsKey]);
-
-  // Load cells when village changes
-  useEffect(() => {
-    if (selectedVillage && levels.includes('cell') && lastLoadedVillageRef.current !== selectedVillage) {
-      lastLoadedVillageRef.current = selectedVillage;
-      loadCells(selectedVillage);
+      loadCells(selectedSector);
     } else {
       setCells([]);
       setSelectedCell('');
     }
-  }, [selectedVillage, levelsKey]);
+  }, [selectedSector, levelsKey]);
+
+  // Load villages when cell changes
+  useEffect(() => {
+    if (selectedCell && levels.includes('village') && lastLoadedCellRef.current !== selectedCell) {
+      lastLoadedCellRef.current = selectedCell;
+      loadVillages(selectedCell);
+    } else {
+      setVillages([]);
+      setSelectedVillage('');
+    }
+  }, [selectedCell, levelsKey]);
 
   // Notify parent component when location changes
   useEffect(() => {
@@ -206,6 +206,16 @@ export default function RwandaLocationSelector({
     } catch (error) {
       console.error('Failed to load districts:', error);
       setDistricts([]);
+  };
+
+  const loadDistricts = async (provinceId: string) => {
+    setLoading(prev => ({ ...prev, districts: true }));
+    try {
+      const data = await rwandaApiService.getDistricts(provinceId);
+      setDistricts(ensureArray(data));
+    } catch (error) {
+      console.error('Failed to load districts:', error);
+      setDistricts([]);
     } finally {
       setLoading(prev => ({ ...prev, districts: false }));
     }
@@ -214,7 +224,7 @@ export default function RwandaLocationSelector({
   const loadSectors = async (districtId: string) => {
     setLoading(prev => ({ ...prev, sectors: true }));
     try {
-      const data = await rwandaApiService.getSectors(districtId);
+      const data = await rwandaApiService.getSectors(districtId, selectedProvince);
       setSectors(ensureArray(data));
     } catch (error) {
       console.error('Failed to load sectors:', error);
@@ -224,29 +234,29 @@ export default function RwandaLocationSelector({
     }
   };
 
-  const loadVillages = async (sectorId: string) => {
-    setLoading(prev => ({ ...prev, villages: true }));
-    try {
-      const data = await rwandaApiService.getVillages(sectorId);
-      setVillages(ensureArray(data));
-    } catch (error) {
-      console.error('Failed to load villages:', error);
-      setVillages([]);
-    } finally {
-      setLoading(prev => ({ ...prev, villages: false }));
-    }
-  };
-
-  const loadCells = async (villageId: string) => {
+  const loadCells = async (sectorId: string) => {
     setLoading(prev => ({ ...prev, cells: true }));
     try {
-      const data = await rwandaApiService.getCells(villageId);
+      const data = await rwandaApiService.getCells(sectorId, selectedDistrict, selectedProvince);
       setCells(ensureArray(data));
     } catch (error) {
       console.error('Failed to load cells:', error);
       setCells([]);
     } finally {
       setLoading(prev => ({ ...prev, cells: false }));
+    }
+  };
+
+  const loadVillages = async (cellId: string) => {
+    setLoading(prev => ({ ...prev, villages: true }));
+    try {
+      const data = await rwandaApiService.getVillages(cellId, selectedSector, selectedDistrict, selectedProvince);
+      setVillages(ensureArray(data));
+    } catch (error) {
+      console.error('Failed to load villages:', error);
+      setVillages([]);
+    } finally {
+      setLoading(prev => ({ ...prev, villages: false }));
     }
   };
 
@@ -259,35 +269,39 @@ export default function RwandaLocationSelector({
     lastLoadedProvinceRef.current = '';
     lastLoadedDistrictRef.current = '';
     lastLoadedSectorRef.current = '';
+    lastLoadedCellRef.current = '';
     lastLoadedVillageRef.current = '';
   };
 
   const handleDistrictChange = (value: string) => {
     setSelectedDistrict(value);
     setSelectedSector('');
-    setSelectedVillage('');
     setSelectedCell('');
+    setSelectedVillage('');
     lastLoadedDistrictRef.current = '';
     lastLoadedSectorRef.current = '';
+    lastLoadedCellRef.current = '';
     lastLoadedVillageRef.current = '';
   };
 
   const handleSectorChange = (value: string) => {
     setSelectedSector(value);
+    setSelectedCell('');
     setSelectedVillage('');
-    setSelectedCell('');
     lastLoadedSectorRef.current = '';
-    lastLoadedVillageRef.current = '';
-  };
-
-  const handleVillageChange = (value: string) => {
-    setSelectedVillage(value);
-    setSelectedCell('');
+    lastLoadedCellRef.current = '';
     lastLoadedVillageRef.current = '';
   };
 
   const handleCellChange = (value: string) => {
     setSelectedCell(value);
+    setSelectedVillage('');
+    lastLoadedCellRef.current = '';
+    lastLoadedVillageRef.current = '';
+  };
+
+  const handleVillageChange = (value: string) => {
+    setSelectedVillage(value);
   };
 
   return (
@@ -355,25 +369,7 @@ export default function RwandaLocationSelector({
         </div>
       )}
 
-      {levels.includes('village') && selectedSector && (
-        <div className="space-y-2">
-          <Label htmlFor="village">Village</Label>
-          <Select value={selectedVillage} onValueChange={handleVillageChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={loading.villages ? "Loading villages..." : "Select village"} />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.isArray(villages) && villages.map((village) => (
-                <SelectItem key={village.id} value={village.id}>
-                  {village.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {levels.includes('cell') && selectedVillage && (
+      {levels.includes('cell') && selectedSector && (
         <div className="space-y-2">
           <Label htmlFor="cell">Cell</Label>
           <Select value={selectedCell} onValueChange={handleCellChange}>
@@ -384,6 +380,24 @@ export default function RwandaLocationSelector({
               {Array.isArray(cells) && cells.map((cell) => (
                 <SelectItem key={cell.id} value={cell.id}>
                   {cell.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {levels.includes('village') && selectedCell && (
+        <div className="space-y-2">
+          <Label htmlFor="village">Village</Label>
+          <Select value={selectedVillage} onValueChange={handleVillageChange}>
+            <SelectTrigger>
+              <SelectValue placeholder={loading.villages ? "Loading villages..." : "Select village"} />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.isArray(villages) && villages.map((village) => (
+                <SelectItem key={village.id} value={village.id}>
+                  {village.name}
                 </SelectItem>
               ))}
             </SelectContent>
