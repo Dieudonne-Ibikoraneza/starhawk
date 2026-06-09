@@ -1,8 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { dashboardTheme } from "@/utils/dashboardTheme";
+import { useMemo, useState } from "react";
+import { Panel, KpiCard } from "@/components/government/gov-widgets";
 import {
+  PieChart,
+  Pie,
+  Cell,
   BarChart as RechartsBarChart,
   Bar,
   XAxis,
@@ -10,150 +11,254 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
-import { Download } from "lucide-react";
+import { Wallet, ShieldCheck, FileText, FileWarning, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 export function GovPoliciesPage() {
-  const cropsData = [
-    { crop: "Maize", farmers: 3200, hectares: 15600, policies: 2400, claims: 120, avgPremium: 350000, totalPremium: 840000000, claimsPaid: 156000000, coverage: 75.0, yield: 4.2, targetYield: 4.5 },
-    { crop: "Rice", farmers: 1800, hectares: 8400, policies: 1350, claims: 85, avgPremium: 420000, totalPremium: 567000000, claimsPaid: 198000000, coverage: 75.0, yield: 5.1, targetYield: 5.3 },
-    { crop: "Beans", farmers: 2100, hectares: 9800, policies: 1680, claims: 95, avgPremium: 280000, totalPremium: 470400000, claimsPaid: 142000000, coverage: 80.0, yield: 1.8, targetYield: 2.0 },
-    { crop: "Coffee", farmers: 950, hectares: 5200, policies: 760, claims: 35, avgPremium: 650000, totalPremium: 494000000, claimsPaid: 89000000, coverage: 80.0, yield: 1.2, targetYield: 1.4 },
-    { crop: "Tea", farmers: 750, hectares: 4100, policies: 600, claims: 28, avgPremium: 580000, totalPremium: 348000000, claimsPaid: 67000000, coverage: 80.0, yield: 2.3, targetYield: 2.5 },
+  const genderData = [
+    { name: "Female", value: 54, color: "#10b981" }, // emerald-500
+    { name: "Male", value: 46, color: "#0ea5e9" },   // sky-500
   ];
 
-  const monthlyTrends = [
-    { month: "Jan", policies: 1200, claims: 85, premium: 1800000000, claimsPaid: 156000000, farmers: 7200 },
-    { month: "Feb", policies: 1350, claims: 92, premium: 2025000000, claimsPaid: 178000000, farmers: 7450 },
-    { month: "Mar", policies: 1480, claims: 78, premium: 2220000000, claimsPaid: 145000000, farmers: 7680 },
-    { month: "Apr", policies: 1620, claims: 105, premium: 2430000000, claimsPaid: 198000000, farmers: 7850 },
-    { month: "May", policies: 1750, claims: 88, premium: 2625000000, claimsPaid: 167000000, farmers: 7920 },
-    { month: "Jun", policies: 1890, claims: 95, premium: 2835000000, claimsPaid: 182000000, farmers: 7950 },
+  const ageData = [
+    { age: "18-30", rate: 18 },
+    { age: "31-45", rate: 42 },
+    { age: "46-60", rate: 28 },
+    { age: "60+", rate: 12 },
   ];
+
+  const policiesData = [
+    { id: "POL-8801", holder: "J. Uwimana", sector: "Kinyinya", crop: "Rice", sumInsured: 3200000, expiry: "2026-12-31", status: "Active" },
+    { id: "POL-8802", holder: "E. Mukamana", sector: "Bumbogo", crop: "Rice", sumInsured: 2800000, expiry: "2026-12-31", status: "Active" },
+    { id: "POL-8803", holder: "P. Habimana", sector: "Ndera", crop: "Cassava", sumInsured: 1500000, expiry: "2026-11-30", status: "Active" },
+    { id: "POL-8804", holder: "C. Niyonsaba", sector: "Gisozi", crop: "Maize", sumInsured: 2100000, expiry: "2026-12-31", status: "Active" },
+    { id: "POL-8805", holder: "A. Ingabire", sector: "Jabana", crop: "Beans", sumInsured: 980000, expiry: "2026-05-01", status: "Expired" },
+    { id: "POL-8806", holder: "D. Bizimana", sector: "Rusororo", crop: "Maize", sumInsured: 2600000, expiry: "2026-12-31", status: "Active" },
+    { id: "POL-8807", holder: "M. Uwase", sector: "Remera", crop: "Maize", sumInsured: 1750000, expiry: "2026-10-15", status: "Active" },
+    { id: "POL-8808", holder: "S. Nkurunziza", sector: "Nduba", crop: "Cassava", sumInsured: 1340000, expiry: "2026-04-20", status: "Expired" },
+  ];
+
+  type PolicyRow = typeof policiesData[0];
+  type SortConfig = { key: keyof PolicyRow; direction: "asc" | "desc" } | null;
+
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+
+  const sortedPolicies = useMemo(() => {
+    let list = [...policiesData];
+    if (sortConfig !== null) {
+      list.sort((a, b) => {
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        
+        if (typeof valA === "string" && typeof valB === "string") {
+          return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        
+        if (typeof valA === "number" && typeof valB === "number") {
+          return sortConfig.direction === "asc" ? valA - valB : valB - valA;
+        }
+        
+        return 0;
+      });
+    }
+    return list;
+  }, [sortConfig]);
+
+  const handleSort = (key: keyof PolicyRow) => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key) {
+      if (sortConfig.direction === "asc") direction = "desc";
+      else {
+        setSortConfig(null);
+        return;
+      }
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const SortableHeader = ({ label, sortKey, className = "" }: { label: string, sortKey: keyof PolicyRow, className?: string }) => {
+    const isActive = sortConfig?.key === sortKey;
+    return (
+      <th className={`px-4 py-3 font-medium ${className}`}>
+        <button 
+          onClick={() => handleSort(sortKey)}
+          className="flex items-center gap-1.5 uppercase tracking-wide hover:text-gray-900 focus:outline-none"
+        >
+          {label}
+          {isActive ? (
+            sortConfig.direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+          ) : (
+            <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 text-gray-400" />
+          )}
+        </button>
+      </th>
+    );
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Policy Analytics</h1>
-          <p className="text-sm text-gray-600 mt-1">Comprehensive policy data across all insurers</p>
-        </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
+    <div className="flex flex-col space-y-6">
+      {/* KPI Row */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Total Sum Insured"
+          value="0.02B RWF"
+          icon={Wallet}
+          accent="primary"
+        />
+        <KpiCard
+          label="Active Policies"
+          value="24,180"
+          delta={0.05}
+          deltaLabel="vs last period"
+          icon={ShieldCheck}
+          accent="primary"
+        />
+        <KpiCard
+          label="Active vs Expired"
+          value="6/2"
+          icon={FileText}
+          accent="info"
+        />
+        <KpiCard
+          label="Coverage Gaps"
+          value="4,230"
+          unit="farms"
+          delta={-0.03}
+          deltaLabel="vs last period"
+          icon={FileWarning}
+          accent="warning"
+        />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card className={`${dashboardTheme.card} border-l-4 border-l-blue-500`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-900/80">Total Policies</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">5,900</div>
-            <p className="text-xs text-green-400 mt-1">+8.5% from last month</p>
-          </CardContent>
-        </Card>
-        <Card className={`${dashboardTheme.card} border-l-4 border-l-green-500`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-900/80">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">5,340</div>
-            <p className="text-xs text-gray-900/60 mt-1">90.5% of total</p>
-          </CardContent>
-        </Card>
-        <Card className={`${dashboardTheme.card} border-l-4 border-l-yellow-500`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-900/80">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">420</div>
-            <p className="text-xs text-gray-900/60 mt-1">7.1% of total</p>
-          </CardContent>
-        </Card>
-        <Card className={`${dashboardTheme.card} border-l-4 border-l-purple-500`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-900/80">Avg Premium</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">RWF 820K</div>
-            <p className="text-xs text-green-400 mt-1">+5.2% YoY</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className={dashboardTheme.card}>
-        <CardHeader>
-          <CardTitle className="text-gray-900">Policy Distribution by Crop Type</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80">
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Gender Donut Chart */}
+        <Panel title="Adoption by Gender" description="Equitable access tracking" className="lg:col-span-1">
+          <div className="flex h-[280px] flex-col items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={cropsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="crop" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
+              <PieChart>
+                <Pie
+                  data={genderData}
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {genderData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
                 <RechartsTooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  itemStyle={{ color: "#111827", fontWeight: 500 }}
+                  formatter={(value: number) => [`${value}%`, "Adoption"]}
                 />
-                <Legend />
-                <Bar dataKey="policies" fill="#3B82F6" name="Policies" />
-                <Bar dataKey="farmers" fill="#10B981" name="Farmers" />
+              </PieChart>
+            </ResponsiveContainer>
+            
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+              {genderData.map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-sm font-medium text-gray-600">
+                    {item.name} {item.value}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        {/* Age Bar Chart */}
+        <Panel title="Adoption by Age Group" description="Policy adoption rate (%)" className="lg:col-span-2">
+          <div className="h-[280px] w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={ageData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="age" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#6b7280", fontSize: 12 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "#6b7280", fontSize: 12 }} 
+                  domain={[0, 60]}
+                  ticks={[0, 15, 30, 45, 60]}
+                />
+                <RechartsTooltip
+                  cursor={{ fill: "#f9fafb" }}
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  itemStyle={{ color: "#111827", fontWeight: 500 }}
+                  formatter={(value: number) => [`${value}%`, "Adoption Rate"]}
+                />
+                <Bar 
+                  dataKey="rate" 
+                  fill="#0ea5e9" // sky-500 matching the screenshot
+                  radius={[4, 4, 0, 0]}
+                  barSize={80}
+                />
               </RechartsBarChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+        </Panel>
+      </div>
 
-      <Card className={dashboardTheme.card}>
-        <CardHeader>
-          <CardTitle className="text-gray-900">Detailed Crop Insurance Analytics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-300">
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Crop</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Farmers</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Policies</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Coverage %</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Total Premium</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Claims Paid</th>
-                  <th className="text-left py-3 px-4 text-gray-900/80 font-medium">Loss Ratio</th>
+      {/* Active Policy Registry Table */}
+      <Panel title="Active Policy Registry" description="8 policies shown">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="group border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                <SortableHeader label="Policy ID" sortKey="id" className="pl-6" />
+                <SortableHeader label="Holder" sortKey="holder" />
+                <SortableHeader label="Sector" sortKey="sector" />
+                <SortableHeader label="Crop" sortKey="crop" />
+                <SortableHeader label="Sum Insured" sortKey="sumInsured" />
+                <SortableHeader label="Expiry" sortKey="expiry" />
+                <SortableHeader label="Status" sortKey="status" className="pr-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPolicies.map((policy, idx) => (
+                <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
+                  <td className="py-3 px-4 pl-6 font-medium text-gray-900">{policy.id}</td>
+                  <td className="py-3 px-4 text-gray-600">{policy.holder}</td>
+                  <td className="py-3 px-4 text-gray-600">{policy.sector}</td>
+                  <td className="py-3 px-4 text-gray-600">{policy.crop}</td>
+                  <td className="py-3 px-4 text-gray-600">{policy.sumInsured.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-gray-600">{policy.expiry}</td>
+                  <td className="py-3 px-4 pr-6">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      policy.status === 'Active' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20' : 
+                      'bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/10'
+                    }`}>
+                      {policy.status}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {cropsData.map((crop, idx) => (
-                  <tr key={idx} className="border-b border-gray-200 hover:bg-gray-800/50">
-                    <td className="py-3 px-4 text-gray-900 font-medium">{crop.crop}</td>
-                    <td className="py-3 px-4 text-gray-900">{crop.farmers.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-gray-900">{crop.policies.toLocaleString()}</td>
-                    <td className="py-3 px-4">
-                      <Badge className="bg-indigo-600">{crop.coverage}%</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-gray-900">RWF {(crop.totalPremium / 1000000).toFixed(0)}M</td>
-                    <td className="py-3 px-4 text-gray-900">RWF {(crop.claimsPaid / 1000000).toFixed(0)}M</td>
-                    <td className="py-3 px-4">
-                      <Badge className={`${
-                        ((crop.claimsPaid / crop.totalPremium) * 100) < 30 ? 'bg-green-600' :
-                        ((crop.claimsPaid / crop.totalPremium) * 100) < 50 ? 'bg-yellow-600' :
-                        'bg-red-600'
-                      }`}>
-                        {((crop.claimsPaid / crop.totalPremium) * 100).toFixed(1)}%
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
     </div>
   );
 }

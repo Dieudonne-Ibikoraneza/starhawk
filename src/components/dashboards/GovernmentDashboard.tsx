@@ -47,7 +47,7 @@ type PageId = typeof NAV_ITEMS[number]["id"];
 const PAGE_META: Record<PageId, { title: string; description: string }> = {
   dashboard:   { title: "National Overview",  description: "Agricultural insurance overview across all provinces" },
   leaderboard: { title: "Leaderboard",        description: "Regional crop health & insurance ranking" },
-  policies:    { title: "Policies",           description: "Active policy registry across your jurisdiction" },
+  policies:    { title: "Policy Registry",    description: "Population financial protection overview — read-only oversight" },
   claims:      { title: "Claims & Losses",    description: "Disaster claims monitoring and payout tracking" },
   invoicing:   { title: "Subsidies",          description: "Government subsidy budget and utilization" },
 };
