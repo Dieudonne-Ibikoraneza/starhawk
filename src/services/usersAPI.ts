@@ -366,6 +366,19 @@ export const createUser = (userData: {
     companyLogoUrl?: string;
     termsAndConditions?: string;
   };
+  governmentProfile?: {
+    level: "COUNTRY" | "PROVINCE" | "DISTRICT" | "SECTOR" | "CELL" | "VILLAGE";
+    title: string;
+    department?: string;
+    province?: string;
+    district?: string;
+    sector?: string;
+    cell?: string;
+    village?: string;
+    parentGovernmentUserId?: string;
+    officeEmail?: string;
+    officePhone?: string;
+  };
   [key: string]: any;
 }) => usersApiService.createUser(userData);
 

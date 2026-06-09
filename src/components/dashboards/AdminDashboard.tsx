@@ -67,6 +67,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RwandaLocationSelector from "@/components/common/RwandaLocationSelector";
 import {
   Select,
   SelectContent,
@@ -223,6 +224,15 @@ const PROVINCE_TRANSLATIONS: Record<string, string[]> = {
   "eastern province": ["eastern", "iburasirazuba", "eastern province", "iburasirazuba province"],
   "western province": ["western", "iburengerazuba", "western province"]
 };
+
+const GOVERNMENT_LEVELS = [
+  { value: "COUNTRY", label: "Country Level" },
+  { value: "PROVINCE", label: "Province Level" },
+  { value: "DISTRICT", label: "District Level" },
+  { value: "SECTOR", label: "Sector Level" },
+  { value: "CELL", label: "Cell Level" },
+  { value: "VILLAGE", label: "Village Level" },
+] as const;
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -855,7 +865,27 @@ export const AdminDashboard = () => {
     email: "",
     phoneNumber: "",
     role: "FARMER",
+    governmentProfile: {
+      level: "COUNTRY",
+      title: "",
+      department: "",
+      province: "",
+      district: "",
+      sector: "",
+      cell: "",
+      village: "",
+      parentGovernmentUserId: "",
+      officeEmail: "",
+      officePhone: "",
+    },
   });
+  const [selectedGovernmentLocation, setSelectedGovernmentLocation] = useState<{
+    province?: { id: string; name: string };
+    district?: { id: string; name: string };
+    sector?: { id: string; name: string };
+    village?: { id: string; name: string };
+    cell?: { id: string; name: string };
+  }>({});
 
   // Computed User Statistics from real data
   const userStats = {
@@ -1893,10 +1923,68 @@ export const AdminDashboard = () => {
       toast({
         title: "Validation Error",
         description:
-          "Please fill in all required fields (National ID, Email, Phone Number, Role)",
+        "Please fill in all required fields (National ID, Email, Phone Number, Role)",
         variant: "destructive",
       });
       return;
+    }
+
+      if (newUserData.role === "GOVERNMENT") {
+        const gov = newUserData.governmentProfile;
+        if (!gov.title.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Government title is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (gov.level !== "COUNTRY" && !gov.province.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Province is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        ["DISTRICT", "SECTOR", "CELL", "VILLAGE"].includes(gov.level) &&
+        !gov.district.trim()
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "District is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        ["SECTOR", "CELL", "VILLAGE"].includes(gov.level) &&
+        !gov.sector.trim()
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "Sector is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (["CELL", "VILLAGE"].includes(gov.level) && !gov.cell.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Cell is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (gov.level === "VILLAGE" && !gov.village.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Village is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setCreatingUser(true);
@@ -1911,6 +1999,23 @@ export const AdminDashboard = () => {
         phoneNumber: newUserData.phoneNumber,
         role: newUserData.role,
       };
+
+      if (newUserData.role === "GOVERNMENT") {
+        const gov = newUserData.governmentProfile;
+        userDataToSend.governmentProfile = {
+          level: gov.level,
+          title: gov.title.trim(),
+          department: gov.department?.trim() || undefined,
+          province: selectedGovernmentLocation.province?.name || gov.province?.trim() || undefined,
+          district: selectedGovernmentLocation.district?.name || gov.district?.trim() || undefined,
+          sector: selectedGovernmentLocation.sector?.name || gov.sector?.trim() || undefined,
+          cell: selectedGovernmentLocation.cell?.name || gov.cell?.trim() || undefined,
+          village: selectedGovernmentLocation.village?.name || gov.village?.trim() || undefined,
+          parentGovernmentUserId: gov.parentGovernmentUserId?.trim() || undefined,
+          officeEmail: gov.officeEmail?.trim() || undefined,
+          officePhone: gov.officePhone?.trim() || undefined,
+        };
+      }
 
       console.log(
         "Creating user with data:",
@@ -1936,7 +2041,21 @@ export const AdminDashboard = () => {
         email: "",
         phoneNumber: "",
         role: "FARMER",
+        governmentProfile: {
+          level: "COUNTRY",
+          title: "",
+          department: "",
+          province: "",
+          district: "",
+          sector: "",
+          cell: "",
+          village: "",
+          parentGovernmentUserId: "",
+          officeEmail: "",
+          officePhone: "",
+        },
       });
+      setSelectedGovernmentLocation({});
       setShowAddUserDialog(false);
       // Reload users
       await loadUsers();
@@ -2154,6 +2273,190 @@ export const AdminDashboard = () => {
                 </Select>
               </div>
             </div>
+
+            {newUserData.role === "GOVERNMENT" && (
+              <div className="space-y-4 rounded-xl border border-red-200 bg-red-50/40 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Government Profile
+                    </h3>
+                    <p className="text-xs text-gray-600">
+                      Select the hierarchy level and fill the matching office details.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-900">Level *</Label>
+                    <Select
+                      value={newUserData.governmentProfile.level}
+                      onValueChange={(value) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            level: value as any,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger className={dashboardTheme.select}>
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent className={dashboardTheme.card}>
+                        {GOVERNMENT_LEVELS.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="govTitle" className="text-gray-900">
+                      Title *
+                    </Label>
+                    <Input
+                      id="govTitle"
+                      value={newUserData.governmentProfile.title}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            title: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="District Agriculture Officer"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="govDepartment" className="text-gray-900">
+                      Department
+                    </Label>
+                    <Input
+                      id="govDepartment"
+                      value={newUserData.governmentProfile.department}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            department: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="Agriculture"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="govOfficeEmail" className="text-gray-900">
+                      Office Email
+                    </Label>
+                    <Input
+                      id="govOfficeEmail"
+                      type="email"
+                      value={newUserData.governmentProfile.officeEmail}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            officeEmail: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="office@example.gov"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="govOfficePhone" className="text-gray-900">
+                      Office Phone
+                    </Label>
+                    <Input
+                      id="govOfficePhone"
+                      value={newUserData.governmentProfile.officePhone}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            officePhone: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="0781234567"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="govParentId" className="text-gray-900">
+                      Parent Government User ID
+                    </Label>
+                    <Input
+                      id="govParentId"
+                      value={newUserData.governmentProfile.parentGovernmentUserId}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            parentGovernmentUserId: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="Optional for hierarchy linking"
+                    />
+                  </div>
+                </div>
+
+                {newUserData.governmentProfile.level !== "COUNTRY" && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <RwandaLocationSelector
+                      levels={
+                        newUserData.governmentProfile.level === "PROVINCE"
+                          ? ["province"]
+                          : newUserData.governmentProfile.level === "DISTRICT"
+                            ? ["province", "district"]
+                            : newUserData.governmentProfile.level === "SECTOR"
+                              ? ["province", "district", "sector"]
+                              : newUserData.governmentProfile.level === "CELL"
+                                ? ["province", "district", "sector", "village", "cell"]
+                                : ["province", "district", "sector", "village", "cell"]
+                      }
+                      onLocationChange={(location) => {
+                        setSelectedGovernmentLocation(location);
+                        setNewUserData((prev) => ({
+                          ...prev,
+                          governmentProfile: {
+                            ...prev.governmentProfile,
+                            province: location.province?.name || "",
+                            district: location.district?.name || "",
+                            sector: location.sector?.name || "",
+                            village: location.village?.name || "",
+                            cell: location.cell?.name || "",
+                          },
+                        }));
+                      }}
+                      className="space-y-4"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
