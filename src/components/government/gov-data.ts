@@ -164,3 +164,147 @@ export function rwfShort(value: number): string {
   if (value >= 1e3) return `${(value / 1e3).toFixed(0)}K`;
   return `${value}`;
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// SEASON COMPARISON LAYER
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface RegionNode {
+  id: string;
+  name: string;
+  districts?: { id: string; name: string }[];
+}
+
+export const provinceTree: RegionNode[] = [
+  {
+    id: "kigali",
+    name: "Kigali City",
+    districts: [
+      { id: "gasabo", name: "Gasabo" },
+      { id: "kicukiro", name: "Kicukiro" },
+      { id: "nyarugenge", name: "Nyarugenge" },
+    ],
+  },
+  {
+    id: "eastern",
+    name: "Eastern Province",
+    districts: [
+      { id: "nyagatare", name: "Nyagatare" },
+      { id: "kayonza", name: "Kayonza" },
+      { id: "bugesera", name: "Bugesera" },
+      { id: "ngoma", name: "Ngoma" },
+    ],
+  },
+  {
+    id: "western",
+    name: "Western Province",
+    districts: [
+      { id: "rubavu", name: "Rubavu" },
+      { id: "rusizi", name: "Rusizi" },
+      { id: "karongi", name: "Karongi" },
+    ],
+  },
+  {
+    id: "northern",
+    name: "Northern Province",
+    districts: [
+      { id: "musanze", name: "Musanze" },
+      { id: "gicumbi", name: "Gicumbi" },
+      { id: "burera", name: "Burera" },
+    ],
+  },
+  {
+    id: "southern",
+    name: "Southern Province",
+    districts: [
+      { id: "huye", name: "Huye" },
+      { id: "muhanga", name: "Muhanga" },
+      { id: "nyamagabe", name: "Nyamagabe" },
+    ],
+  },
+];
+
+export const compareSeasons = [
+  "Season A 2026",
+  "Season B 2025",
+  "Season A 2025",
+  "Season B 2024",
+  "Season A 2024",
+] as const;
+
+export type CompareSeason = (typeof compareSeasons)[number];
+
+export type ConceptKey =
+  | "ndvi"
+  | "insurance"
+  | "yield"
+  | "claims"
+  | "subsidy"
+  | "cultivated";
+
+export interface ConceptDef {
+  key: ConceptKey;
+  label: string;
+  unit: string;
+  higherIsBetter: boolean;
+  format: (v: number) => string;
+}
+
+export const concepts: ConceptDef[] = [
+  { key: "ndvi",      label: "Crop Health (NDVI)",       unit: "index",   higherIsBetter: true,  format: (v) => v.toFixed(2) },
+  { key: "insurance", label: "Insurance Penetration",    unit: "%",       higherIsBetter: true,  format: (v) => `${Math.round(v)}%` },
+  { key: "yield",     label: "Avg Yield",                unit: "t/ha",    higherIsBetter: true,  format: (v) => `${v.toFixed(1)} t/ha` },
+  { key: "claims",    label: "Active Claims",            unit: "claims",  higherIsBetter: false, format: (v) => `${Math.round(v)}` },
+  { key: "subsidy",   label: "Subsidy Utilized",         unit: "M RWF",   higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
+  { key: "cultivated",label: "Cultivated Area",          unit: "ha",      higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()} ha` },
+];
+
+export type ConceptValues = Record<ConceptKey, number>;
+
+function hashSeed(str: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+const seasonDrift: Record<CompareSeason, number> = {
+  "Season A 2026": 0.0,
+  "Season B 2025": -0.04,
+  "Season A 2025": -0.07,
+  "Season B 2024": -0.11,
+  "Season A 2024": -0.15,
+};
+
+export function getConceptValues(scopeId: string, season: CompareSeason): ConceptValues {
+  const seed = hashSeed(scopeId);
+  const drift = seasonDrift[season] ?? 0;
+  const scale = scopeId === "national" ? 12 : provinceTree.some((p) => p.id === scopeId) ? 3 : 1;
+
+  const ndvi = +(0.58 + seed * 0.18 + drift).toFixed(2);
+  const insurance = Math.max(20, Math.round(40 + seed * 45 + drift * 120));
+  const yieldVal = +(2.2 + seed * 2.6 + drift * 5).toFixed(1);
+  const claims = Math.max(0, Math.round((40 + seed * 90) * (1 - drift * 2) * (scale / 3)));
+  const subsidy = Math.round((90 + seed * 160) * scale * (1 + drift));
+  const cultivated = Math.round((1200 + seed * 1800) * scale);
+
+  return { ndvi, insurance, yield: yieldVal, claims, subsidy, cultivated };
+}
+
+export function scopeLabel(scopeId: string): string {
+  if (scopeId === "national") return "All Rwanda";
+  const prov = provinceTree.find((p) => p.id === scopeId);
+  if (prov) return prov.name;
+  for (const p of provinceTree) {
+    const d = p.districts?.find((d) => d.id === scopeId);
+    if (d) return `${d.name} District`;
+  }
+  return scopeId;
+}
+
+export function pctChange(a: number, b: number): number {
+  if (a === 0) return b === 0 ? 0 : 100;
+  return ((b - a) / Math.abs(a)) * 100;
+}
