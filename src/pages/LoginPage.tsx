@@ -91,7 +91,7 @@ export const LoginPage = ({ role }: LoginPageProps) => {
     } else if (role === "insurer") {
       navigate("/insurer/dashboard");
     } else if (role === "government") {
-      navigate("/government-dashboard");
+      navigate("/government");
     } else if (role === "assessor") {
       navigate("/assessor-dashboard");
     } else if (role === "admin") {
@@ -122,7 +122,7 @@ export const LoginPage = ({ role }: LoginPageProps) => {
         // standard dashboards
         if (role === "farmer") navigate("/farmer-dashboard");
         else if (role === "insurer") navigate("/insurer/dashboard");
-        else if (role === "government") navigate("/government-dashboard");
+        else if (role === "government") navigate("/government");
         else if (role === "assessor") navigate("/assessor-dashboard");
         else if (role === "admin") navigate("/admin/dashboard");
         
@@ -145,7 +145,7 @@ export const LoginPage = ({ role }: LoginPageProps) => {
           navigate("/insurer/dashboard");
         }
       } else if (role === "government") {
-        navigate("/government-dashboard");
+        navigate("/government");
       } else if (role === "assessor") {
         navigate("/assessor-dashboard");
       } else if (role === "admin") {
