@@ -198,6 +198,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   <CommandItem onSelect={() => go("/government/policies")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-blue-600" />Policy Registry</CommandItem>
                   <CommandItem onSelect={() => go("/government/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><AlertTriangle className="mr-3 h-4 w-4 text-rose-600" />Claims & Losses</CommandItem>
                   <CommandItem onSelect={() => go("/government/invoicing")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-indigo-600" />Subsidies Overview</CommandItem>
+                  <CommandItem onSelect={() => go("/government/compare")} className="py-3 px-4 rounded-xl cursor-pointer"><History className="mr-3 h-4 w-4 text-purple-600" />Season Comparison</CommandItem>
                 </>
               ) : (
                 <>

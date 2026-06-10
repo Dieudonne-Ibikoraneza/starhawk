@@ -13,7 +13,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import CustomScrollbar from "@/components/ui/CustomScrollbar";
 import {
   LayoutDashboard, Trophy, ReceiptText, ShieldCheck, AlertTriangle,
-  Satellite, LogOut, X, ChevronLeft, ChevronRight, ChevronDown,
+  Satellite, LogOut, X, ChevronLeft, ChevronRight, ChevronDown, GitCompareArrows,
 } from "lucide-react";
 import {
   Select,
@@ -31,25 +31,28 @@ import {
   GovPoliciesPage,
   GovClaimsPage,
   GovSubsidiesPage,
+  GovSeasonComparePage,
 } from "@/components/government/pages";
 
 // ─── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",   label: "Dashboard",      icon: LayoutDashboard },
-  { id: "leaderboard", label: "Leaderboard",    icon: Trophy          },
-  { id: "policies",    label: "Policies",       icon: ShieldCheck     },
-  { id: "claims",      label: "Claims & Losses", icon: AlertTriangle  },
-  { id: "invoicing",   label: "Subsidies",       icon: ReceiptText    },
+  { id: "dashboard",   label: "Dashboard",        icon: LayoutDashboard   },
+  { id: "leaderboard", label: "Leaderboard",      icon: Trophy            },
+  { id: "policies",    label: "Policies",         icon: ShieldCheck       },
+  { id: "claims",      label: "Claims & Losses",  icon: AlertTriangle     },
+  { id: "invoicing",   label: "Subsidies",        icon: ReceiptText       },
+  { id: "compare",     label: "Compare Seasons",  icon: GitCompareArrows  },
 ] as const;
 
 type PageId = typeof NAV_ITEMS[number]["id"];
 
 const PAGE_META: Record<PageId, { title: string; description: string }> = {
-  dashboard:   { title: "National Overview",  description: "Agricultural insurance overview across all provinces" },
-  leaderboard: { title: "Leaderboard",        description: "Regional crop health & insurance ranking" },
-  policies:    { title: "Policy Registry",    description: "Population financial protection overview — read-only oversight" },
-  claims:      { title: "Claims & Losses",    description: "District disaster monitoring & insurer payout oversight" },
-  invoicing:   { title: "Subsidies",          description: "Government subsidy budget and utilization" },
+  dashboard:   { title: "National Overview",    description: "Agricultural insurance overview across all provinces" },
+  leaderboard: { title: "Leaderboard",          description: "Regional crop health & insurance ranking" },
+  policies:    { title: "Policy Registry",      description: "Population financial protection overview — read-only oversight" },
+  claims:      { title: "Claims & Losses",      description: "District disaster monitoring & insurer payout oversight" },
+  invoicing:   { title: "Subsidies",            description: "Government subsidy budget and utilization" },
+  compare:     { title: "Season Comparison",    description: "Pick a region and season for each side — data appears the moment you choose" },
 };
 
 function renderPage(page: PageId) {
@@ -59,6 +62,7 @@ function renderPage(page: PageId) {
     case "policies":    return <GovPoliciesPage />;
     case "claims":      return <GovClaimsPage />;
     case "invoicing":   return <GovSubsidiesPage />;
+    case "compare":     return <GovSeasonComparePage />;
     default:            return <GovDashboardPage />;
   }
 }
