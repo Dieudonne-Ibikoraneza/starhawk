@@ -107,6 +107,15 @@ export const GovernmentDashboard = () => {
     return [gov.village, gov.cell, gov.sector, gov.district, gov.province].find(Boolean) || "Rwanda";
   })();
 
+  const displaySubtitle = (() => {
+    const level = governmentProfile?.governmentProfile?.level;
+    if (level) {
+      const formattedLevel = level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+      return `${formattedLevel}-Level administrator`;
+    }
+    return undefined;
+  })();
+
   const handleNavigate = (page: PageId) => {
     navigate(`/government/${page}`);
     setMobileOpen(false);
@@ -240,7 +249,7 @@ export const GovernmentDashboard = () => {
             }}
             sidebarCollapsed={collapsed}
             userName={displayName}
-            userEmail={governmentEmail}
+            userEmail={displaySubtitle}
             userRole="Government"
           />
 
