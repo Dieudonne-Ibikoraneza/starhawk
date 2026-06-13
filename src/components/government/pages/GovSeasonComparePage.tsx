@@ -122,10 +122,10 @@ export function GovSeasonComparePage() {
         </span>
       </div>
 
-      {/* Selector cards — exactly 14 columns wide */}
-      <div className="grid" style={{ gridTemplateColumns: `repeat(14, minmax(0, 1fr))` }}>
+      {/* Selector cards — responsive grid */}
+      <div className="grid grid-cols-2 gap-3 md:gap-0 md:grid-cols-[repeat(14,minmax(0,1fr))]">
         {/* Add comparison button (col-span-2) */}
-        <div className="col-span-2 pr-1 flex flex-col items-center justify-center">
+        <div className="hidden md:flex col-span-2 pr-1 flex-col items-center justify-center">
           <button
             onClick={addSide}
             disabled={sides.length >= MAX_SIDES}
@@ -147,11 +147,11 @@ export function GovSeasonComparePage() {
 
         {/* Dynamic side slots */}
         {sides.map((side, i) => {
-          const paddingClass = i === sides.length - 1 ? "pl-1" : "px-1";
-          const colSpanClass = sides.length === 2 ? "col-span-6" : sides.length === 3 ? "col-span-4" : "col-span-12";
+          const paddingClass = i === sides.length - 1 ? "md:pl-1" : "md:px-1";
+          const colSpanClass = sides.length === 2 ? "md:col-span-6" : sides.length === 3 ? "md:col-span-4" : "md:col-span-12";
 
           return (
-            <div key={i} className={cn(colSpanClass, paddingClass)}>
+            <div key={i} className={cn("col-span-1", colSpanClass, paddingClass, i === 2 ? "hidden md:block" : "")}>
               <SideSelector
                 accent={SIDE_ACCENTS[i]}
                 label={SIDE_LABELS[i]}
@@ -205,10 +205,15 @@ export function GovSeasonComparePage() {
                 return (
                   <div
                     key={c.key}
-                    className="grid"
-                    style={{ gridTemplateColumns: `repeat(14, minmax(0, 1fr))` }}
+                    className={cn(
+                      "grid items-center transition-colors",
+                      "grid-cols-[1fr_auto_1fr] bg-white border-x border-b border-gray-200 px-4 py-3 hover:bg-gray-50/50",
+                      isFirst && "rounded-t-2xl border-t",
+                      isLast && "rounded-b-2xl",
+                      "md:grid-cols-[repeat(14,minmax(0,1fr))] md:bg-transparent md:border-0 md:p-0 md:hover:bg-transparent"
+                    )}
                   >
-                    <div className="col-span-2 flex items-center py-3 pl-1 pr-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    <div className="order-2 md:order-1 col-span-1 md:col-span-2 flex items-center justify-center md:justify-start px-2 md:py-3 md:pl-1 md:pr-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left">
                       {c.label.replace(/ \(.*\)/, "")}
                     </div>
                     {sides.map((side, i) => {
@@ -219,16 +224,28 @@ export function GovSeasonComparePage() {
                           ? pctChange(baselineVal, v)
                           : null;
                       
-                      const paddingClass = i === sides.length - 1 ? "pl-1" : "px-1";
-                      const colSpanClass = sides.length === 2 ? "col-span-6" : sides.length === 3 ? "col-span-4" : "col-span-12";
+                      const paddingClass = i === sides.length - 1 ? "md:pl-1" : "md:px-1";
+                      const colSpanClass = sides.length === 2 ? "md:col-span-6" : sides.length === 3 ? "md:col-span-4" : "md:col-span-12";
+                      const orderClass = i === 0 ? "order-1 md:order-2" : i === 1 ? "order-3 md:order-3" : "order-4 md:order-4";
 
                       return (
-                        <div key={i} className={cn(colSpanClass, "flex flex-col", paddingClass)}>
+                        <div key={i} className={cn(
+                          "col-span-1",
+                          colSpanClass,
+                          orderClass,
+                          paddingClass,
+                          i === 2 ? "hidden md:flex md:flex-col" : "flex flex-col"
+                        )}>
                           <div
                             className={cn(
-                              "flex flex-1 flex-row items-center justify-center gap-2 border border-gray-200 bg-white px-3 py-3 transition-colors hover:bg-gray-50/50",
-                              isFirst && "rounded-t-xl",
-                              isLast && "rounded-b-xl"
+                              "flex flex-1 gap-1 md:gap-2",
+                              "flex-col sm:flex-row",
+                              i === 0 
+                                ? "items-start sm:items-center sm:justify-start md:justify-center md:items-center" 
+                                : "items-end sm:items-center sm:justify-end md:justify-center md:items-center",
+                              "md:border md:border-gray-200 md:bg-white md:px-3 md:py-3 md:transition-colors md:hover:bg-gray-50/50",
+                              isFirst && "md:rounded-t-2xl",
+                              isLast && "md:rounded-b-2xl"
                             )}
                           >
                             {sides[i] === null || sides[i] === undefined || v === null || v === undefined ? (
@@ -238,7 +255,8 @@ export function GovSeasonComparePage() {
                                 <span
                                   className={cn(
                                     "font-mono text-sm font-bold tabular-nums",
-                                    isBest ? "text-gray-900" : "text-gray-500"
+                                    isBest ? "text-gray-900" : "text-gray-500",
+                                    i === 0 ? "text-left" : "text-right"
                                   )}
                                 >
                                   {c.format(v)}
@@ -409,7 +427,7 @@ function SideSelector({
       onDrop={() => { setDragOver(false); onDrop(); }}
       onDragEnd={() => { setDragOver(false); onDragEnd(); }}
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-white p-5 transition-all shadow-sm cursor-grab active:cursor-grabbing select-none",
+        "relative h-full flex flex-col overflow-hidden rounded-2xl border bg-white p-3 md:p-5 transition-all shadow-sm cursor-grab active:cursor-grabbing select-none",
         isDragging && "opacity-50 scale-[0.97]",
         dragOver && cn("ring-2 ring-offset-1", accent.ring),
         side ? cn("border-transparent shadow-md ring-1", accent.ring) : "border-gray-200"
@@ -429,7 +447,7 @@ function SideSelector({
         <div className="flex flex-1 items-center gap-1.5">
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider",
+              "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap",
               side ? accent.text : "text-gray-400"
             )}
           >
@@ -455,23 +473,23 @@ function SideSelector({
       </div>
 
       {/* Region display */}
-      <div className="relative mt-4 flex flex-col items-center text-center">
+      <div className="relative mt-3 md:mt-4 flex-1 flex flex-col items-center justify-center text-center">
         <span
           className={cn(
-            "grid h-12 w-12 place-items-center rounded-full bg-gray-50 transition-colors",
+            "grid h-10 w-10 md:h-12 md:w-12 place-items-center rounded-full bg-gray-50 transition-colors",
             side ? accent.text : "text-gray-400"
           )}
         >
-          {side?.scope === "national" ? <Globe className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
+          {side?.scope === "national" ? <Globe className="h-4 w-4 md:h-5 md:w-5" /> : <MapPin className="h-4 w-4 md:h-5 md:w-5" />}
         </span>
-        <h3 className="mt-3 line-clamp-1 text-base font-semibold text-gray-900">
+        <h3 className="mt-2 md:mt-3 line-clamp-1 text-sm md:text-base font-semibold text-gray-900">
           {side ? scopeLabel(side.scope) : "No region"}
         </h3>
-        <span className="mt-1 line-clamp-1 text-xs text-gray-400">{season}</span>
+        <span className="mt-0.5 md:mt-1 line-clamp-1 text-[10px] md:text-xs text-gray-400">{season}</span>
       </div>
 
       {/* Pickers */}
-      <div className="relative mt-4 flex flex-wrap items-center gap-2">
+      <div className="relative mt-3 md:mt-4 flex flex-wrap items-center gap-2">
         <RegionSelect value={side?.scope} onValueChange={setRegion} placeholder="Region…" />
         <SeasonSelect value={season} onValueChange={setSeason} />
       </div>
