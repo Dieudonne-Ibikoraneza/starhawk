@@ -23,6 +23,15 @@ import { cn } from "@/lib/utils";
 import { Panel } from "@/components/government/gov-widgets";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   compareSeasons,
   concepts,
   getConceptValues,
@@ -188,26 +197,25 @@ function RegionSelect({
   placeholder: string;
 }) {
   return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => onValueChange(e.target.value)}
-      className="h-9 min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-    >
-      <option value="" disabled>
-        {placeholder}
-      </option>
-      <option value="national">All Rwanda</option>
-      {provinceTree.map((p) => (
-        <optgroup key={p.id} label={p.name}>
-          <option value={p.id}>{p.name} (all)</option>
-          {p.districts?.map((d) => (
-            <option key={d.id} value={d.id}>
-              ↳ {d.name} District
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+    <Select value={value ?? ""} onValueChange={onValueChange}>
+      <SelectTrigger className="h-9 min-w-[120px] flex-1 truncate rounded-lg border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 hover:bg-gray-50 shadow-sm transition-colors">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="national">All Rwanda</SelectItem>
+        {provinceTree.map((p) => (
+          <SelectGroup key={p.id}>
+            <SelectLabel className="text-xs uppercase tracking-wider text-gray-500 font-semibold">{p.name}</SelectLabel>
+            <SelectItem value={p.id}>{p.name} (all)</SelectItem>
+            {p.districts?.map((d) => (
+              <SelectItem key={d.id} value={d.id} className="pl-6 text-gray-600">
+                {d.name} District
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -221,17 +229,18 @@ function SeasonSelect({
   onValueChange: (v: CompareSeason) => void;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onValueChange(e.target.value as CompareSeason)}
-      className="h-9 w-[150px] shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-    >
-      {compareSeasons.map((s) => (
-        <option key={s} value={s}>
-          {s}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={(v) => onValueChange(v as CompareSeason)}>
+      <SelectTrigger className="h-9 min-w-[120px] flex-1 truncate rounded-lg border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 hover:bg-gray-50 shadow-sm transition-colors">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {compareSeasons.map((s) => (
+          <SelectItem key={s} value={s}>
+            {s}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -269,7 +278,7 @@ function SideSelector({
       className={cn(
         "relative overflow-hidden rounded-2xl border bg-white p-5 transition-all shadow-sm",
         side
-          ? cn("border-transparent shadow-md ring-2", accent.ring)
+          ? cn("border-transparent shadow-md ring-1", accent.ring)
           : "border-gray-200"
       )}
     >
@@ -330,7 +339,7 @@ function SideSelector({
       </div>
 
       {/* Pickers */}
-      <div className="relative mt-4 flex flex-row items-center gap-2">
+      <div className="relative mt-4 flex flex-wrap items-center gap-2">
         <RegionSelect value={side?.scope} onValueChange={setRegion} placeholder="Region…" />
         <SeasonSelect value={season} onValueChange={setSeason} />
       </div>
