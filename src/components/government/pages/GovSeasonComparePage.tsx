@@ -13,8 +13,10 @@ import {
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Globe,
   GitCompareArrows,
+  Globe,
+  GripVertical,
+  Info,
   MapPin,
   Plus,
   X,
@@ -50,15 +52,17 @@ type Accent = {
   dot: string;
   ring: string;
   glow: string;
+  headerBg: string;
 };
 
 const SIDE_ACCENTS: Accent[] = [
-  { bar: "#3b82f6", text: "text-blue-600",   dot: "bg-blue-500",   ring: "ring-blue-200",   glow: "from-blue-50"   },
-  { bar: "#10b981", text: "text-emerald-600", dot: "bg-emerald-500", ring: "ring-emerald-200", glow: "from-emerald-50" },
-  { bar: "#f59e0b", text: "text-amber-600",  dot: "bg-amber-500",  ring: "ring-amber-200",  glow: "from-amber-50"  },
+  { bar: "#3b82f6", text: "text-blue-600",    dot: "bg-blue-500",    ring: "ring-blue-200",    glow: "from-blue-50",    headerBg: "bg-blue-50/60"    },
+  { bar: "#10b981", text: "text-emerald-600", dot: "bg-emerald-500", ring: "ring-emerald-200", glow: "from-emerald-50", headerBg: "bg-emerald-50/60" },
+  { bar: "#f59e0b", text: "text-amber-600",   dot: "bg-amber-500",   ring: "ring-amber-200",   glow: "from-amber-50",   headerBg: "bg-amber-50/60"   },
 ];
 
 const SIDE_LABELS = ["Side A", "Side B", "Side C"];
+const MAX_SIDES = 3;
 
 interface Side {
   scope: string;
@@ -69,14 +73,11 @@ interface Side {
 
 export function GovSeasonComparePage() {
   const [sides, setSides] = useState<(Side | null)[]>([null, null]);
-  const maxSides = 3;
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
 
-  // Keep within maxSides when state changes externally
   useEffect(() => {
-    setSides((prev) =>
-      prev.length > maxSides ? prev.slice(0, maxSides) : prev
-    );
-  }, [maxSides]);
+    setSides((prev) => (prev.length > MAX_SIDES ? prev.slice(0, MAX_SIDES) : prev));
+  }, []);
 
   const selected = sides.filter((s): s is Side => Boolean(s));
   const anySelected = selected.length > 0;
@@ -86,7 +87,7 @@ export function GovSeasonComparePage() {
   }
 
   function addSide() {
-    setSides((prev) => (prev.length < maxSides ? [...prev, null] : prev));
+    setSides((prev) => (prev.length < MAX_SIDES ? [...prev, null] : prev));
   }
 
   function removeSlot(index: number) {
@@ -97,70 +98,186 @@ export function GovSeasonComparePage() {
     );
   }
 
+  function handleDragStart(i: number) { setDragFrom(i); }
+
+  function handleDrop(i: number) {
+    if (dragFrom === null || dragFrom === i) return;
+    setSides((prev) => {
+      const next = [...prev];
+      [next[dragFrom], next[i]] = [next[i], next[dragFrom]];
+      return next;
+    });
+    setDragFrom(null);
+  }
+
   return (
     <div className="space-y-6">
-      {/* Selection header */}
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${sides.length}, minmax(0, 1fr))` }}
-      >
-        {sides.map((side, i) => (
-          <SideSelector
-            key={i}
-            accent={SIDE_ACCENTS[i]}
-            label={SIDE_LABELS[i]}
-            side={side}
-            onChange={(s) => updateSide(i, s)}
-            onClear={() => removeSlot(i)}
-            removable={sides.length > 2 || Boolean(side)}
-          />
-        ))}
+      {/* Base-reference info strip */}
+      <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+        <span>
+          <strong>Side A is the base reference</strong> — all percentage changes (↑ / ↓) on Side B
+          and C are calculated relative to Side A. Drag the cards left or right to change which
+          side acts as the baseline.
+        </span>
       </div>
 
-      {sides.length < maxSides && (
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
+      {/* Selector cards — exactly 14 columns wide */}
+      <div className="grid" style={{ gridTemplateColumns: `repeat(14, minmax(0, 1fr))` }}>
+        {/* Add comparison button (col-span-2) */}
+        <div className="col-span-2 pr-1 flex flex-col items-center justify-center">
+          <button
             onClick={addSide}
-            className="cursor-pointer gap-2 border-gray-200 text-gray-600 hover:bg-gray-50"
+            disabled={sides.length >= MAX_SIDES}
+            className={cn(
+              "flex flex-col items-center justify-center gap-3 text-indigo-400 transition-all",
+              sides.length >= MAX_SIDES
+                ? "cursor-not-allowed opacity-40"
+                : "cursor-pointer hover:text-indigo-600 hover:scale-105"
+            )}
           >
-            <Plus className="h-4 w-4" />
-            Add comparison
-          </Button>
+            <span className="grid h-12 w-12 place-items-center rounded-full border-[1.5px] border-current">
+              <Plus className="h-6 w-6" />
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-center leading-tight px-2">
+              {sides.length >= MAX_SIDES ? "Max reached" : "Add comparison"}
+            </span>
+          </button>
         </div>
-      )}
 
+        {/* Dynamic side slots */}
+        {sides.map((side, i) => {
+          const paddingClass = i === sides.length - 1 ? "pl-1" : "px-1";
+          const colSpanClass = sides.length === 2 ? "col-span-6" : sides.length === 3 ? "col-span-4" : "col-span-12";
+
+          return (
+            <div key={i} className={cn(colSpanClass, paddingClass)}>
+              <SideSelector
+                accent={SIDE_ACCENTS[i]}
+                label={SIDE_LABELS[i]}
+                isReference={i === 0}
+                side={side}
+                onChange={(s) => updateSide(i, s)}
+                onClear={() => removeSlot(i)}
+                removable={sides.length > 2 || Boolean(side)}
+                onDragStart={() => handleDragStart(i)}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={() => setDragFrom(null)}
+                isDragging={dragFrom === i}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Data table + chart */}
       {!anySelected ? (
         <EmptyState />
       ) : (
-        <>
-          {/* Section label */}
-          <div className="text-center">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-gray-400">
+        <div className="mt-8 space-y-8">
+          <div>
+            {/* Sofascore-style General header */}
+            <div className="mb-4 text-center text-[13px] font-bold uppercase tracking-widest text-gray-500">
               General
-            </span>
+            </div>
+
+            {/* Table */}
+            <div className="flex flex-col gap-y-0.5">
+              {/* Concept rows */}
+              {concepts.map((c, rowIdx) => {
+                const allValues = sides.map((side) =>
+                  side ? getConceptValues(side.scope, side.season)[c.key] : null
+                );
+                const present = allValues.filter((v): v is number => v !== null);
+                const best = present.length
+                  ? c.higherIsBetter
+                    ? Math.max(...present)
+                    : Math.min(...present)
+                  : null;
+                const baselineVal =
+                  allValues[0] !== null && allValues[0] !== undefined
+                    ? (allValues[0] as number)
+                    : null;
+
+                const isFirst = rowIdx === 0;
+                const isLast = rowIdx === concepts.length - 1;
+
+                return (
+                  <div
+                    key={c.key}
+                    className="grid"
+                    style={{ gridTemplateColumns: `repeat(14, minmax(0, 1fr))` }}
+                  >
+                    <div className="col-span-2 flex items-center py-3 pl-1 pr-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                      {c.label.replace(/ \(.*\)/, "")}
+                    </div>
+                    {sides.map((side, i) => {
+                      const v = allValues[i];
+                      const isBest = best !== null && v !== null && v !== undefined && v === best;
+                      const change =
+                        i !== 0 && baselineVal !== null && v !== null && v !== undefined
+                          ? pctChange(baselineVal, v)
+                          : null;
+                      
+                      const paddingClass = i === sides.length - 1 ? "pl-1" : "px-1";
+                      const colSpanClass = sides.length === 2 ? "col-span-6" : sides.length === 3 ? "col-span-4" : "col-span-12";
+
+                      return (
+                        <div key={i} className={cn(colSpanClass, "flex flex-col", paddingClass)}>
+                          <div
+                            className={cn(
+                              "flex flex-1 flex-row items-center justify-center gap-2 border border-gray-200 bg-white px-3 py-3 transition-colors hover:bg-gray-50/50",
+                              isFirst && "rounded-t-xl",
+                              isLast && "rounded-b-xl"
+                            )}
+                          >
+                            {sides[i] === null || sides[i] === undefined || v === null || v === undefined ? (
+                              <span className="text-sm text-gray-300">—</span>
+                            ) : (
+                              <>
+                                <span
+                                  className={cn(
+                                    "font-mono text-sm font-bold tabular-nums",
+                                    isBest ? "text-gray-900" : "text-gray-500"
+                                  )}
+                                >
+                                  {c.format(v)}
+                                </span>
+                                {change !== null && Math.abs(change) >= 0.5 && (
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold",
+                                      change > 0
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : "bg-red-50 text-red-600"
+                                    )}
+                                  >
+                                    {change > 0 ? (
+                                      <ArrowUpRight className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowDownRight className="h-3 w-3" />
+                                    )}
+                                    {Math.abs(change).toFixed(0)}%
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Metric rows */}
-          <Panel className="overflow-hidden p-0">
-            <div className="divide-y divide-gray-100">
-              {concepts.map((c) => (
-                <ComparisonRow key={c.key} concept={c} sides={sides} />
-              ))}
-            </div>
-          </Panel>
-
-          {/* Bar chart (only when ≥2 sides selected) */}
           {selected.length >= 2 && (
-            <Panel
-              title="Concept Breakdown"
-              subtitle="Normalized index (%) across selected regions & seasons"
-            >
+            <Panel title="Concept Breakdown" subtitle="Normalized index (%) across selected regions & seasons">
               <ComparisonChart sides={sides} />
             </Panel>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -249,19 +366,29 @@ function SeasonSelect({
 function SideSelector({
   accent,
   label,
+  isReference,
   side,
   onChange,
   onClear,
   removable,
+  onDragStart,
+  onDrop,
+  isDragging,
 }: {
   accent: Accent;
   label: string;
+  isReference: boolean;
   side: Side | null;
   onChange: (s: Side) => void;
   onClear: () => void;
   removable: boolean;
+  onDragStart: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
 }) {
   const [draftSeason, setDraftSeason] = useState<CompareSeason>(compareSeasons[0]);
+  const [dragOver, setDragOver] = useState(false);
   const season = side?.season ?? draftSeason;
 
   function setSeason(s: CompareSeason) {
@@ -275,14 +402,20 @@ function SideSelector({
 
   return (
     <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={() => { setDragOver(false); onDrop(); }}
+      onDragEnd={() => { setDragOver(false); onDragEnd(); }}
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-white p-5 transition-all shadow-sm",
-        side
-          ? cn("border-transparent shadow-md ring-1", accent.ring)
-          : "border-gray-200"
+        "relative overflow-hidden rounded-2xl border bg-white p-5 transition-all shadow-sm cursor-grab active:cursor-grabbing select-none",
+        isDragging && "opacity-50 scale-[0.97]",
+        dragOver && cn("ring-2 ring-offset-1", accent.ring),
+        side ? cn("border-transparent shadow-md ring-1", accent.ring) : "border-gray-200"
       )}
     >
-      {/* Gradient glow when active */}
+      {/* Gradient glow */}
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent",
@@ -290,22 +423,25 @@ function SideSelector({
         )}
       />
 
-      {/* Top row: label + clear button */}
-      <div className="relative flex items-center justify-between">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider",
-            side ? accent.text : "text-gray-400"
-          )}
-        >
+      {/* Top row: grip + label + BASE badge + clear */}
+      <div className="relative flex items-center gap-2">
+        <GripVertical className="h-4 w-4 shrink-0 text-gray-300" />
+        <div className="flex flex-1 items-center gap-1.5">
           <span
             className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              side ? accent.dot : "bg-gray-300"
+              "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider",
+              side ? accent.text : "text-gray-400"
             )}
-          />
-          {label}
-        </span>
+          >
+            <span className={cn("h-1.5 w-1.5 rounded-full", side ? accent.dot : "bg-gray-300")} />
+            {label}
+          </span>
+          {isReference && (
+            <span className="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-600">
+              Base
+            </span>
+          )}
+        </div>
         {removable && (
           <button
             type="button"
@@ -318,7 +454,7 @@ function SideSelector({
         )}
       </div>
 
-      {/* Region + season display */}
+      {/* Region display */}
       <div className="relative mt-4 flex flex-col items-center text-center">
         <span
           className={cn(
@@ -326,11 +462,7 @@ function SideSelector({
             side ? accent.text : "text-gray-400"
           )}
         >
-          {side?.scope === "national" ? (
-            <Globe className="h-5 w-5" />
-          ) : (
-            <MapPin className="h-5 w-5" />
-          )}
+          {side?.scope === "national" ? <Globe className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
         </span>
         <h3 className="mt-3 line-clamp-1 text-base font-semibold text-gray-900">
           {side ? scopeLabel(side.scope) : "No region"}
@@ -347,94 +479,7 @@ function SideSelector({
   );
 }
 
-// ─── Comparison row ────────────────────────────────────────────────────────────
 
-function ComparisonRow({
-  concept,
-  sides,
-}: {
-  concept: ConceptDef;
-  sides: (Side | null)[];
-}) {
-  const values = sides.map((s) =>
-    s ? getConceptValues(s.scope, s.season)[concept.key] : null
-  );
-  const present = values.filter((v): v is number => v !== null);
-  const max = Math.max(...present, 0) || 1;
-  const best = present.length
-    ? concept.higherIsBetter
-      ? Math.max(...present)
-      : Math.min(...present)
-    : null;
-
-  const baselineIdx = values.findIndex((v) => v !== null);
-  const baseline = baselineIdx >= 0 ? (values[baselineIdx] as number) : null;
-
-  return (
-    <div className="px-6 py-4 transition-colors hover:bg-gray-50">
-      <div className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">
-        {concept.label.replace(/ \(.*\)/, "")}
-      </div>
-      <div
-        className="grid items-center gap-4"
-        style={{ gridTemplateColumns: `repeat(${sides.length}, minmax(0, 1fr))` }}
-      >
-        {sides.map((s, i) => {
-          const v = values[i];
-          const accent = SIDE_ACCENTS[i];
-          if (v === null) {
-            return (
-              <div key={i} className="flex flex-col items-center gap-1.5 opacity-40">
-                <span className="font-mono text-2xl font-bold text-gray-400">—</span>
-                <div className="h-1.5 w-full max-w-[140px] rounded-full bg-gray-100" />
-              </div>
-            );
-          }
-          const isBest = best !== null && v === best;
-          const change =
-            i !== baselineIdx && baseline !== null ? pctChange(baseline, v) : null;
-          return (
-            <div key={i} className="flex flex-col items-center gap-1.5">
-              <span
-                className={cn(
-                  "font-mono text-2xl font-bold tabular-nums",
-                  isBest ? "text-gray-900" : "text-gray-400"
-                )}
-              >
-                {concept.format(v)}
-              </span>
-              {change !== null && Math.abs(change) >= 0.5 ? (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                    change > 0
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-red-50 text-red-600"
-                  )}
-                >
-                  {change > 0 ? (
-                    <ArrowUpRight className="h-3 w-3" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3" />
-                  )}
-                  {Math.abs(change).toFixed(0)}%
-                </span>
-              ) : (
-                <span className="h-[18px]" />
-              )}
-              <div className="h-1.5 w-full max-w-[140px] overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${(v / max) * 100}%`, background: accent.bar }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ─── Bar chart ─────────────────────────────────────────────────────────────────
 
