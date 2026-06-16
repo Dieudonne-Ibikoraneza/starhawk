@@ -7,7 +7,7 @@ const features = [
     icon: Satellite,
     title: "Satellite Monitoring",
     description:
-      "Real-time satellite imagery analysis for comprehensive farm monitoring and crop health assessment.",
+      "Real-time satellite imagery for comprehensive farm monitoring and crop health assessment.",
     stat: "99.7%",
     statLabel: "Coverage Accuracy",
   },
@@ -15,7 +15,7 @@ const features = [
     icon: Shield,
     title: "AI Risk Assessment",
     description:
-      "Advanced machine learning algorithms analyze weather patterns, crop health, and historical data.",
+      "Machine learning algorithms analyze weather, crop health, and historical data in real-time.",
     stat: "< 24h",
     statLabel: "Assessment Time",
   },
@@ -23,7 +23,7 @@ const features = [
     icon: BarChart3,
     title: "Claims Processing",
     description:
-      "Streamlined AI-driven damage assessment with fast payout recommendations for farmers.",
+      "AI-driven damage assessment with fast, accurate payout recommendations for farmers.",
     stat: "3x",
     statLabel: "Faster Payouts",
   },
@@ -34,117 +34,130 @@ export function HeroSection() {
 
   return (
     <section className="relative w-full overflow-hidden">
-      {/* ── Hero Banner ── */}
-      <div className="relative w-full min-h-[88vh] flex flex-col">
-        {/* Background */}
-        <div className="absolute inset-0">
-          <motion.img
-            src="/intro.webp"
-            alt="STARHAWK hero — AI-powered farmland monitoring"
-            className="w-full h-full object-cover origin-center"
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          />
-          {/* Gradient overlay — navy tint bottom */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#14284B]/80 via-[#14284B]/60 to-[#0a1628]/75" />
-          {/* Subtle grid texture */}
-          <div
-            className="absolute inset-0 opacity-[0.05]"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-              backgroundSize: "60px 60px",
-            }}
-          />
-        </div>
+      {/* ── Video Hero ── */}
+      <div className="relative w-full min-h-[92vh] flex items-end">
 
-        {/* Content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center px-6 sm:px-10 md:px-16 lg:px-24 xl:px-32 pt-28 pb-32 md:pb-40">
+        {/* Full-bleed video — 100% visible, no blur */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/MOISE.mp4" type="video/mp4" />
+        </video>
+
+        {/*
+          Cinematic scrim strategy:
+          - Bottom-to-top dark vignette so the bottom content area is legible
+          - A very faint top fade so the navbar doesn't clash
+          - NO left/right white blur — video stays 100% visible
+        */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10 pointer-events-none" />
+
+        {/* Content — anchored to the bottom-left, overlaid on the video */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 pb-16 md:pb-24 pt-40">
+          {/* Small eyebrow label */}
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-xs font-bold tracking-[0.2em] uppercase text-white/60 mb-4"
+          >
+            AI-Powered Agricultural Insurance
+          </motion.p>
+
           {/* Headline */}
           <motion.h1
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
-            style={{ fontFamily: "AvenirLTStd-Black, sans-serif" }}
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight mb-5 max-w-4xl"
+            style={{ fontFamily: "Montserrat, sans-serif" }}
           >
             Fast, Data-Backed{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#a8c4e0] to-[#e2eaf5]">
-              Crop Insurance Assessments.
+            <span
+              className="text-transparent bg-clip-text"
+              style={{
+                backgroundImage:
+                  "linear-gradient(90deg, #93c5fd, #a5f3fc, #ffffff)",
+              }}
+            >
+              Crop Insurance.
             </span>
           </motion.h1>
 
-          {/* Subheadline */}
+          {/* Subtitle */}
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-lg sm:text-xl md:text-2xl text-white/80 font-light leading-relaxed max-w-2xl mb-10"
+            transition={{ duration: 0.6, delay: 0.22 }}
+            className="text-base sm:text-lg md:text-xl text-white/75 font-light leading-relaxed max-w-2xl mb-10"
           >
-            Replace slow, expensive manual field inspections with high-resolution aerial insights. Starhawk delivers insurance-ready risk and loss reports using geospatial AI.
+            Replace slow manual field inspections with high-resolution satellite
+            intelligence. Starhawk delivers insurance-ready risk and loss reports
+            using geospatial AI.
           </motion.p>
 
           {/* CTAs */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.38 }}
+            transition={{ duration: 0.55, delay: 0.34 }}
             className="flex flex-wrap gap-4"
           >
             <button
               onClick={() => navigate("/role-selection")}
-              className="flex items-center gap-2 px-8 py-3.5 bg-white text-[#14284B] font-bold text-sm rounded-full shadow-[0_6px_24px_rgba(255,255,255,0.25)] hover:shadow-[0_8px_30px_rgba(255,255,255,0.35)] hover:-translate-y-0.5 transition-all duration-300"
+              className="group flex items-center gap-2 px-8 py-3.5 bg-white text-[#14284B] font-bold text-sm rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:shadow-[0_6px_28px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 transition-all duration-300"
             >
               Get Started
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
             <button
               onClick={() => navigate("/services")}
-              className="flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold text-sm rounded-full backdrop-blur-sm hover:border-white/60 hover:bg-white/10 transition-all duration-300"
+              className="flex items-center gap-2 px-8 py-3.5 border border-white/40 text-white font-semibold text-sm rounded-full backdrop-blur-sm hover:bg-white/10 hover:border-white/70 transition-all duration-300"
             >
               Explore Services
             </button>
           </motion.div>
-
         </div>
       </div>
 
-      {/* ── Feature Cards — Overlap ── */}
-      <div className="relative -mt-24 md:-mt-28 z-20 px-4 sm:px-6 lg:px-8">
+      {/* ── Feature Cards ── */}
+      <div className="relative z-20 bg-[#f8f9fc] px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 -mt-16">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
                 <motion.div
                   key={feature.title}
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 36 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.55, delay: index * 0.12 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
                   className="group"
                 >
-                  <div className="h-full bg-white rounded-2xl shadow-[0_8px_40px_rgba(20,40,75,0.14)] border border-[#14284B]/8 p-7 md:p-8 flex flex-col hover:shadow-[0_12px_50px_rgba(20,40,75,0.2)] hover:-translate-y-1 transition-all duration-300">
-                    {/* Top: icon + stat */}
+                  <div className="h-full bg-white rounded-2xl shadow-[0_8px_40px_rgba(20,40,75,0.09)] border border-slate-100 p-7 md:p-8 flex flex-col hover:shadow-[0_14px_50px_rgba(20,40,75,0.15)] hover:-translate-y-1.5 transition-all duration-300">
                     <div className="flex items-start justify-between mb-5">
-                      <div className="w-12 h-12 rounded-xl bg-[#14284B]/8 flex items-center justify-center group-hover:bg-[#14284B] transition-colors duration-300">
+                      <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-[#14284B] transition-colors duration-300">
                         <Icon className="h-6 w-6 text-[#14284B] group-hover:text-white transition-colors duration-300" />
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-black text-[#14284B]">
+                        <div className="text-xl font-black text-[#14284B] tracking-tight">
                           {feature.stat}
                         </div>
-                        <div className="text-[11px] text-slate-500 font-medium">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                           {feature.statLabel}
                         </div>
                       </div>
                     </div>
-                    {/* Divider */}
-                    <div className="w-8 h-[2px] bg-[#14284B]/20 rounded mb-4 group-hover:w-full transition-all duration-500" />
+                    <div className="w-8 h-[2px] bg-[#14284B]/15 rounded mb-4 group-hover:w-full transition-all duration-500" />
                     <h3 className="text-base font-bold text-[#14284B] mb-2">
                       {feature.title}
                     </h3>
-                    <p className="text-sm text-slate-600 leading-relaxed flex-1">
+                    <p className="text-sm text-slate-500 leading-relaxed flex-1">
                       {feature.description}
                     </p>
                   </div>
