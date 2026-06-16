@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import rwandaApiService from '@/services/rwandaApi';
@@ -14,19 +14,29 @@ interface RwandaLocationSelectorProps {
     province?: LocationData;
     district?: LocationData;
     sector?: LocationData;
-    village?: LocationData;
     cell?: LocationData;
+    village?: LocationData;
   }) => void;
   initialValues?: {
     provinceId?: string;
     districtId?: string;
     sectorId?: string;
-    villageId?: string;
     cellId?: string;
+    villageId?: string;
   };
-  levels?: ('province' | 'district' | 'sector' | 'village' | 'cell')[];
+  levels?: ('province' | 'district' | 'sector' | 'cell' | 'village')[];
   className?: string;
 }
+
+const ensureArray = (data: any): LocationData[] => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    if (data.data && Array.isArray(data.data)) return data.data;
+    if (data.items && Array.isArray(data.items)) return data.items;
+    if (data.results && Array.isArray(data.results)) return data.results;
+  }
+  return [];
+};
 
 export default function RwandaLocationSelector({
   onLocationChange,
@@ -37,272 +47,194 @@ export default function RwandaLocationSelector({
   const [provinces, setProvinces] = useState<LocationData[]>([]);
   const [districts, setDistricts] = useState<LocationData[]>([]);
   const [sectors, setSectors] = useState<LocationData[]>([]);
-  const [villages, setVillages] = useState<LocationData[]>([]);
   const [cells, setCells] = useState<LocationData[]>([]);
+  const [villages, setVillages] = useState<LocationData[]>([]);
 
   const [selectedProvince, setSelectedProvince] = useState<string>(initialValues.provinceId || '');
   const [selectedDistrict, setSelectedDistrict] = useState<string>(initialValues.districtId || '');
   const [selectedSector, setSelectedSector] = useState<string>(initialValues.sectorId || '');
-  const [selectedVillage, setSelectedVillage] = useState<string>(initialValues.villageId || '');
   const [selectedCell, setSelectedCell] = useState<string>(initialValues.cellId || '');
+  const [selectedVillage, setSelectedVillage] = useState<string>(initialValues.villageId || '');
 
   const [loading, setLoading] = useState({
     provinces: false,
     districts: false,
     sectors: false,
+    cells: false,
     villages: false,
-    cells: false
   });
 
-  // Load provinces on component mount
+  const onLocationChangeRef = useRef(onLocationChange);
+  useEffect(() => { onLocationChangeRef.current = onLocationChange; }, [onLocationChange]);
+
+  // Load provinces on mount
   useEffect(() => {
-    loadProvinces();
+    const load = async () => {
+      setLoading(prev => ({ ...prev, provinces: true }));
+      try {
+        const data = await rwandaApiService.getProvinces();
+        const arr = ensureArray(data).map((p: any) => ({
+          ...p,
+          id: p.id || p.slug || '',
+          name: p.name || '',
+        })).filter((p: LocationData) => p.id && p.name);
+        setProvinces(arr.length > 0 ? arr : [
+          { id: 'kigali', name: 'City of Kigali' },
+          { id: 'north', name: 'Northern Province' },
+          { id: 'south', name: 'Southern Province' },
+          { id: 'east', name: 'Eastern Province' },
+          { id: 'west', name: 'Western Province' },
+        ]);
+      } catch {
+        setProvinces([
+          { id: 'kigali', name: 'City of Kigali' },
+          { id: 'north', name: 'Northern Province' },
+          { id: 'south', name: 'Southern Province' },
+          { id: 'east', name: 'Eastern Province' },
+          { id: 'west', name: 'Western Province' },
+        ]);
+      } finally {
+        setLoading(prev => ({ ...prev, provinces: false }));
+      }
+    };
+    load();
   }, []);
 
-  // Load districts when province changes
+  // Load districts when province or levels change (e.g., user switches level to district+)
   useEffect(() => {
     if (selectedProvince && levels.includes('district')) {
-      loadDistricts(selectedProvince);
+      setLoading(prev => ({ ...prev, districts: true }));
+      rwandaApiService.getDistricts(selectedProvince)
+        .then(data => setDistricts(ensureArray(data)))
+        .catch(() => setDistricts([]))
+        .finally(() => setLoading(prev => ({ ...prev, districts: false })));
     } else {
       setDistricts([]);
       setSelectedDistrict('');
     }
-  }, [selectedProvince, levels]);
+  }, [selectedProvince, levels.join('|')]);
 
-  // Load sectors when district changes
+  // Load sectors when district or levels change
   useEffect(() => {
     if (selectedDistrict && levels.includes('sector')) {
-      loadSectors(selectedDistrict);
+      setLoading(prev => ({ ...prev, sectors: true }));
+      rwandaApiService.getSectors(selectedDistrict, selectedProvince)
+        .then(data => setSectors(ensureArray(data)))
+        .catch(() => setSectors([]))
+        .finally(() => setLoading(prev => ({ ...prev, sectors: false })));
     } else {
       setSectors([]);
       setSelectedSector('');
     }
-  }, [selectedDistrict, levels]);
+  }, [selectedDistrict, levels.join('|')]);
 
-  // Load villages when sector changes
+  // Load cells when sector or levels change
   useEffect(() => {
-    if (selectedSector && levels.includes('village')) {
-      loadVillages(selectedSector);
-    } else {
-      setVillages([]);
-      setSelectedVillage('');
-    }
-  }, [selectedSector, levels]);
-
-  // Load cells when village changes
-  useEffect(() => {
-    if (selectedVillage && levels.includes('cell')) {
-      loadCells(selectedVillage);
+    if (selectedSector && levels.includes('cell')) {
+      setLoading(prev => ({ ...prev, cells: true }));
+      rwandaApiService.getCells(selectedSector, selectedDistrict, selectedProvince)
+        .then(data => setCells(ensureArray(data)))
+        .catch(() => setCells([]))
+        .finally(() => setLoading(prev => ({ ...prev, cells: false })));
     } else {
       setCells([]);
       setSelectedCell('');
     }
-  }, [selectedVillage, levels]);
+  }, [selectedSector, levels.join('|')]);
 
-  // Notify parent component when location changes
+  // Load villages when cell or levels change
   useEffect(() => {
-    if (onLocationChange) {
-      const location = {
+    if (selectedCell && levels.includes('village')) {
+      setLoading(prev => ({ ...prev, villages: true }));
+      rwandaApiService.getVillages(selectedCell, selectedSector, selectedDistrict, selectedProvince)
+        .then(data => setVillages(ensureArray(data)))
+        .catch(() => setVillages([]))
+        .finally(() => setLoading(prev => ({ ...prev, villages: false })));
+    } else {
+      setVillages([]);
+      setSelectedVillage('');
+    }
+  }, [selectedCell, levels.join('|')]);
+
+  // Notify parent when selection changes
+  useEffect(() => {
+    if (onLocationChangeRef.current) {
+      onLocationChangeRef.current({
         province: provinces.find(p => p.id === selectedProvince),
         district: districts.find(d => d.id === selectedDistrict),
         sector: sectors.find(s => s.id === selectedSector),
+        cell: cells.find(c => c.id === selectedCell),
         village: villages.find(v => v.id === selectedVillage),
-        cell: cells.find(c => c.id === selectedCell)
-      };
-      onLocationChange(location);
+      });
     }
-  }, [selectedProvince, selectedDistrict, selectedSector, selectedVillage, selectedCell, provinces, districts, sectors, villages, cells, onLocationChange]);
-
-  // Helper function to ensure data is an array
-  const ensureArray = (data: any): LocationData[] => {
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && typeof data === 'object') {
-      // Check if data has a nested array property
-      if (data.data && Array.isArray(data.data)) {
-        return data.data;
-      }
-      if (data.items && Array.isArray(data.items)) {
-        return data.items;
-      }
-      if (data.results && Array.isArray(data.results)) {
-        return data.results;
-      }
-      // Check for other common formats
-      if (data.provinces && Array.isArray(data.provinces)) {
-        return data.provinces;
-      }
-      if (data.districts && Array.isArray(data.districts)) {
-        return data.districts;
-      }
-      if (data.sectors && Array.isArray(data.sectors)) {
-        return data.sectors;
-      }
-    }
-    console.warn('API returned non-array data, defaulting to empty array:', data);
-    return [];
-  };
-
-  const loadProvinces = async () => {
-    setLoading(prev => ({ ...prev, provinces: true }));
-    try {
-      const data = await rwandaApiService.getProvinces();
-      console.log('Provinces API response:', data);
-      const provincesArray = ensureArray(data);
-      console.log('Processed provinces array:', provincesArray);
-      
-      if (provincesArray.length === 0) {
-        console.warn('No provinces found, using fallback mock data');
-        // Use mock data as fallback
-        setProvinces([
-          { id: '1', name: 'Kigali City' },
-          { id: '2', name: 'Northern Province' },
-          { id: '3', name: 'Southern Province' },
-          { id: '4', name: 'Eastern Province' },
-          { id: '5', name: 'Western Province' }
-        ]);
-      } else {
-        setProvinces(provincesArray);
-      }
-    } catch (error) {
-      console.error('Failed to load provinces:', error);
-      // Use mock data on error
-      setProvinces([
-        { id: '1', name: 'Kigali City' },
-        { id: '2', name: 'Northern Province' },
-        { id: '3', name: 'Southern Province' },
-        { id: '4', name: 'Eastern Province' },
-        { id: '5', name: 'Western Province' }
-      ]);
-    } finally {
-      setLoading(prev => ({ ...prev, provinces: false }));
-    }
-  };
-
-  const loadDistricts = async (provinceId: string) => {
-    setLoading(prev => ({ ...prev, districts: true }));
-    try {
-      const data = await rwandaApiService.getDistricts(provinceId);
-      setDistricts(ensureArray(data));
-    } catch (error) {
-      console.error('Failed to load districts:', error);
-      setDistricts([]);
-    } finally {
-      setLoading(prev => ({ ...prev, districts: false }));
-    }
-  };
-
-  const loadSectors = async (districtId: string) => {
-    setLoading(prev => ({ ...prev, sectors: true }));
-    try {
-      const data = await rwandaApiService.getSectors(districtId);
-      setSectors(ensureArray(data));
-    } catch (error) {
-      console.error('Failed to load sectors:', error);
-      setSectors([]);
-    } finally {
-      setLoading(prev => ({ ...prev, sectors: false }));
-    }
-  };
-
-  const loadVillages = async (sectorId: string) => {
-    setLoading(prev => ({ ...prev, villages: true }));
-    try {
-      const data = await rwandaApiService.getVillages(sectorId);
-      setVillages(ensureArray(data));
-    } catch (error) {
-      console.error('Failed to load villages:', error);
-      setVillages([]);
-    } finally {
-      setLoading(prev => ({ ...prev, villages: false }));
-    }
-  };
-
-  const loadCells = async (villageId: string) => {
-    setLoading(prev => ({ ...prev, cells: true }));
-    try {
-      const data = await rwandaApiService.getCells(villageId);
-      setCells(ensureArray(data));
-    } catch (error) {
-      console.error('Failed to load cells:', error);
-      setCells([]);
-    } finally {
-      setLoading(prev => ({ ...prev, cells: false }));
-    }
-  };
+  }, [selectedProvince, selectedDistrict, selectedSector, selectedCell, selectedVillage, provinces, districts, sectors, cells, villages]);
 
   const handleProvinceChange = (value: string) => {
     setSelectedProvince(value);
     setSelectedDistrict('');
     setSelectedSector('');
-    setSelectedVillage('');
     setSelectedCell('');
+    setSelectedVillage('');
   };
 
   const handleDistrictChange = (value: string) => {
     setSelectedDistrict(value);
     setSelectedSector('');
-    setSelectedVillage('');
     setSelectedCell('');
+    setSelectedVillage('');
   };
 
   const handleSectorChange = (value: string) => {
     setSelectedSector(value);
+    setSelectedCell('');
     setSelectedVillage('');
-    setSelectedCell('');
-  };
-
-  const handleVillageChange = (value: string) => {
-    setSelectedVillage(value);
-    setSelectedCell('');
   };
 
   const handleCellChange = (value: string) => {
     setSelectedCell(value);
+    setSelectedVillage('');
+  };
+
+  const handleVillageChange = (value: string) => {
+    setSelectedVillage(value);
   };
 
   return (
     <div className={`space-y-4 ${className}`}>
       {levels.includes('province') && (
         <div className="space-y-2">
-          <Label htmlFor="province">Province</Label>
+          <Label htmlFor="province">Province *</Label>
           <Select value={selectedProvince} onValueChange={handleProvinceChange}>
             <SelectTrigger>
-              <SelectValue placeholder={loading.provinces ? "Loading provinces..." : "Select province"} />
+              <SelectValue placeholder={loading.provinces ? 'Loading provinces...' : 'Select province'} />
             </SelectTrigger>
             <SelectContent>
               {loading.provinces ? (
                 <SelectItem value="loading" disabled>Loading provinces...</SelectItem>
-              ) : Array.isArray(provinces) && provinces.length > 0 ? (
-                provinces.map((province) => (
-                  <SelectItem key={province.id} value={province.id}>
-                    {province.name}
-                  </SelectItem>
+              ) : provinces.length > 0 ? (
+                provinces.map(province => (
+                  <SelectItem key={province.id} value={province.id}>{province.name}</SelectItem>
                 ))
               ) : (
                 <SelectItem value="no-data" disabled>No provinces available</SelectItem>
               )}
             </SelectContent>
           </Select>
-          {!loading.provinces && (!Array.isArray(provinces) || provinces.length === 0) && (
-            <p className="text-xs text-yellow-600">Unable to load provinces. Please refresh the page.</p>
-          )}
         </div>
       )}
 
       {levels.includes('district') && selectedProvince && (
         <div className="space-y-2">
-          <Label htmlFor="district">District</Label>
+          <Label htmlFor="district">District *</Label>
           <Select value={selectedDistrict} onValueChange={handleDistrictChange}>
             <SelectTrigger>
-              <SelectValue placeholder={loading.districts ? "Loading districts..." : "Select district"} />
+              <SelectValue placeholder={loading.districts ? 'Loading districts...' : 'Select district'} />
             </SelectTrigger>
             <SelectContent>
-              {Array.isArray(districts) && districts.map((district) => (
-                <SelectItem key={district.id} value={district.id}>
-                  {district.name}
-                </SelectItem>
+              {loading.districts ? (
+                <SelectItem value="loading" disabled>Loading districts...</SelectItem>
+              ) : districts.map(district => (
+                <SelectItem key={district.id} value={district.id}>{district.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -311,52 +243,52 @@ export default function RwandaLocationSelector({
 
       {levels.includes('sector') && selectedDistrict && (
         <div className="space-y-2">
-          <Label htmlFor="sector">Sector</Label>
+          <Label htmlFor="sector">Sector *</Label>
           <Select value={selectedSector} onValueChange={handleSectorChange}>
             <SelectTrigger>
-              <SelectValue placeholder={loading.sectors ? "Loading sectors..." : "Select sector"} />
+              <SelectValue placeholder={loading.sectors ? 'Loading sectors...' : 'Select sector'} />
             </SelectTrigger>
             <SelectContent>
-              {Array.isArray(sectors) && sectors.map((sector) => (
-                <SelectItem key={sector.id} value={sector.id}>
-                  {sector.name}
-                </SelectItem>
+              {loading.sectors ? (
+                <SelectItem value="loading" disabled>Loading sectors...</SelectItem>
+              ) : sectors.map(sector => (
+                <SelectItem key={sector.id} value={sector.id}>{sector.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       )}
 
-      {levels.includes('village') && selectedSector && (
+      {levels.includes('cell') && selectedSector && (
         <div className="space-y-2">
-          <Label htmlFor="village">Village</Label>
-          <Select value={selectedVillage} onValueChange={handleVillageChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={loading.villages ? "Loading villages..." : "Select village"} />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.isArray(villages) && villages.map((village) => (
-                <SelectItem key={village.id} value={village.id}>
-                  {village.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {levels.includes('cell') && selectedVillage && (
-        <div className="space-y-2">
-          <Label htmlFor="cell">Cell</Label>
+          <Label htmlFor="cell">Cell *</Label>
           <Select value={selectedCell} onValueChange={handleCellChange}>
             <SelectTrigger>
-              <SelectValue placeholder={loading.cells ? "Loading cells..." : "Select cell"} />
+              <SelectValue placeholder={loading.cells ? 'Loading cells...' : 'Select cell'} />
             </SelectTrigger>
             <SelectContent>
-              {Array.isArray(cells) && cells.map((cell) => (
-                <SelectItem key={cell.id} value={cell.id}>
-                  {cell.name}
-                </SelectItem>
+              {loading.cells ? (
+                <SelectItem value="loading" disabled>Loading cells...</SelectItem>
+              ) : cells.map(cell => (
+                <SelectItem key={cell.id} value={cell.id}>{cell.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {levels.includes('village') && selectedCell && (
+        <div className="space-y-2">
+          <Label htmlFor="village">Village *</Label>
+          <Select value={selectedVillage} onValueChange={handleVillageChange}>
+            <SelectTrigger>
+              <SelectValue placeholder={loading.villages ? 'Loading villages...' : 'Select village'} />
+            </SelectTrigger>
+            <SelectContent>
+              {loading.villages ? (
+                <SelectItem value="loading" disabled>Loading villages...</SelectItem>
+              ) : villages.map(village => (
+                <SelectItem key={village.id} value={village.id}>{village.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

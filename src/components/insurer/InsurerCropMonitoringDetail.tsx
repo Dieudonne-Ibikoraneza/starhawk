@@ -47,19 +47,17 @@ export default function InsurerCropMonitoringDetail({
 
       const pId = data.policyId?._id || data.policyId;
 
-      try {
-        const history = await getMonitoringHistory();
-        const historyData = Array.isArray(history) ? history : (history.data || []);
-        const filteredCycles = historyData.filter((m: any) => {
-          const mPolicyId = m.policyId?._id || m.policyId;
-          return String(mPolicyId) === String(pId);
-        }).sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
-        
-        setAllCycles(filteredCycles);
-      } catch (err) {
-        console.warn("Failed to load cycles history:", err);
-        setAllCycles([data]);
-      }
+      // Filter to only include completed cycles, then sort descending by monitoringNumber
+      const cycles = (data.monitoringCycles || []).filter((c: any) => c.status === "COMPLETED");
+      const sortedHistory = [...cycles].sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
+      
+      // Envelop policyId and farmId if needed
+      const enrichedCycles = sortedHistory.map(c => ({
+        ...c, 
+        policyId: data.policyId, 
+        farmId: data.farmId
+      }));
+      setAllCycles(enrichedCycles);
 
       if (data.farmId?._id) {
         await loadFieldData(data.farmId._id);

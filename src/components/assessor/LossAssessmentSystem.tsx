@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Search,
   Filter,
@@ -641,6 +642,19 @@ export default function LossAssessmentSystem() {
                </div>
             </div>
           </div>
+
+          {currentClaim.status === 'NEEDS_CORRECTION' && currentClaim.correctionReason && (
+            <Alert className="mb-6 bg-amber-50 border-amber-200 text-amber-800 rounded-xl shadow-sm">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <AlertTitle className="text-amber-800 font-bold ml-2">Correction Needed</AlertTitle>
+              <AlertDescription className="ml-2 mt-1">
+                <div className="font-medium text-amber-900 mb-1">Insurer Notes:</div>
+                <div className="whitespace-pre-wrap text-sm opacity-90 p-3 bg-white/50 rounded-lg border border-amber-100">
+                  {currentClaim.correctionReason}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4 lg:w-[600px] border border-gray-200">

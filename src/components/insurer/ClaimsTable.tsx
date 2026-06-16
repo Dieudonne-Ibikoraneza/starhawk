@@ -105,7 +105,6 @@ export default function ClaimsTable({ onViewPolicy, initialClaimId }: ClaimsTabl
                   claim.policy?.cropType || 
                   'Wheat', // High quality default
         claimAmount: claim.claimAmount || 
-                     claim.estimatedLoss || 
                      claim.payoutAmount || 
                      claim.amount || 
                      184000, // Safe design default to show beautiful values

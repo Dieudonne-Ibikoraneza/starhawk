@@ -19,7 +19,9 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				sans: ['Montserrat', 'sans-serif'],
+				sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				display: ['"Space Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
 			},
 			colors: {
 				// Custom primary color (replacing green)
@@ -108,5 +110,5 @@ export default {
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+	plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

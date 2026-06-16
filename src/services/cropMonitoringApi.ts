@@ -134,7 +134,7 @@ class CropMonitoringApiService {
     return data?.data || data;
   }
 
-  // Get Monitoring History
+  // Get Monitoring History (now returns fields with active policies)
   // GET /crop-monitoring
   async getMonitoringHistory(): Promise<any> {
     const response = await this.request<any>('');

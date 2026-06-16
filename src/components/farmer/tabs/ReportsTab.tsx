@@ -125,7 +125,7 @@ export default function ReportsTab() {
                         <td className="py-4 px-6 font-medium text-gray-900">{claim.claimNumber || (claim._id || claim.id).substring(0, 8)}</td>
                         <td className="py-4 px-6 text-gray-600">{claim.cropType || "N/A"}</td>
                         <td className="py-4 px-6 text-gray-600">{claim.createdAt ? new Date(claim.createdAt).toLocaleDateString() : "N/A"}</td>
-                        <td className="py-4 px-6 text-gray-900 font-bold">{claim.estimatedLoss?.toLocaleString() || claim.amount?.toLocaleString() || "0"}</td>
+                        <td className="py-4 px-6 text-gray-900 font-bold">{claim.amount?.toLocaleString() || claim.payoutAmount?.toLocaleString() || "0"}</td>
                         <td className="py-4 px-6">
                           <Badge className={getStatusColor(claim.status)}>{claim.status}</Badge>
                         </td>

@@ -1,151 +1,93 @@
-// Rwanda Administrative API Service
-const RAPIDAPI_KEY = '9f48ad82c6msh098f90f39b10139p116d6djsnc81534a14605';
-const RAPIDAPI_HOST = 'rwanda.p.rapidapi.com';
-const BASE_URL = 'https://rwanda.p.rapidapi.com';
+import { API_BASE_URL } from '@/config/api';
+
+const BASE_URL = API_BASE_URL;
 
 class RwandaApiService {
-  constructor() {
-    this.headers = {
-      'x-rapidapi-host': RAPIDAPI_HOST,
-      'x-rapidapi-key': RAPIDAPI_KEY,
-      'Content-Type': 'application/json'
-    };
-  }
+  async makeRequest(endpoint, params = {}) {
+    const url = new URL(`${BASE_URL}${endpoint}`);
+    Object.keys(params).forEach(key => {
+      if (params[key]) {
+        url.searchParams.append(key, params[key]);
+      }
+    });
 
-  async makeRequest(endpoint) {
     try {
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+      const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: this.headers
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.data || [];
     } catch (error) {
-      console.error('Rwanda API request failed:', error);
+      console.error(`Rwanda API request failed for ${endpoint}:`, error);
       throw error;
     }
   }
 
-  // Get all provinces
-  async getProvinces() {
-    try {
-      return await this.makeRequest('/provinces');
-    } catch (error) {
-      console.warn('Rwanda API not available, using mock data:', error);
-      // Return mock data if API fails
-      return [
-        { id: '1', name: 'Kigali City' },
-        { id: '2', name: 'Northern Province' },
-        { id: '3', name: 'Southern Province' },
-        { id: '4', name: 'Eastern Province' },
-        { id: '5', name: 'Western Province' }
-      ];
-    }
+  async getProvinces(query) {
+    return this.makeRequest('/provinces', { q: query });
   }
 
-  // Get districts by province
-  async getDistricts(provinceId) {
-    return this.makeRequest(`/provinces/${provinceId}/districts`);
+  async getDistricts(provinceId, query) {
+    return this.makeRequest('/districts', { p: provinceId, q: query });
   }
 
-  // Get sectors by district
-  async getSectors(districtId) {
-    return this.makeRequest(`/districts/${districtId}/sectors`);
+  async getSectors(districtId, provinceId, query) {
+    return this.makeRequest('/sectors', { p: provinceId, d: districtId, q: query });
   }
 
-  // Get villages by sector
-  async getVillages(sectorId) {
-    return this.makeRequest(`/sectors/${sectorId}/villages`);
+  async getCells(sectorId, districtId, provinceId, query) {
+    return this.makeRequest('/cells', { p: provinceId, d: districtId, s: sectorId, q: query });
   }
 
-  // Get cells by village
-  async getCells(villageId) {
-    return this.makeRequest(`/villages/${villageId}/cells`);
+  async getVillages(cellId, sectorId, districtId, provinceId, query) {
+    return this.makeRequest('/villages', { p: provinceId, d: districtId, s: sectorId, c: cellId, q: query });
   }
 
-  // Get all administrative levels for a specific location
-  async getLocationHierarchy(provinceId, districtId, sectorId, villageId) {
-    try {
-      const [provinces, districts, sectors, villages] = await Promise.all([
-        this.getProvinces(),
-        districtId ? this.getDistricts(provinceId) : null,
-        sectorId ? this.getSectors(districtId) : null,
-        villageId ? this.getVillages(sectorId) : null
-      ]);
+  async getLocationHierarchy(provinceId, districtId, sectorId, cellId, villageId) {
+    const [provinces, districts, sectors, cells, villages] = await Promise.all([
+      this.getProvinces(),
+      provinceId ? this.getDistricts(provinceId) : Promise.resolve([]),
+      districtId ? this.getSectors(districtId, provinceId) : Promise.resolve([]),
+      sectorId ? this.getCells(sectorId, districtId, provinceId) : Promise.resolve([]),
+      cellId ? this.getVillages(cellId, sectorId, districtId, provinceId) : Promise.resolve([]),
+    ]);
 
-      return {
-        provinces,
-        districts,
-        sectors,
-        villages
-      };
-    } catch (error) {
-      console.error('Failed to fetch location hierarchy:', error);
-      throw error;
-    }
+    return { provinces, districts, sectors, cells, villages };
   }
 
-  // Search locations by name
   async searchLocations(query, type = 'all') {
+    if (!query) return [];
+    
+    // We try to search on all levels using global query `q` where allowed.
+    // The backend may require p,d,s for exact search but since we just pass q it might work or return empty.
+    const promises = [];
+    if (type === 'all' || type === 'provinces') promises.push(this.getProvinces(query).then(res => res.map(item => ({ ...item, type: 'province' }))));
+    if (type === 'all' || type === 'districts') promises.push(this.getDistricts(null, query).then(res => res.map(item => ({ ...item, type: 'district' }))));
+    if (type === 'all' || type === 'sectors') promises.push(this.getSectors(null, null, query).then(res => res.map(item => ({ ...item, type: 'sector' }))));
+    if (type === 'all' || type === 'cells') promises.push(this.getCells(null, null, null, query).then(res => res.map(item => ({ ...item, type: 'cell' }))));
+    if (type === 'all' || type === 'villages') promises.push(this.getVillages(null, null, null, null, query).then(res => res.map(item => ({ ...item, type: 'village' }))));
+    
     try {
-      const allProvinces = await this.getProvinces();
-      const results = [];
-
-      // Ensure allProvinces is an array
-      if (!Array.isArray(allProvinces)) {
-        console.warn('Provinces data is not an array:', allProvinces);
-        return [];
-      }
-
-      // Search in provinces
-      if (type === 'all' || type === 'provinces') {
-        const provinceMatches = allProvinces.filter(province =>
-          province.name && province.name.toLowerCase().includes(query.toLowerCase())
-        );
-        results.push(...provinceMatches.map(p => ({ ...p, type: 'province' })));
-      }
-
-      // Search in districts (if we have a province context)
-      if (type === 'all' || type === 'districts') {
-        for (const province of allProvinces) {
-          try {
-            const districts = await this.getDistricts(province.id);
-            const districtMatches = districts.filter(district =>
-              district.name.toLowerCase().includes(query.toLowerCase())
-            );
-            results.push(...districtMatches.map(d => ({ ...d, type: 'district', provinceId: province.id })));
-          } catch (error) {
-            // Continue if district fetch fails
-            console.warn(`Failed to fetch districts for province ${province.id}:`, error);
-          }
-        }
-      }
-
-      return results;
-    } catch (error) {
-      console.error('Location search failed:', error);
-      throw error;
+      const results = await Promise.all(promises);
+      return results.flat();
+    } catch(e) {
+      console.warn("Global search failed:", e);
+      return [];
     }
   }
 
-  // Get location details by coordinates (if the API supports it)
   async getLocationByCoordinates(latitude, longitude) {
-    // This would depend on the API's reverse geocoding capabilities
-    // For now, we'll implement a basic search
-    try {
-      const searchResults = await this.searchLocations(`${latitude},${longitude}`);
-      return searchResults[0] || null;
-    } catch (error) {
-      console.error('Failed to get location by coordinates:', error);
-      throw error;
-    }
+    return null;
   }
 }
 
-// Create and export a singleton instance
 const rwandaApiService = new RwandaApiService();
 export default rwandaApiService;

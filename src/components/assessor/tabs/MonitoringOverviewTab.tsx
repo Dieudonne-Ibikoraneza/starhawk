@@ -269,8 +269,9 @@ export const MonitoringOverviewTab = ({
             </Badge>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6 items-stretch">
+            {/* Left Column: Observations and Notes */}
+            <div className="space-y-6 flex flex-col">
               {/* Observations */}
               <Card>
                 <CardHeader>
@@ -331,20 +332,42 @@ export const MonitoringOverviewTab = ({
                 </CardContent>
               </Card>
 
+              {/* Notes & Summary */}
+              <Card className="flex-1 flex flex-col">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Save className="h-4 w-4 text-primary" />
+                    Detailed Notes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 space-y-4">
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Provide additional details about the field condition..."
+                    className="min-h-[200px] resize-none"
+                    disabled={isCompleted || readOnly}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column: Photos + Actions */}
+            <div className="flex flex-col gap-6">
               {/* Photos */}
-              <Card>
+              <Card className="flex-1 flex flex-col">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <ImageIcon className="h-4 w-4 text-primary" />
                     Cycle Photos
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap gap-3">
+                <CardContent className="space-y-4 flex-1">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {photoUrls.map((url, idx) => (
                       <div
                         key={idx}
-                        className="relative group w-24 h-24 rounded-lg border overflow-hidden bg-muted"
+                        className="relative group w-full aspect-square rounded-lg border overflow-hidden bg-muted"
                       >
                         <img
                           src={getPhotoUrl(url)}
@@ -362,128 +385,112 @@ export const MonitoringOverviewTab = ({
                       </div>
                     ))}
                   </div>
-                  {!readOnly && (
-                    <div className="flex items-center gap-2">
+                  {!readOnly && !isCompleted && (
+                    <div 
+                      className={`w-full mt-2 border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${isUploading ? 'border-primary bg-primary/5' : 'border-slate-200 hover:border-primary/50 hover:bg-slate-50 cursor-pointer'}`}
+                      onDragOver={(e) => e.preventDefault()}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-10 w-10 mx-auto mb-3 text-primary animate-spin" />
+                      ) : (
+                        <div className="bg-primary/10 h-14 w-14 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <ImageIcon className="h-7 w-7 text-primary" />
+                        </div>
+                      )}
+                      <p className="text-sm font-bold mb-1">
+                        {isUploading ? "Uploading Photo..." : "Upload Field Photo"}
+                      </p>
+                      <p className="text-xs text-slate-500 mb-4">Drag and drop or click to select image</p>
                       <input
-                        ref={fileInputRef}
                         type="file"
                         accept="image/*"
                         className="hidden"
+                        ref={fileInputRef}
                         onChange={handlePhotoUpload}
-                        disabled={isCompleted}
+                        disabled={isUploading}
                       />
+                      <Button variant="outline" className="rounded-full font-bold px-6 border-slate-200" disabled={isUploading}>
+                        Select Photo
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Actions — bottom right */}
+              {!isCompleted && !readOnly && (
+                <div className="flex flex-col gap-3">
+                  <Button
+                    onClick={() => updateMutation.mutate()}
+                    disabled={updateMutation.isPending}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {updateMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Progress
+                  </Button>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
                       <Button
                         variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading || isCompleted}
+                        className="w-full"
+                        disabled={!canGenerateReport}
                       >
-                        {isUploading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4 mr-2" />
-                        )}
-                        {isUploading ? "Uploading..." : "Add Photo"}
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Notes & Summary */}
-            <div className="space-y-6">
-              <Card className="h-full flex flex-col">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Save className="h-4 w-4 text-primary" />
-                    Detailed Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 space-y-4">
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Provide additional details about the field condition..."
-                    className="min-h-[250px] resize-none"
-                    disabled={isCompleted || readOnly}
-                  />
-
-                  {!isCompleted && !readOnly && (
-                    <div className="flex flex-col gap-3 pt-4 border-t">
-                      <Button
-                        onClick={() => updateMutation.mutate()}
-                        disabled={updateMutation.isPending}
-                        className="w-full bg-green-600 hover:bg-green-700"
-                      >
-                        {updateMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Save Progress
-                      </Button>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            disabled={!canGenerateReport}
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Complete Cycle & Generate Report
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Finalize Monitoring Cycle?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will generate the final report for Cycle #
-                              {activeCycle.monitoringNumber} of{" "}
-                              <strong>{fieldName}</strong> and notify the
-                              insurer. You won't be able to edit this cycle
-                              further.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={(e) => {
-                                e.preventDefault();
-                                reportMutation.mutate();
-                              }}
-                              className="bg-green-600 hover:bg-green-700 min-w-[140px]"
-                              disabled={reportMutation.isPending}
-                            >
-                              {reportMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              ) : null}
-                              {reportMutation.isPending ? "Generating..." : "Generate Report"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-
-                      {!canGenerateReport && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          Add observations, notes, and at least one drone report
-                          to finalize.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {isCompleted && (
-                    <div className="pt-4 border-t">
-                      <Badge className="w-full justify-center py-2 bg-green-100 text-green-800 border-green-200">
                         <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Cycle Finalized
-                      </Badge>
-                    </div>
+                        Complete Cycle & Generate Report
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Finalize Monitoring Cycle?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will generate the final report for Cycle #
+                          {activeCycle.monitoringNumber} of{" "}
+                          <strong>{fieldName}</strong> and notify the
+                          insurer. You won't be able to edit this cycle
+                          further.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => {
+                            e.preventDefault();
+                            reportMutation.mutate();
+                          }}
+                          className="bg-green-600 hover:bg-green-700 min-w-[140px]"
+                          disabled={reportMutation.isPending}
+                        >
+                          {reportMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : null}
+                          {reportMutation.isPending ? "Generating..." : "Generate Report"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  {!canGenerateReport && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Add observations, notes, and at least one drone report
+                      to finalize.
+                    </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              )}
+              {isCompleted && (
+                <Badge className="w-full justify-center py-2 bg-green-100 text-green-800 border-green-200">
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Cycle Finalized
+                </Badge>
+              )}
             </div>
           </div>
         </>
@@ -501,8 +508,8 @@ export const MonitoringOverviewTab = ({
 
       {/* Completed Cycles History */}
       {completedCycles.length > 0 && (
-        <div className="pt-6 border-t font-bold">
-          <h3 className="text-lg mb-4">Completed History</h3>
+        <div className="pt-6 border-t">
+          <h3 className="text-lg font-bold mb-4">Completed History</h3>
           <div className="space-y-4">
             {completedCycles.map((cycle) => (
               <Card key={cycle._id} className="bg-muted/50 border-border">
@@ -517,77 +524,72 @@ export const MonitoringOverviewTab = ({
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase">
-                        Date
-                      </p>
-                      <p className="font-medium">
-                        {new Date(cycle.monitoringDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase">
-                        Report Generated
-                      </p>
-                      <p className="font-medium">
-                        {cycle.reportGeneratedAt
-                          ? new Date(
-                              cycle.reportGeneratedAt,
-                            ).toLocaleDateString()
-                          : "N/A"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {cycle.observations && (
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase mb-1">
-                        Observations
-                      </p>
-                      <ul className="list-disc list-inside space-y-1">
-                        {cycle.observations.map((obs, i) => (
-                          <li key={i} className="text-foreground">
-                            {obs}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {cycle.notes && (
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase mb-1">
-                        Notes
-                      </p>
-                      <p className="bg-background/50 p-3 rounded border border-border italic text-foreground">
-                        {cycle.notes}
-                      </p>
-                    </div>
-                  )}
-
-                  {cycle.photoUrls && cycle.photoUrls.length > 0 && (
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase mb-2">
-                        Photos
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {cycle.photoUrls.map((url, i) => (
-                          <div
-                            key={i}
-                            className="w-16 h-16 rounded border overflow-hidden"
-                          >
-                            <img
-                              src={getPhotoUrl(url)}
-                              alt={`Photo ${i}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
+                <CardContent className="text-sm">
+                  <div className={`grid gap-6 ${cycle.photoUrls && cycle.photoUrls.length > 0 ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+                    {/* Left: Text Data */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-muted-foreground text-xs uppercase mb-1">Date</p>
+                          <p className="font-medium">
+                            {new Date(cycle.monitoringDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs uppercase mb-1">Report Generated</p>
+                          <p className="font-medium">
+                            {cycle.reportGeneratedAt
+                              ? new Date(cycle.reportGeneratedAt).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                        </div>
                       </div>
+
+                      {cycle.observations && cycle.observations.length > 0 && (
+                        <div>
+                          <p className="text-muted-foreground text-xs uppercase mb-1">Observations</p>
+                          <ul className="space-y-1">
+                            {cycle.observations.map((obs, i) => (
+                              <li key={i} className="flex items-start gap-2 text-foreground">
+                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                {obs}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {cycle.notes && (
+                        <div>
+                          <p className="text-muted-foreground text-xs uppercase mb-1">Notes</p>
+                          <p className="bg-background/50 p-3 rounded border border-border italic text-foreground">
+                            {cycle.notes}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Right: Field Photos */}
+                    {cycle.photoUrls && cycle.photoUrls.length > 0 && (
+                      <div>
+                        <p className="text-muted-foreground text-xs uppercase mb-2">Field Photos</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {cycle.photoUrls.map((url, i) => (
+                            <div
+                              key={i}
+                              className="w-full aspect-square rounded-lg border overflow-hidden bg-muted"
+                            >
+                              <img
+                                src={getPhotoUrl(url)}
+                                alt={`Photo ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

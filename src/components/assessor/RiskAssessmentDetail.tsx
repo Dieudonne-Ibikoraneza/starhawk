@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
@@ -29,6 +30,7 @@ import {
 } from "lucide-react";
 import assessmentsApiService from "@/services/assessmentsApi";
 import { getFarmById } from "@/services/farmsApi";
+import { getUserById } from "@/services/usersAPI";
 import { BasicInfoTab } from "./tabs/BasicInfoTab";
 import { WeatherAnalysisTab } from "./tabs/WeatherAnalysisTab";
 import DroneTab from "./tabs/DroneTab";
@@ -69,6 +71,16 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
           setFarmer(farmData.farmerId);
         } else if (data.farmerId && typeof data.farmerId === 'object') {
           setFarmer(data.farmerId);
+        } else {
+          const farmerIdStr = farmData.farmerId || data.farmerId;
+          if (typeof farmerIdStr === 'string' && farmerIdStr) {
+            try {
+              const userResp = await getUserById(farmerIdStr);
+              setFarmer(userResp.data || userResp);
+            } catch (err) {
+              console.error("Failed to fetch farmer:", err);
+            }
+          }
         }
       }
     } catch (err: any) {
@@ -248,6 +260,28 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
         </div>
       </div>
 
+      {(() => {
+        const activeCorrectionReason = assessment.correctionReason || 
+          (assessment.reportText?.includes('Correction Requested: ') 
+            ? assessment.reportText.split('Correction Requested: ').pop() 
+            : null);
+
+        if (assessment.status === "NEEDS_CORRECTION" && activeCorrectionReason) {
+          return (
+            <div className="px-6 mb-6">
+              <Alert className="bg-orange-50 border-orange-200">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertTitle className="text-orange-800 font-bold">Correction Needed</AlertTitle>
+                <AlertDescription className="text-orange-700 mt-1 whitespace-pre-wrap">
+                  {activeCorrectionReason}
+                </AlertDescription>
+              </Alert>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {/* Tabs */}
       <div className="px-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -271,7 +305,7 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
               fieldId={farm?._id || farm?.id}
               farmerId={farmer?.id || ""}
               fieldName={farm?.name || farm?.cropType || "Unknown"}
-              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim()}
+              farmerName={`${farmer?.firstName || ""} ${farmer?.lastName || ""}`.trim() || farm?.farmerName || ""}
               cropType={farm?.cropType || ""}
               area={farm?.area || 0}
               season={farm?.season || "B"}
@@ -292,7 +326,13 @@ export default function RiskAssessmentDetail({ assessmentId, onBack, readOnly }:
           </TabsContent>
 
           <TabsContent value="drone">
-            <DroneTab assessment={assessment} onRefresh={loadData} />
+            <DroneTab 
+              assessment={assessment} 
+              farm={farm}
+              farmer={farmer}
+              onRefresh={loadData} 
+              readOnly={readOnly}
+            />
           </TabsContent>
 
           <TabsContent value="overview">

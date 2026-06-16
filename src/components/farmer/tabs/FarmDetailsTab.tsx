@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Sprout, Shield, FileWarning, 
   ClipboardList, Activity, Satellite, Hash, Loader2, 
   ChevronRight, TrendingUp, CloudRain, Droplets, Thermometer,
-  Wind, ShieldCheck, AlertTriangle, Sparkles
+  Wind, ShieldCheck, AlertTriangle, Sparkles, CheckCircle2, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,12 @@ import { getFarmById, getVegetationStats, getWeatherForecast } from "@/services/
 import { getFarmerSuggestions, getMonitoringCycle, getInsight } from "@/services/aiApi";
 import { useToast } from "@/hooks/use-toast";
 import { AiChatInterface } from "@/components/common/AiChatInterface";
+import { FieldMapWithLayers } from "@/components/assessor/FieldMapWithLayers";
+import { renewFarmCycle } from "@/services/farmsApi";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface FarmDetailsTabProps {
   farmId: string;
@@ -37,6 +43,12 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
   const [aiLoading, setAiLoading] = useState(false);
   const [cycleAnalysis, setCycleAnalysis] = useState<any>(null);
   const [cycleLoading, setCycleLoading] = useState(false);
+
+  // Renew Cycle State
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [renewCropType, setRenewCropType] = useState("");
+  const [renewSowingDate, setRenewSowingDate] = useState("");
+  const [renewLoading, setRenewLoading] = useState(false);
 
   useEffect(() => {
     loadFarmData();
@@ -134,6 +146,24 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
     }
   };
 
+  const handleRenewSubmit = async () => {
+    if (!renewCropType || !renewSowingDate) {
+      toast({ title: "Error", description: "Please select crop type and sowing date.", variant: "destructive" });
+      return;
+    }
+    setRenewLoading(true);
+    try {
+      await renewFarmCycle(farmId, renewCropType, renewSowingDate);
+      toast({ title: "Success", description: "New crop cycle started successfully!" });
+      setRenewDialogOpen(false);
+      onBack();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to start new cycle.", variant: "destructive" });
+    } finally {
+      setRenewLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -146,6 +176,18 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
 
   const ndviValue = monitoring?.[0]?.ndvi || monitoring?.ndvi;
   const healthPercent = typeof ndviValue === 'number' ? Math.round(ndviValue * 100) : null;
+  const cycleData = cycleAnalysis?.data || cycleAnalysis;
+
+  // Extract daily forecasts (one per day) from the 3-hourly forecast array
+  const dailyForecasts = Array.isArray(weather) ? weather.reduce((acc: any[], curr: any) => {
+    const date = new Date(curr.dt * 1000).toDateString();
+    if (!acc.find(item => new Date(item.dt * 1000).toDateString() === date)) {
+      acc.push(curr);
+    }
+    return acc;
+  }, []).slice(0, 5) : [];
+  
+  const currentWeather = dailyForecasts.length > 0 ? dailyForecasts[0] : null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -190,10 +232,19 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
             <Satellite className="h-4 w-4" />
             Update Map
           </Button>
-          {farm.status !== 'INSURED' && (
+          {farm.status !== 'INSURED' && farm.status !== 'ARCHIVED' && (
             <Button className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200">
               <ShieldCheck className="h-4 w-4 mr-2" />
               Get Insured
+            </Button>
+          )}
+          {farm.status !== 'ARCHIVED' && (
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"
+              onClick={() => setRenewDialogOpen(true)}
+            >
+              <Sprout className="h-4 w-4 mr-2" />
+              Start New Season
             </Button>
           )}
         </div>
@@ -210,37 +261,44 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                 Live Health Snapshot
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Vegetation Index (NDVI)</span>
-                      <span className="text-3xl font-black text-gray-900">{healthPercent !== null ? `${healthPercent}%` : "N/A"}</span>
-                    </div>
-                    <Progress value={healthPercent || 0} className="h-3 bg-gray-100" />
-                    <p className="text-xs text-gray-400 italic">
-                      Last updated: {monitoring?.[0]?.monitoredAt ? format(new Date(monitoring[0].monitoredAt), "PPP") : "Just now"}
-                    </p>
-                  </div>
+            <CardContent className="p-6 space-y-6">
+              {/* Map at the top (increased height and full width) */}
+              <div className="relative rounded-2xl bg-gray-100 h-[450px] w-full overflow-hidden border border-gray-200 shadow-inner">
+                <FieldMapWithLayers
+                  fieldId={farmId}
+                  showLayerControls={true}
+                  boundary={farm.boundary}
+                  center={farm.location?.coordinates && farm.location.coordinates.length >= 2 
+                    ? [farm.location.coordinates[1], farm.location.coordinates[0]] 
+                    : undefined
+                  }
+                />
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="text-xs text-gray-500 font-medium mb-1">Moisture Level</div>
-                      <div className="text-xl font-bold text-gray-900">Optimal</div>
-                    </div>
-                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="text-xs text-gray-500 font-medium mb-1">Growth Stage</div>
-                      <div className="text-xl font-bold text-gray-900">Vegetative</div>
-                    </div>
+              {/* Stats at the bottom */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                {/* NDVI Progress */}
+                <div className="md:col-span-1 space-y-2 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Vegetation Index (NDVI)</span>
+                    <span className="text-2xl font-black text-gray-900">{healthPercent !== null ? `${healthPercent}%` : "N/A"}</span>
                   </div>
+                  <Progress value={healthPercent || 0} className="h-2 bg-gray-200" />
+                  <p className="text-[10px] text-gray-400 italic">
+                    Last updated: {monitoring?.[0]?.monitoredAt ? format(new Date(monitoring[0].monitoredAt), "PPP") : "Just now"}
+                  </p>
                 </div>
 
-                <div className="relative rounded-2xl bg-gray-100 aspect-video flex items-center justify-center overflow-hidden border border-gray-200 group">
-                  <Satellite className="h-12 w-12 text-gray-300 group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
-                    <span className="text-white text-xs font-medium">Satellite View Simulation</span>
-                  </div>
+                {/* Moisture Level */}
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex flex-col justify-center">
+                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Moisture Level</div>
+                  <div className="text-xl font-bold text-gray-900">Optimal</div>
+                </div>
+
+                {/* Growth Stage */}
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex flex-col justify-center">
+                  <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Growth Stage</div>
+                  <div className="text-xl font-bold text-gray-900">Vegetative</div>
                 </div>
               </div>
             </CardContent>
@@ -337,26 +395,26 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Current Stage</p>
-                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.currentStage || "N/A"}</p>
+                      <p className="text-sm font-black text-gray-900">{cycleData.currentStage || "N/A"}</p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Health Trend</p>
                       <p className={`text-sm font-black ${
-                        cycleAnalysis.healthTrend === 'Improving' ? 'text-green-600' : 
-                        cycleAnalysis.healthTrend === 'Declining' ? 'text-red-500' : 'text-blue-600'
+                        cycleData.healthTrend === 'Improving' ? 'text-green-600' : 
+                        cycleData.healthTrend === 'Declining' ? 'text-red-500' : 'text-blue-600'
                       }`}>
-                        {cycleAnalysis.healthTrend || "Stable"}
+                        {cycleData.healthTrend || "Stable"}
                       </p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Days to Harvest</p>
-                      <p className="text-sm font-black text-gray-900">{cycleAnalysis.daysToHarvest || "N/A"} Days</p>
+                      <p className="text-sm font-black text-gray-900">{cycleData.daysToHarvest || "N/A"} Days</p>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                       <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold mb-1">Market Score</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-black text-gray-900">{cycleAnalysis.marketValueScore || 0}%</p>
-                        <Progress value={cycleAnalysis.marketValueScore || 0} className="h-1.5 w-12 bg-blue-100" />
+                        <p className="text-sm font-black text-gray-900">{cycleData.marketValueScore || 0}%</p>
+                        <Progress value={cycleData.marketValueScore || 0} className="h-1.5 w-12 bg-blue-100" />
                       </div>
                     </div>
                   </div>
@@ -364,7 +422,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                   <div className="space-y-3">
                     <h4 className="text-xs font-bold text-blue-900 uppercase tracking-widest">Cycle Report</h4>
                     <p className="text-sm text-gray-700 leading-relaxed italic border-l-2 border-blue-200 pl-4 bg-blue-50/30 py-2 rounded-r-lg">
-                      {cycleAnalysis.cycleAnalysis}
+                      {cycleData.cycleAnalysis}
                     </p>
                   </div>
 
@@ -372,7 +430,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold text-green-700 uppercase tracking-widest">Growth Recommendations</h4>
                       <ul className="space-y-1.5">
-                        {(cycleAnalysis.recommendations || []).map((rec: string, i: number) => (
+                        {(cycleData.recommendations || []).map((rec: string, i: number) => (
                           <li key={i} className="text-xs text-gray-600 flex items-center gap-2">
                             <CheckCircle2 className="h-3 w-3 text-green-500" />
                             {rec}
@@ -383,7 +441,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold text-blue-700 uppercase tracking-widest">Market Potential</h4>
                       <p className="text-xs text-gray-600 leading-relaxed">
-                        {cycleAnalysis.investmentPotential}
+                        {cycleData.investmentPotential}
                       </p>
                     </div>
                   </div>
@@ -400,26 +458,68 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
 
           {/* Weather Forecast */}
           <Card className="border-gray-200 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CloudRain className="h-5 w-5 text-blue-500" />
-                Local Forecast
+            <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-transparent">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CloudRain className="h-5 w-5 text-blue-500" />
+                  Local Weather & Forecast
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-gray-100">
-                {[1, 2, 3, 4, 5].map((day) => (
-                  <div key={day} className="p-6 text-center space-y-3 hover:bg-gray-50 transition-colors">
-                    <span className="text-xs font-bold text-gray-400 uppercase">{format(new Date(Date.now() + day * 86400000), "EEE")}</span>
-                    <div className="mx-auto h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                      {day % 2 === 0 ? <Droplets className="h-5 w-5" /> : <CloudRain className="h-5 w-5" />}
+              {currentWeather && (
+                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-white">
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center">
+                       <img src={`http://openweathermap.org/img/wn/${currentWeather.weather[0].icon}@2x.png`} alt="weather" className="h-12 w-12 drop-shadow-sm" />
                     </div>
-                    <div className="space-y-0.5">
-                      <div className="text-lg font-black text-gray-900">24°</div>
-                      <div className="text-xs text-gray-500">18°C</div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Current Weather</h3>
+                      <div className="text-3xl font-black text-gray-900">
+                        {Math.round(currentWeather.main.temp - 273.15)}°C
+                      </div>
                     </div>
                   </div>
-                ))}
+                  <div className="flex gap-6 text-sm">
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Condition</span>
+                       <span className="font-bold text-gray-900 capitalize">{currentWeather.weather[0].description}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Humidity</span>
+                       <span className="font-bold text-gray-900">{currentWeather.main.humidity}%</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                       <span className="text-gray-500 font-medium">Wind</span>
+                       <span className="font-bold text-gray-900">{currentWeather.wind.speed} m/s</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-gray-100">
+                {(dailyForecasts.length > 0 ? dailyForecasts : [1, 2, 3, 4, 5]).map((day: any, idx: number) => {
+                  const isDummy = typeof day === 'number';
+                  const dateStr = isDummy ? format(new Date(Date.now() + day * 86400000), "EEE") : format(new Date(day.dt * 1000), "EEE");
+                  const tempMax = isDummy ? 24 : Math.round(day.main.temp_max - 273.15);
+                  const tempMin = isDummy ? 18 : Math.round(day.main.temp_min - 273.15);
+                  
+                  return (
+                    <div key={idx} className="p-4 md:p-6 text-center space-y-3 hover:bg-gray-50 transition-colors">
+                      <span className="text-xs font-bold text-gray-400 uppercase">{dateStr}</span>
+                      <div className="mx-auto h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
+                        {isDummy ? (
+                          idx % 2 === 0 ? <Droplets className="h-5 w-5 text-blue-500" /> : <CloudRain className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <img src={`http://openweathermap.org/img/wn/${day.weather[0].icon}.png`} alt="weather" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-lg font-black text-gray-900">{tempMax}°</div>
+                        <div className="text-xs text-gray-500">{tempMin}°C</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -447,6 +547,7 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
                 icon={<Activity className="h-4.5 w-4.5 text-green-600" />} 
               />
               <DetailItem label="Sowing Date" value={farm.sowingDate ? format(new Date(farm.sowingDate), "PPP") : "N/A"} icon={<Hash className="h-4.5 w-4.5 text-green-600" />} />
+              <DetailItem label="Registered At" value={farm.createdAt ? format(new Date(farm.createdAt), "PPP") : "N/A"} icon={<Calendar className="h-4.5 w-4.5 text-green-600" />} />
               <DetailItem label="Location" value={farm.locationName || "Rwanda"} icon={<MapPin className="h-4.5 w-4.5 text-green-600" />} vertical />
             </CardContent>
           </Card>
@@ -501,6 +602,54 @@ export default function FarmDetailsTab({ farmId, onBack, onViewPolicy, onFileCla
           </Card>
         </div>
       </div>
+
+      {/* Renew Cycle Dialog */}
+      <Dialog open={renewDialogOpen} onOpenChange={setRenewDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Start New Season</DialogTitle>
+            <DialogDescription>
+              Archive the current crop and register a new crop on this exact piece of land. You will not need to re-upload boundaries.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cropType">New Crop Type</Label>
+              <Select onValueChange={setRenewCropType} value={renewCropType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select crop" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MAIZE">Maize</SelectItem>
+                  <SelectItem value="BEANS">Beans</SelectItem>
+                  <SelectItem value="WHEAT">Wheat</SelectItem>
+                  <SelectItem value="RICE">Rice</SelectItem>
+                  <SelectItem value="POTATOES">Potatoes</SelectItem>
+                  <SelectItem value="CASSAVA">Cassava</SelectItem>
+                  <SelectItem value="SOYBEANS">Soybeans</SelectItem>
+                  <SelectItem value="SORGHUM">Sorghum</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sowingDate">New Sowing Date</Label>
+              <Input
+                id="sowingDate"
+                type="date"
+                value={renewSowingDate}
+                onChange={(e) => setRenewSowingDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRenewSubmit} disabled={renewLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {renewLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sprout className="h-4 w-4 mr-2" />}
+              Start Season
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

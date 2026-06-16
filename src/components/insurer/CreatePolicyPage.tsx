@@ -11,9 +11,22 @@ import {
   ArrowLeft,
   Save,
   FileText,
-  AlertCircle
+  AlertCircle,
+  CheckCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+const CROP_HARVEST_DURATIONS_MONTHS: Record<string, number> = {
+  maize: 6,
+  rice: 5,
+  wheat: 6,
+  beans: 4,
+  soybeans: 5,
+  potatoes: 4,
+  coffee: 12,
+  tea: 12,
+};
+
 
 interface CreatePolicyPageProps {
   onBack: () => void;
@@ -37,16 +50,50 @@ export default function CreatePolicyPage({ onBack, onSuccess }: CreatePolicyPage
   useEffect(() => {
     loadSubmittedAssessments();
     
-    // Set default dates
+    // Set default startDate (endDate will be calculated by the other useEffect)
     const today = new Date();
-    const nextYear = new Date();
-    nextYear.setFullYear(today.getFullYear() + 1);
     setFormData(prev => ({
       ...prev,
-      startDate: today.toISOString().split('T')[0],
-      endDate: nextYear.toISOString().split('T')[0]
+      startDate: today.toISOString().split('T')[0]
     }));
   }, []);
+
+  // Recalculate end date based on crop type and sowing date
+  useEffect(() => {
+    let durationMonths = 6; // default
+    let sowingDateStr = new Date().toISOString();
+
+    if (formData.assessmentId) {
+      const selectedAssessment = assessments.find((a: any) => 
+        (a._id || a.id) === formData.assessmentId
+      );
+      if (selectedAssessment) {
+        const cropType = (selectedAssessment.cropType || selectedAssessment.farmId?.cropType || "").toLowerCase();
+        durationMonths = CROP_HARVEST_DURATIONS_MONTHS[cropType] || 6;
+        
+        const farm = selectedAssessment.farmId || selectedAssessment.farm || {};
+        sowingDateStr = farm.sowingDate || selectedAssessment.createdAt || new Date().toISOString();
+      }
+    }
+
+    const sowingDate = new Date(sowingDateStr);
+    if (!isNaN(sowingDate.getTime())) {
+      const endDate = new Date(sowingDate);
+      endDate.setMonth(endDate.getMonth() + durationMonths);
+      
+      const today = new Date();
+      // Ensure the end date is at least some days in the future, just in case
+      if (endDate <= today) {
+        endDate.setMonth(today.getMonth() + 1); // fallback to 1 month from today if already harvested
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        endDate: endDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [formData.assessmentId, assessments]);
+
 
   const loadSubmittedAssessments = async () => {
     setAssessmentsLoading(true);
@@ -271,7 +318,7 @@ export default function CreatePolicyPage({ onBack, onSuccess }: CreatePolicyPage
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="coverageLevel">Coverage Level *</Label>
+              <Label className="text-gray-700 font-semibold mb-2 block">Coverage Level *</Label>
               <Select 
                 value={formData.coverageLevel} 
                 onValueChange={(value: "BASIC" | "STANDARD" | "PREMIUM") => 
@@ -279,18 +326,20 @@ export default function CreatePolicyPage({ onBack, onSuccess }: CreatePolicyPage
                 }
                 required
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-gray-300 bg-white">
                   <SelectValue placeholder="Select coverage level" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]" position="popper">
                   <SelectItem value="BASIC">Basic Coverage</SelectItem>
                   <SelectItem value="STANDARD">Standard Coverage</SelectItem>
                   <SelectItem value="PREMIUM">Premium Coverage</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
-                Coverage level determines the extent of protection and premium rates
-              </p>
+              <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded-md border border-gray-100">
+                {formData.coverageLevel === 'BASIC' && <span><strong>Basic:</strong> Covers catastrophic losses only (e.g., severe drought). Lowest premium.</span>}
+                {formData.coverageLevel === 'STANDARD' && <span><strong>Standard:</strong> Covers most weather risks and significant yield drops. Balanced premium.</span>}
+                {formData.coverageLevel === 'PREMIUM' && <span><strong>Premium:</strong> Comprehensive coverage including minor yield drops. Highest premium.</span>}
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

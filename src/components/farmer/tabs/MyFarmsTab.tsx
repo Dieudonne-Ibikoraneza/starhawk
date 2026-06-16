@@ -5,23 +5,33 @@ import { Badge } from "@/components/ui/badge";
 import { Crop, TrendingUp, Shield, MapPin, Loader2, Plus, Search } from "lucide-react";
 import { getFarms, getAllFarms } from "@/services/farmsApi";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface MyFarmsTabProps {
   onRegisterFarm: () => void;
   onViewDetails: (farm: any) => void;
   onViewAnalytics: (farm: any) => void;
-  onRequestInsurance: (farm: any) => void;
 }
 
 export default function MyFarmsTab({ 
   onRegisterFarm, 
   onViewDetails, 
-  onViewAnalytics,
-  onRequestInsurance
+  onViewAnalytics
 }: MyFarmsTabProps) {
   const { toast } = useToast();
   const [farms, setFarms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDialog, setPendingDialog] = useState<{ open: boolean; farmName: string }>({
+    open: false,
+    farmName: ""
+  });
 
   useEffect(() => {
     loadFarms();
@@ -116,11 +126,12 @@ export default function MyFarmsTab({
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Farm Name</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Crop Type</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Location</th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Status</th>
-                    <th className="text-right py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider">Actions</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Farm Name</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Crop Type</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Location</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Registered At</th>
+                    <th className="text-right py-4 px-6 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -130,17 +141,17 @@ export default function MyFarmsTab({
                     
                     return (
                       <tr key={farmId} className="hover:bg-gray-50/50 transition-colors group">
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="font-bold text-gray-900">{toDisplayText(farm.name, "Unnamed Farm")}</div>
                           <div className="text-xs text-gray-400 mt-0.5">ID: {farmId.substring(0, 8)}...</div>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <div className="h-2 w-2 rounded-full bg-green-500" />
                             {toDisplayText(farm.cropType || farm.crop, "N/A")}
                           </div>
                         </td>
-                        <td className="py-4 px-6 max-w-[200px] md:max-w-[280px]">
+                        <td className="py-4 px-6 max-w-[200px] md:max-w-[280px] whitespace-nowrap">
                           <div 
                             className="flex items-center gap-1.5 text-sm text-gray-500 truncate"
                             title={formatLocation(farm)}
@@ -149,7 +160,7 @@ export default function MyFarmsTab({
                             <span className="truncate">{formatLocation(farm)}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <Badge className={`${
                             status === 'INSURED' ? 'bg-green-100 text-green-700 border-green-200' :
                             status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
@@ -158,23 +169,24 @@ export default function MyFarmsTab({
                             {status}
                           </Badge>
                         </td>
-                        <td className="py-4 px-6 text-right">
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="text-sm text-gray-600">
+                            {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            {status === 'REGISTERED' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onRequestInsurance(farm)}
-                                className="h-8 border-green-600 text-green-600 hover:bg-green-50 transition-all active:scale-[0.98]"
-                              >
-                                <Shield className="h-3.5 w-3.5 mr-1" />
-                                Request Insurance
-                              </Button>
-                            )}
+
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => onViewAnalytics(farm)}
+                              onClick={() => {
+                                if (status === 'PENDING') {
+                                  setPendingDialog({ open: true, farmName: farm.name || "Unnamed Farm" });
+                                } else {
+                                  onViewAnalytics(farm);
+                                }
+                              }}
                               className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
                               <TrendingUp className="h-3.5 w-3.5 mr-1" />
@@ -183,7 +195,13 @@ export default function MyFarmsTab({
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => onViewDetails(farm)}
+                              onClick={() => {
+                                if (status === 'PENDING') {
+                                  setPendingDialog({ open: true, farmName: farm.name || "Unnamed Farm" });
+                                } else {
+                                  onViewDetails(farm);
+                                }
+                              }}
                               className="h-8 text-gray-500 hover:text-gray-900"
                             >
                               Details
@@ -199,6 +217,46 @@ export default function MyFarmsTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Pending Farm Boundary Warning Dialog */}
+      <Dialog 
+        open={pendingDialog.open} 
+        onOpenChange={(open) => setPendingDialog(prev => ({ ...prev, open }))}
+      >
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white border border-gray-100 shadow-2xl">
+          <DialogHeader className="flex flex-col items-center text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 animate-pulse">
+              <MapPin className="h-8 w-8" />
+            </div>
+            <DialogTitle className="text-xl font-black text-gray-900">
+              Boundary Mapping Pending
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 leading-relaxed max-w-sm">
+              Your farm <strong className="text-gray-900">"{pendingDialog.farmName}"</strong> has been registered successfully but is awaiting geographical boundary mapping.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-5 p-4 rounded-xl bg-amber-50/50 border border-amber-100/50 text-xs text-amber-800 space-y-2 leading-relaxed">
+            <p className="font-bold flex items-center gap-1.5 text-amber-900">
+              <span>⚠️</span> Next Steps in GIS Registration:
+            </p>
+            <ul className="list-disc pl-4 space-y-1 text-gray-600">
+              <li>An assessor is assigned to physically survey your field.</li>
+              <li>Once surveyed, the boundary KML/Shapefile will be uploaded.</li>
+              <li>Full satellite monitoring (NDVI, soil moisture, local weather) and crop details will then activate automatically.</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="flex justify-center sm:justify-center pt-2">
+            <Button 
+              onClick={() => setPendingDialog(prev => ({ ...prev, open: false }))}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 py-2.5 rounded-xl shadow-lg shadow-amber-100 transition-all active:scale-[0.98]"
+            >
+              Acknowledge & Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

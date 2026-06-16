@@ -28,6 +28,8 @@ export function NotificationsPopover() {
     unreadCount: unread, 
     loading, 
     markAsRead: markRead, 
+    markAsUnread: markUnread,
+    deleteNotification: delNotification,
     markAllAsRead: markAll, 
     clearAll: clear 
   } = useNotifications();
@@ -106,7 +108,7 @@ export function NotificationsPopover() {
             </div>
           ) : (
             visible.map((n) => {
-              const Icon = categoryIcon[n.category];
+              const Icon = categoryIcon[n.category] || categoryIcon.system;
               return (
                 <div
                   key={n.id}
@@ -116,7 +118,7 @@ export function NotificationsPopover() {
                     !n.read && "bg-primary/[0.03]"
                   )}
                 >
-                  <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", categoryColor[n.category])}>
+                  <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", categoryColor[n.category] || categoryColor.system)}>
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -124,18 +126,35 @@ export function NotificationsPopover() {
                       <p className={cn("text-sm leading-tight", !n.read && "font-semibold")}>{n.title}</p>
                       {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{n.body}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>
                     <p className="mt-1 text-[10px] text-muted-foreground">{n.createdAt}</p>
                   </div>
-                  {!n.read && (
+                  <div className="flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {!n.read ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); markRead(n.id); }}
+                        className="p-1 hover:bg-slate-200 rounded"
+                        title="Mark as read"
+                      >
+                        <Check className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); markUnread(n.id); }}
+                        className="p-1 hover:bg-slate-200 rounded"
+                        title="Mark as unread"
+                      >
+                        <CheckCheck className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => { e.stopPropagation(); markRead(n.id); }}
-                      className="opacity-0 transition-opacity group-hover:opacity-100"
-                      aria-label="Mark as read"
+                      onClick={(e) => { e.stopPropagation(); delNotification(n.id); }}
+                      className="p-1 hover:bg-red-100 rounded"
+                      title="Delete notification"
                     >
-                      <Check className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
                     </button>
-                  )}
+                  </div>
                 </div>
               );
             })

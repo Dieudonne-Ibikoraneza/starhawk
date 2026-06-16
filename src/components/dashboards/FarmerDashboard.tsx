@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import DashboardLayout from "../layout/DashboardLayout";
 import { getUserId, getPhoneNumber, getEmail, updatePassword } from "@/services/authAPI";
-import { getUserProfile, updateUserProfile, getInsurers } from "@/services/usersAPI";
+import { getUserProfile, updateUserProfile, getInsurers, fetchPrivatePhotoBlob } from "@/services/usersAPI";
 import { photosService } from "@/lib/api/services/photos";
 import ImageCropper from "@/components/ui/image-cropper";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,7 @@ import {
   FileText, Bell,
   AlertTriangle,
   CheckCircle,
+  MapPin,
   Clock,
   Phone,
   Mail,
@@ -49,7 +50,6 @@ import {
   Wind,
   X,
   Sun,
-  MapPin,
   Leaf,
   Building2,
   List
@@ -128,7 +128,6 @@ export default function FarmerDashboard() {
     lossDescription: "",
     damagePhotos: [] as string[],
     eventDate: "",
-    estimatedLoss: ""
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
@@ -150,6 +149,9 @@ export default function FarmerDashboard() {
   const [selectedInsurerName, setSelectedInsurerName] = useState<string | null>(null);
   const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
 
+  // State for Pending Dialog
+  const [pendingDialog, setPendingDialog] = useState({ open: false, farmName: "" });
+
   // State for Farm Analytics
   const [farmAnalytics, setFarmAnalytics] = useState<{
     weatherForecast: any;
@@ -165,6 +167,7 @@ export default function FarmerDashboard() {
 
   // State for Profile
   const [farmerProfile, setFarmerProfile] = useState<any>(null);
+  const [signatureBlobUrl, setSignatureBlobUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   
   // State for Profile Form (from registration page)
@@ -465,6 +468,15 @@ export default function FarmerDashboard() {
       const profile = await getUserProfile();
       const profileData = profile.data || profile;
       setFarmerProfile(profileData);
+      
+      if (profileData?.signatureUrl) {
+        try {
+          const blobUrl = await fetchPrivatePhotoBlob(profileData.signatureUrl);
+          setSignatureBlobUrl(blobUrl);
+        } catch (e) {
+          console.error("Failed to fetch signature", e);
+        }
+      }
       
       // Pre-populate form data if profile exists
       if (profileData) {
@@ -1167,23 +1179,14 @@ export default function FarmerDashboard() {
       return;
     }
 
-    if (!claimFormData.estimatedLoss || isNaN(parseFloat(claimFormData.estimatedLoss))) {
-      toast({
-        title: 'Validation Error',
-        description: 'Estimated loss is required and must be a valid number',
-        variant: 'destructive'
-      });
-      return;
-    }
 
     setIsSubmittingClaim(true);
     try {
-      const claimData: any = {
+      const claimData = {
         policyId: claimFormData.policyId,
         eventType: claimFormData.lossEventType.toUpperCase(),
         eventDate: new Date(claimFormData.eventDate).toISOString(),
         description: claimFormData.lossDescription,
-        estimatedLoss: parseFloat(claimFormData.estimatedLoss),
         damagePhotos: claimFormData.damagePhotos || []
       };
       
@@ -1201,7 +1204,6 @@ export default function FarmerDashboard() {
         lossDescription: "",
         damagePhotos: [],
         eventDate: "",
-        estimatedLoss: ""
       });
       setUploadedFiles([]);
       
@@ -1220,25 +1222,30 @@ export default function FarmerDashboard() {
     }
   };
 
-  // Validate sowing date is at least 14 days in the future
+  // Validate sowing date is at least 14 days prior to today (in the past)
   const validateSowingDate = (date: string): { valid: boolean; error?: string } => {
     if (!date) {
       return { valid: true }; // Date is optional
     }
     
+    const dateParts = date.split('-').map(Number);
+    if (dateParts.length !== 3 || dateParts.some(isNaN)) {
+      return { valid: false, error: 'Invalid sowing date format' };
+    }
+    
+    const selectedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
+    
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset to start of day
+    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
     
-    const minDate = new Date(today);
-    minDate.setDate(today.getDate() + 14);
+    const maxDate = new Date(todayUTC);
+    maxDate.setUTCDate(todayUTC.getUTCDate() - 14);
     
-    const selectedDate = new Date(date);
-    selectedDate.setHours(0, 0, 0, 0);
-    
-    if (selectedDate < minDate) {
+    if (selectedDate > maxDate) {
+      const maxDateStr = maxDate.toISOString().split('T')[0];
       return {
         valid: false,
-        error: `Sowing date must be at least 14 days in the future. Minimum date: ${minDate.toISOString().split('T')[0]}`
+        error: `Sowing date must be at least 14 days prior to today. Maximum allowed date: ${maxDateStr}`
       };
     }
     
@@ -1451,6 +1458,7 @@ export default function FarmerDashboard() {
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Crop Type</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Area (ha)</th>
                     <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Registered At</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1459,7 +1467,13 @@ export default function FarmerDashboard() {
                     return (
                       <tr
                         key={farmId || index}
-                        onClick={() => loadFarmDetails(farmId)}
+                        onClick={() => {
+                          if (farm.status === 'PENDING') {
+                            setPendingDialog({ open: true, farmName: farm.name || "Unnamed Farm" });
+                          } else {
+                            loadFarmDetails(farmId);
+                          }
+                        }}
                         className="hover:bg-gray-50/50 transition-all duration-150 cursor-pointer border-b border-gray-100"
                       >
                         <td className="py-4 px-6 whitespace-nowrap">
@@ -1486,6 +1500,11 @@ export default function FarmerDashboard() {
                           }`}>
                             {toDisplayText(farm.status, "REGISTERED")}
                           </span>
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="text-sm text-gray-600">
+                            {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1718,6 +1737,7 @@ export default function FarmerDashboard() {
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Area (ha)</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Location</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Status</th>
+                      <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Registered At</th>
                       <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -1764,6 +1784,11 @@ export default function FarmerDashboard() {
                             }`}>
                               {toDisplayText(farm.status, "REGISTERED")}
                             </span>
+                          </td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <div className="text-sm text-gray-600">
+                              {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                            </div>
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
                             <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
@@ -1908,43 +1933,50 @@ export default function FarmerDashboard() {
           <form onSubmit={handleSubmitClaim} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="policyId" className="text-gray-900">Policy *</Label>
-              {policiesLoading ? (
-                <div className="text-gray-500">Loading policies...</div>
-              ) : policies.length === 0 ? (
-                <div className="text-gray-500">
-                  <p>No active policies found. You need an active policy to file a claim.</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/farmer/dashboard")}
-                    className="mt-2 border-gray-300 text-gray-900 hover:bg-gray-50 !rounded-none"
+              {(() => {
+                const activePolicies = policies.filter(p => p.status?.toUpperCase() === 'ACTIVE');
+                if (policiesLoading) {
+                  return <div className="text-gray-500">Loading policies...</div>;
+                }
+                if (activePolicies.length === 0) {
+                  return (
+                    <div className="text-gray-500">
+                      <p>No active policies found. You need an active policy to file a claim.</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate("/farmer/dashboard")}
+                        className="mt-2 border-gray-300 text-gray-900 hover:bg-gray-50 !rounded-none"
+                      >
+                        Go to Dashboard
+                      </Button>
+                    </div>
+                  );
+                }
+                return (
+                  <Select
+                    value={claimFormData.policyId}
+                    onValueChange={(value) => setClaimFormData({ ...claimFormData, policyId: value })}
+                    required
                   >
-                    Go to Dashboard
-                  </Button>
-                </div>
-              ) : (
-                <Select
-                  value={claimFormData.policyId}
-                  onValueChange={(value) => setClaimFormData({ ...claimFormData, policyId: value })}
-                  required
-                >
-                  <SelectTrigger className="bg-gray-50 border-gray-300 text-gray-900 ">
-                    <SelectValue placeholder="Select a policy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {policies.map((policy) => {
-                      const farmName = typeof policy.farmId === 'object' && policy.farmId?.name
-                        ? policy.farmId.name
-                        : (policy.cropType ? `${policy.cropType} Field` : 'Unnamed Farm');
-                      return (
-                        <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
-                          {policy.policyNumber || 'Policy'} - {farmName}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              )}
+                    <SelectTrigger className="bg-gray-50 border-gray-300 text-gray-900 ">
+                      <SelectValue placeholder="Select a policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activePolicies.map((policy) => {
+                        const farmName = typeof policy.farmId === 'object' && policy.farmId?.name
+                          ? policy.farmId.name
+                          : (policy.cropType ? `${policy.cropType} Field` : 'Unnamed Farm');
+                        return (
+                          <SelectItem key={policy._id || policy.id} value={policy._id || policy.id}>
+                            {policy.policyNumber || 'Policy'} - {farmName}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
               <p className="text-xs text-gray-500">Select the policy for this claim</p>
             </div>
 
@@ -1985,22 +2017,6 @@ export default function FarmerDashboard() {
                 max={new Date().toISOString().split('T')[0]}
               />
               <p className="text-xs text-gray-500">Date when the loss event occurred</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="estimatedLoss" className="text-gray-900">Estimated Loss (RWF) *</Label>
-              <Input
-                id="estimatedLoss"
-                type="number"
-                step="0.01"
-                min="0"
-                value={claimFormData.estimatedLoss}
-                onChange={(e) => setClaimFormData({ ...claimFormData, estimatedLoss: e.target.value })}
-                placeholder="500000"
-                required
-                className="bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
-              />
-              <p className="text-xs text-gray-500">Estimated financial loss in Rwandan Francs</p>
             </div>
 
             <div className="space-y-2">
@@ -2327,6 +2343,23 @@ export default function FarmerDashboard() {
                         </div>
                       </div>
                     </div>
+                    
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Digital Signature</h3>
+                      {signatureBlobUrl ? (
+                        <div className="border border-gray-200 rounded-lg p-4 bg-white inline-block">
+                          <img 
+                            src={signatureBlobUrl} 
+                            alt="Farmer Signature" 
+                            className="h-24 object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 italic p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50 inline-block">
+                          No signature attached to this profile.
+                        </div>
+                      )}
+                    </div>
                   </>
 
                 <div className="flex justify-end gap-3 pt-8">
@@ -2502,14 +2535,6 @@ export default function FarmerDashboard() {
               setSelectedFarmId(farm._id || farm.id);
               navigate("/farmer/monitoring");
             }}
-            onRequestInsurance={(farm) => {
-              setInsuranceRequestDialog({
-                open: true,
-                farmId: farm._id || farm.id,
-                farmName: farm.name || "Unnamed Farm",
-                insurerId: ""
-              });
-            }}
           />
         );
       case "insurers": 
@@ -2626,6 +2651,46 @@ export default function FarmerDashboard() {
           {renderPage()}
         </div>
       </div>
+
+      {/* Pending Farm Boundary Warning Dialog */}
+      <Dialog 
+        open={pendingDialog.open} 
+        onOpenChange={(open) => setPendingDialog(prev => ({ ...prev, open }))}
+      >
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white border border-gray-100 shadow-2xl">
+          <DialogHeader className="flex flex-col items-center text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 animate-pulse">
+              <MapPin className="h-8 w-8" />
+            </div>
+            <DialogTitle className="text-xl font-black text-gray-900">
+              Boundary Mapping Pending
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 leading-relaxed max-w-sm">
+              Your farm <strong className="text-gray-900">"{pendingDialog.farmName}"</strong> has been registered successfully but is awaiting geographical boundary mapping.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-5 p-4 rounded-xl bg-amber-50/50 border border-amber-100/50 text-xs text-amber-800 space-y-2 leading-relaxed">
+            <p className="font-bold flex items-center gap-1.5 text-amber-900">
+              <span>📌</span> Next Steps in GIS Registration:
+            </p>
+            <ul className="list-disc pl-4 space-y-1 text-gray-600">
+              <li>An assessor is assigned to physically survey your field.</li>
+              <li>Once surveyed, the boundary KML/Shapefile will be uploaded.</li>
+              <li>Full satellite monitoring (NDVI, soil moisture, local weather) and crop details will then activate automatically.</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="flex justify-center sm:justify-center pt-2">
+            <Button 
+              onClick={() => setPendingDialog(prev => ({ ...prev, open: false }))}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 py-2.5 rounded-xl shadow-lg shadow-amber-100 transition-all active:scale-[0.98]"
+            >
+              Acknowledge & Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

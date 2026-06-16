@@ -45,10 +45,11 @@ export function formatReportTypeLabel(reportType?: string | null): string {
   if (!reportType) return "Analysis Report";
   return reportType
     .replace(/\.pdf$/i, "")
+    .replace(/\d+/g, "")
     .replace(/[-_]+/g, " ")
     .trim()
     .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
 }
 

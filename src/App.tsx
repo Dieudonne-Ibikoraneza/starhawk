@@ -19,6 +19,7 @@ import { PolicyRequestForm } from "./components/requests/PolicyRequestForm";
 import { RiskAssessmentModule } from "./components/assessment/RiskAssessmentModule";
 import { UnderwritingDashboard } from "./components/underwriting/UnderwritingDashboard";
 import { GovernmentAnalyticsDashboard } from "./components/government/GovernmentAnalyticsDashboard";
+import { GovernmentDashboard } from "./components/dashboards/GovernmentDashboard";
 import { NotificationManager } from "./components/notifications/NotificationManager";
 import { PaymentIntegration } from "./components/payments/PaymentIntegration";
 import { ClaimFilingSystem } from "./components/claims/ClaimFilingSystem";
@@ -100,6 +101,14 @@ const App = () => {
                 element={
                   <ProtectedRoute allowedRole="ADMIN">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/government/*" 
+                element={
+                  <ProtectedRoute allowedRole="GOVERNMENT">
+                    <GovernmentDashboard />
                   </ProtectedRoute>
                 } 
               />

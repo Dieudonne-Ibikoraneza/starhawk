@@ -28,22 +28,58 @@ export interface CropMonitoringRecord {
   updatedAt?: string;
 }
 
+async function resolveAndFlattenCycles(parents: any[]): Promise<CropMonitoringRecord[]> {
+  if (!Array.isArray(parents)) return [];
+  const allCycles: CropMonitoringRecord[] = [];
+  
+  const detailedParents = await Promise.all(
+    parents.map(async (parent: any) => {
+      if (parent && parent._id) {
+        try {
+          return await cropMonitoringService.getById(parent._id);
+        } catch (err) {
+          console.error(`Failed to fetch crop monitoring details for ${parent._id}:`, err);
+          return parent;
+        }
+      }
+      return parent;
+    })
+  );
+
+  detailedParents.forEach((parent: any) => {
+    if (parent && parent.monitoringCycles && Array.isArray(parent.monitoringCycles)) {
+      allCycles.push(...parent.monitoringCycles);
+    } else if (parent && parent.monitoringNumber) {
+      allCycles.push(parent);
+    }
+  });
+
+  return allCycles;
+}
+
 export const cropMonitoringService = {
-  /** List all monitoring tasks for the current assessor */
-  listTasks: async (): Promise<CropMonitoringRecord[]> => {
-    return apiClient.get<CropMonitoringRecord[]>("/crop-monitoring");
+  /** Get a single monitoring record (parent with cycles) */
+  getById: async (id: string): Promise<any> => {
+    return apiClient.get<any>(`/crop-monitoring/${id}`);
+  },
+
+  /** List all monitoring tasks (returns fields with active policies) */
+  listTasks: async (): Promise<any[]> => {
+    return apiClient.get<any[]>("/crop-monitoring");
   },
 
   /** All cycles across the platform (Admin only) */
   listAllAdmin: async (): Promise<CropMonitoringRecord[]> => {
-    return apiClient.get<CropMonitoringRecord[]>("/crop-monitoring/records/all");
+    const parents = await apiClient.get<any[]>("/crop-monitoring/records/all");
+    return resolveAndFlattenCycles(parents);
   },
 
   /** Get all monitoring records for a specific policy */
   getByPolicy: async (policyId: string): Promise<CropMonitoringRecord[]> => {
-    return apiClient.get<CropMonitoringRecord[]>(
+    const parents = await apiClient.get<any[]>(
       `/crop-monitoring/policy/${policyId}`,
     );
+    return resolveAndFlattenCycles(parents);
   },
 
   /** Start a new monitoring cycle for a policy */
@@ -102,6 +138,14 @@ export const cropMonitoringService = {
     return apiClient.upload<any>(
       `/crop-monitoring/${monitoringId}/upload-drone-pdf?pdfType=${pdfType}`,
       formData,
+    );
+  },
+
+  /** Process an uploaded drone PDF to extract data */
+  processDronePdf: async (monitoringId: string, pdfType: string): Promise<any> => {
+    return apiClient.post<any>(
+      `/crop-monitoring/${monitoringId}/process-drone-pdf`,
+      { pdfType }
     );
   },
 

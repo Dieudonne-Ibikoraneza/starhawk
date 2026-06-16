@@ -7,6 +7,7 @@ interface User {
   role: string;
   name: string;
   profile: any;
+  signatureUrl?: string;
 }
 
 interface AuthContextType {

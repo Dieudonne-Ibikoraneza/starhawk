@@ -17,6 +17,7 @@ export interface ReportData {
     location: string;
     farmerName: string;
   };
+  assessorName?: string;
   dronePdfs: Array<{
     pdfType: string;
     droneAnalysisData?: DroneAnalysisData;
@@ -722,7 +723,7 @@ export class ComprehensiveReportGenerator {
     const ch = 20;
     const labels = ["Assessor Name", "Date"];
     const values = [
-      data.farmDetails.farmerName || "N/A", // Use farmer name as assessor
+      data.assessorName || "N/A",
       data.reportGeneratedAt.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",

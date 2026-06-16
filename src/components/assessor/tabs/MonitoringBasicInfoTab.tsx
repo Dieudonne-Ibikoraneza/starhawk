@@ -5,7 +5,7 @@ import { Sprout, MapPin, Calendar, Clock, CheckCircle2, Eye } from "lucide-react
 import { useNavigate } from "react-router-dom";
 import { FieldMapWithLayers } from "../FieldMapWithLayers";
 import { CropMonitoringRecord } from "@/lib/api/services/cropMonitoring";
-import { formatCropTypeLabel } from "@/lib/crops";
+import { formatCropTypeLabel, getRequiredMonitoringCycles } from "@/lib/crops";
 
 interface MonitoringBasicInfoTabProps {
   fieldId: string;
@@ -58,7 +58,8 @@ export const MonitoringBasicInfoTab = ({
     recommendedDateStr = fallbackRecommendedDate.toISOString();
   }
 
-  const maxReached = completedCount >= (totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || Number.MAX_SAFE_INTEGER);
+  const resolvedTotalCycles = totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || getRequiredMonitoringCycles(cropType);
+  const maxReached = completedCount >= resolvedTotalCycles;
   
   const formattedFieldId = fieldId
     ? `FLD-${fieldId.slice(0, 3).toUpperCase()}`
@@ -101,13 +102,13 @@ export const MonitoringBasicInfoTab = ({
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Area</p>
-              <p className="font-medium">{area} hectares</p>
+              <p className="font-medium">{typeof area === "number" ? area.toFixed(2) : parseFloat(area || "0").toFixed(2)} hectares</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Season</p>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
-                <p className="font-medium">{season}</p>
+                <p className="font-medium">{season || "Season A"}</p>
               </div>
             </div>
             <div>
@@ -117,7 +118,7 @@ export const MonitoringBasicInfoTab = ({
                 <p className="font-medium">{location}</p>
               </div>
             </div>
-            {recommendedDateStr && !isNaN(new Date(recommendedDateStr).getTime()) && (
+            {!maxReached && recommendedDateStr && !isNaN(new Date(recommendedDateStr).getTime()) && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Recommended Next Cycle</p>
                 <p className="font-medium">
@@ -143,7 +144,7 @@ export const MonitoringBasicInfoTab = ({
           <CardTitle className="flex justify-between items-center text-xl">
             Monitoring Cycles
             <Badge variant="outline" className="font-normal text-xs">
-              {completedCount} / {totalRecommendedCycles || activeCycle?.totalRecommendedCycles || cycles[0]?.totalRecommendedCycles || "?"} Completed
+              {completedCount} / {resolvedTotalCycles} Completed
             </Badge>
           </CardTitle>
           {!readOnly && (
@@ -181,8 +182,7 @@ export const MonitoringBasicInfoTab = ({
             {cycles.map((cycle) => (
               <div
                 key={cycle._id}
-                onClick={() => navigate(`/assessor/crop-monitoring/${cycle._id}`)}
-                className="flex items-center gap-3 p-4 rounded-lg border bg-background hover:bg-gray-50 cursor-pointer transition-colors group"
+                className="flex items-center gap-3 p-4 rounded-lg border bg-background transition-colors group"
               >
                 {cycle.status === "COMPLETED" ? (
                   <CheckCircle2 className="h-6 w-6 text-green-600 shrink-0" />
@@ -194,7 +194,6 @@ export const MonitoringBasicInfoTab = ({
                     <p className="font-semibold">
                       Cycle #{cycle.monitoringNumber}
                     </p>
-                    <Eye className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Started:{" "}

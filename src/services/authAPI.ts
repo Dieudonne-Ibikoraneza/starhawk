@@ -8,6 +8,7 @@ interface LoginResponse {
   userId: string;
   phoneNumber: string;
   email: string;
+  signatureUrl?: string;
 }
 
 class AuthApiService {
@@ -237,6 +238,16 @@ class AuthApiService {
       localStorage.setItem("userId", data.userId || data._id || "");
       localStorage.setItem("phoneNumber", data.phoneNumber || "");
       localStorage.setItem("email", data.email || "");
+      
+      const userObj = {
+        id: data.userId || data._id || "",
+        email: data.email || "",
+        role: data.role,
+        name: data.name || "User",
+        profile: null,
+        signatureUrl: data.signatureUrl
+      };
+      localStorage.setItem("user", JSON.stringify(userObj));
 
       return data;
     } catch (error: any) {
@@ -281,6 +292,16 @@ class AuthApiService {
       localStorage.setItem("phoneNumber", data.phoneNumber || "");
       localStorage.setItem("email", data.email || "");
 
+      const userObj = {
+        id: data.userId || data._id || "",
+        email: data.email || "",
+        role: data.role,
+        name: data.name || "User",
+        profile: null,
+        signatureUrl: data.signatureUrl
+      };
+      localStorage.setItem("user", JSON.stringify(userObj));
+
       return data;
     } catch (error: any) {
       // Re-throw with a more user-friendly message if possible
@@ -324,6 +345,16 @@ class AuthApiService {
       localStorage.setItem("phoneNumber", data.phoneNumber || "");
       localStorage.setItem("email", data.email || "");
 
+      const userObj = {
+        id: data.userId || data._id || "",
+        email: data.email || "",
+        role: data.role,
+        name: data.name || "User",
+        profile: null,
+        signatureUrl: data.signatureUrl
+      };
+      localStorage.setItem("user", JSON.stringify(userObj));
+
       return data;
     } catch (error: any) {
       // Re-throw with a more user-friendly message if possible
@@ -366,6 +397,16 @@ class AuthApiService {
       localStorage.setItem("userId", data.userId || data._id || "");
       localStorage.setItem("phoneNumber", data.phoneNumber || "");
       localStorage.setItem("email", data.email || "");
+
+      const userObj = {
+        id: data.userId || data._id || "",
+        email: data.email || "",
+        role: data.role,
+        name: data.name || "User",
+        profile: null,
+        signatureUrl: data.signatureUrl
+      };
+      localStorage.setItem("user", JSON.stringify(userObj));
 
       return data;
     } catch (error: any) {

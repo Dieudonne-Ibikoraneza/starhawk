@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dashboardTheme } from "@/utils/dashboardTheme";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, updateMonitoring, generateMonitoringReport } from "@/services/cropMonitoringApi";
+import cropMonitoringApiService, { startCropMonitoring, getMonitoringHistory, updateMonitoring, generateMonitoringReport, getMonitoringById } from "@/services/cropMonitoringApi";
 import policiesApiService from "@/services/policiesApi";
 import { getUserId } from "@/services/authAPI";
 import { useToast } from "@/hooks/use-toast";
+import { getRequiredMonitoringCycles } from "@/lib/crops";
 import { MonitoringOverviewTab } from "./tabs/MonitoringOverviewTab";
 import { FieldMapWithLayers } from "./FieldMapWithLayers";
 import meteosourceApiService from "@/services/meteosourceApi";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format, addDays, isWithinInterval } from "date-fns";
+import { DateRange } from "react-day-picker";
 import { 
   MapPin,
   Search,
@@ -129,6 +135,7 @@ interface WeatherData {
 }
 
 export default function CropMonitoringSystem() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [assessorId, setAssessorId] = useState<string | null>(null);
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -136,10 +143,13 @@ export default function CropMonitoringSystem() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedMonitoring, setSelectedMonitoring] = useState<any | null>(null);
+  const [fullMonitoringDetails, setFullMonitoringDetails] = useState<any | null>(null);
   const [selectedField, setSelectedField] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("basic-info");
-  const [viewMode, setViewMode] = useState<any>("policies");
+  const [viewMode, setViewMode] = useState<any>("monitoring");
   
   // Dialog states
   const [startMonitoringDialogOpen, setStartMonitoringDialogOpen] = useState(false);
@@ -214,22 +224,28 @@ export default function CropMonitoringSystem() {
 
   // Get monitoring count for a policy
   const getMonitoringCount = (policyId: string): number => {
-    return monitoringHistory.filter(m => m.policyId === policyId).length;
+    const field = monitoringHistory.find((m: any) => m.policyId === policyId);
+    return field ? field.cyclesCount || 0 : 0;
   };
 
-  // Check if monitoring can be started (max 2 cycles)
+  // Check if monitoring can be started (dynamic cycles count based on crop type)
   const canStartMonitoring = (policyId: string): boolean => {
-    return getMonitoringCount(policyId) < 2;
+    const policy = policies.find(p => p._id === policyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    return getMonitoringCount(policyId) < requiredCycles;
   };
 
   // Handle start monitoring
   const handleStartMonitoring = async () => {
     if (!selectedPolicyId) return;
     
+    const policy = policies.find(p => p._id === selectedPolicyId);
+    const requiredCycles = getRequiredMonitoringCycles(policy?.cropType);
+    
     if (!canStartMonitoring(selectedPolicyId)) {
       toast({
         title: 'Maximum monitoring cycles reached',
-        description: 'You can only start monitoring 2 times per policy.',
+        description: `You can only start monitoring ${requiredCycles} times per policy.`,
         variant: 'destructive'
       });
       return;
@@ -244,8 +260,16 @@ export default function CropMonitoringSystem() {
       });
       setStartMonitoringDialogOpen(false);
       setSelectedPolicyId(null);
-      await loadMonitoringHistory();
-      setViewMode('monitoring');
+      
+      // Reload history and wait for it to complete
+      const history = await getMonitoringHistory();
+      const historyArray = Array.isArray(history) ? history : [];
+      setMonitoringHistory(historyArray);
+      
+      const updatedField = historyArray.find((m: any) => m.policyId === selectedPolicyId) || result;
+      if (updatedField) {
+        handleViewFieldDetails(updatedField);
+      }
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -306,19 +330,57 @@ export default function CropMonitoringSystem() {
     }
   };
 
-  // Filter monitoring history
-  const filteredMonitoring = monitoringHistory.filter(monitoring => {
-    const policyStr = typeof monitoring.policyId === "object"
-      ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
-      : (monitoring.policyId || "");
+  const calculateNextRecommendedDate = (monitoring: any) => {
+    if (monitoring.lastMonitoringDate) {
+      return addDays(new Date(monitoring.lastMonitoringDate), 30);
+    }
+    if (monitoring.sowingDate) {
+      return addDays(new Date(monitoring.sowingDate), 30);
+    }
+    return null;
+  };
 
-    const matchesSearch = searchQuery === "" || 
-      monitoring._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      policyStr.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || monitoring.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredMonitoring = monitoringHistory
+    .map((monitoring: any) => ({
+      ...monitoring,
+      nextRecommendedDate: calculateNextRecommendedDate(monitoring)
+    }))
+    .filter((monitoring: any) => {
+      const policyStr = typeof monitoring.policyId === "object"
+        ? (monitoring.policyId.policyNumber || monitoring.policyId._id || "")
+        : (monitoring.policyId || "");
+
+      const matchesSearch = searchQuery === "" || 
+        (monitoring.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        policyStr.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === 'IN_PROGRESS' && monitoring.hasActiveCycle) ||
+        (statusFilter === 'COMPLETED' && monitoring.completedCycles > 0) ||
+        (statusFilter === 'PENDING' && !monitoring.hasMonitoring);
+      
+      let matchesDateRange = true;
+      if (dateRange?.from) {
+        if (!monitoring.nextRecommendedDate) {
+          matchesDateRange = false;
+        } else {
+          const checkDate = monitoring.nextRecommendedDate;
+          if (dateRange.to) {
+            matchesDateRange = isWithinInterval(checkDate, { start: dateRange.from, end: dateRange.to });
+          } else {
+            matchesDateRange = format(checkDate, 'yyyy-MM-dd') === format(dateRange.from, 'yyyy-MM-dd');
+          }
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesDateRange;
+    })
+    .sort((a: any, b: any) => {
+      if (!a.nextRecommendedDate) return sortOrder === "asc" ? 1 : -1;
+      if (!b.nextRecommendedDate) return sortOrder === "asc" ? -1 : 1;
+      const diff = a.nextRecommendedDate.getTime() - b.nextRecommendedDate.getTime();
+      return sortOrder === "asc" ? diff : -diff;
+    });
 
   // Legacy mock data (kept for backward compatibility with old components)
   const monitorings: any[] = [
@@ -450,6 +512,10 @@ export default function CropMonitoringSystem() {
     setSearchQuery("");
   };
 
+  const handleViewFieldDetails = (field: any) => {
+    navigate(`/assessor/crop-monitoring/${field.cropMonitoringId || field.farmId}`);
+  };
+
   const handleMonitoringClick = (monitoring: MonitoringSummary) => {
     setSelectedMonitoring(monitoring);
     setViewMode("fieldSelection");
@@ -540,8 +606,8 @@ export default function CropMonitoringSystem() {
           >
             Crop Monitoring
           </button>
-          <span className="text-white/60">/</span>
-          <span className="text-white">{selectedMonitoring.farmerName}</span>
+          <span className="text-gray-500">/</span>
+          <span className="text-gray-900">{selectedMonitoring.farmerName}</span>
         </div>
 
         {/* Table */}
@@ -550,13 +616,13 @@ export default function CropMonitoringSystem() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-800">
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Field ID</th>
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Farmer</th>
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Crop</th>
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Area (ha)</th>
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Season</th>
-                    <th className="text-left py-4 px-6 font-medium text-white/80">Status</th>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Field ID</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Farmer</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Crop</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Area (ha)</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Season</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -564,15 +630,15 @@ export default function CropMonitoringSystem() {
                     <tr
                       key={field.id}
                       onClick={() => handleFieldClick(field)}
-                      className={`border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors cursor-pointer ${
-                        index % 2 === 0 ? "bg-gray-950/30" : ""
+                      className={`border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        index % 2 === 0 ? "bg-gray-50/50" : ""
                       }`}
                     >
-                      <td className="py-4 px-6 text-white">{field.id}</td>
-                      <td className="py-4 px-6 text-white">{field.farmerName}</td>
-                      <td className="py-4 px-6 text-white">{field.crop}</td>
-                      <td className="py-4 px-6 text-white">{field.area} ha</td>
-                      <td className="py-4 px-6 text-white">{field.season}</td>
+                      <td className="py-4 px-6 text-gray-900">{field.id}</td>
+                      <td className="py-4 px-6 text-gray-900">{field.farmerName}</td>
+                      <td className="py-4 px-6 text-gray-900">{field.crop}</td>
+                      <td className="py-4 px-6 text-gray-900">{field.area} ha</td>
+                      <td className="py-4 px-6 text-gray-900">{field.season}</td>
                       <td className="py-4 px-6">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           field.status === "Processed"
@@ -641,7 +707,7 @@ export default function CropMonitoringSystem() {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
-            <p className="text-white/60">Loading weather data...</p>
+            <p className="text-gray-500">Loading weather data...</p>
           </div>
         </div>
       );
@@ -670,13 +736,13 @@ export default function CropMonitoringSystem() {
       <div className="space-y-6">
         <Card className={`${dashboardTheme.card}`}>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-white">
+            <CardTitle className="flex items-center justify-between text-gray-900">
               <div className="flex items-center">
                 <CloudRain className="h-5 w-5 mr-2" />
                 Current Weather
               </div>
               {lastUpdated && (
-                <span className="text-xs text-white/60">Updated: {formatTime(lastUpdated)}</span>
+                <span className="text-xs text-gray-500">Updated: {formatTime(lastUpdated)}</span>
               )}
             </CardTitle>
           </CardHeader>
@@ -685,41 +751,41 @@ export default function CropMonitoringSystem() {
               <div className="flex items-center space-x-3">
                 {getWeatherIcon(weatherData.current.summary)}
                 <div>
-                  <div className="text-4xl font-bold text-white">
+                  <div className="text-4xl font-bold text-gray-900">
                     {weatherData.current.temperature}°C
                   </div>
-                  <div className="text-lg text-white/70 capitalize">
+                  <div className="text-lg text-gray-500 capitalize">
                     {weatherData.current.summary}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
-              <div className="flex items-center text-white/80">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center text-gray-600">
                 <Wind className="h-5 w-5 mr-2 text-teal-500" />
                 <div>
-                  <div className="text-xs text-white/60">Wind</div>
+                  <div className="text-xs text-gray-500">Wind</div>
                   <div className="font-medium">{weatherData.current.windSpeed} km/h</div>
                 </div>
               </div>
-              <div className="flex items-center text-white/80">
+              <div className="flex items-center text-gray-600">
                 <Droplets className="h-5 w-5 mr-2 text-blue-500" />
                 <div>
-                  <div className="text-xs text-white/60">Humidity</div>
+                  <div className="text-xs text-gray-500">Humidity</div>
                   <div className="font-medium">{weatherData.current.humidity}%</div>
                 </div>
               </div>
-              <div className="flex items-center text-white/80">
+              <div className="flex items-center text-gray-600">
                 <CloudRain className="h-5 w-5 mr-2 text-cyan-500" />
                 <div>
-                  <div className="text-xs text-white/60">Precipitation</div>
+                  <div className="text-xs text-gray-500">Precipitation</div>
                   <div className="font-medium">{weatherData.current.precipitation}mm</div>
                 </div>
               </div>
-              <div className="flex items-center text-white/80">
+              <div className="flex items-center text-gray-600">
                 <Thermometer className="h-5 w-5 mr-2 text-orange-500" />
                 <div>
-                  <div className="text-xs text-white/60">Pressure</div>
+                  <div className="text-xs text-gray-500">Pressure</div>
                   <div className="font-medium">{weatherData.current.pressure} hPa</div>
                 </div>
               </div>
@@ -729,7 +795,7 @@ export default function CropMonitoringSystem() {
 
         <Card className={`${dashboardTheme.card}`}>
           <CardHeader>
-            <CardTitle className="flex items-center text-white">
+            <CardTitle className="flex items-center text-gray-900">
               <Clock className="h-5 w-5 mr-2" />
               8-Hour Forecast
             </CardTitle>
@@ -739,12 +805,12 @@ export default function CropMonitoringSystem() {
               <div className="flex gap-4">
                 {weatherData.hourly.map((hour, idx) => (
                   <div key={idx} className="min-w-[100px] text-center">
-                    <div className="text-white/60 text-sm mb-2">{formatTime(hour.time)}</div>
+                    <div className="text-gray-500 text-sm mb-2">{formatTime(hour.time)}</div>
                     <div className="flex justify-center mb-2">
                       {getWeatherIcon(hour.summary)}
                     </div>
-                    <div className="text-white font-bold mb-1">{hour.temperature}°</div>
-                    <div className="text-white/60 text-xs capitalize">{hour.summary}</div>
+                    <div className="text-gray-900 font-bold mb-1">{hour.temperature}°</div>
+                    <div className="text-gray-500 text-xs capitalize">{hour.summary}</div>
                   </div>
                 ))}
               </div>
@@ -754,7 +820,7 @@ export default function CropMonitoringSystem() {
 
         <Card className={`${dashboardTheme.card}`}>
           <CardHeader>
-            <CardTitle className="flex items-center text-white">
+            <CardTitle className="flex items-center text-gray-900">
               <Calendar className="h-5 w-5 mr-2" />
               7-Day Forecast
             </CardTitle>
@@ -762,23 +828,23 @@ export default function CropMonitoringSystem() {
           <CardContent>
             <div className="space-y-3">
               {weatherData.daily.map((day, idx) => (
-                <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-800 last:border-0">
+                <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
                   <div className="flex items-center space-x-3 flex-1">
-                    <div className="text-white/70 w-20">{formatDate(day.date)}</div>
+                    <div className="text-gray-500 w-20">{formatDate(day.date)}</div>
                     <div className="flex justify-center w-12">
                       {getWeatherIcon(day.summary)}
                     </div>
                     <div className="flex-1">
-                      <div className="text-white capitalize">{day.summary}</div>
-                      <div className="text-white/60 text-xs">
+                      <div className="text-gray-900 capitalize">{day.summary}</div>
+                      <div className="text-gray-500 text-xs">
                         <Wind className="h-3 w-3 inline mr-1" />
                         {day.windSpeed}km/h {day.windDir} • {day.precipitation}mm
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-white font-bold">{day.temperature.max}°</div>
-                    <div className="text-white/60 text-sm">{day.temperature.min}°</div>
+                    <div className="text-gray-900 font-bold">{day.temperature.max}°</div>
+                    <div className="text-gray-500 text-sm">{day.temperature.min}°</div>
                   </div>
                 </div>
               ))}
@@ -860,7 +926,7 @@ export default function CropMonitoringSystem() {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-white/60">Loading crop analysis data...</p>
+            <p className="text-gray-500">Loading crop analysis data...</p>
           </div>
         </div>
       );
@@ -886,7 +952,7 @@ export default function CropMonitoringSystem() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white/70 mb-2">Overall Health</p>
+                  <p className="text-sm font-medium text-gray-500 mb-2">Overall Health</p>
                   <p className={`text-3xl font-bold ${getHealthColor(cropData.overallHealth)}`}>
                     {cropData.overallHealth}%
                   </p>
@@ -902,11 +968,11 @@ export default function CropMonitoringSystem() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white/70 mb-2">Growth Progress</p>
-                  <p className="text-3xl font-bold text-white">
+                  <p className="text-sm font-medium text-gray-500 mb-2">Growth Progress</p>
+                  <p className="text-3xl font-bold text-gray-900">
                     {cropData.growthProgress}%
                   </p>
-                  <p className="text-xs text-white/60 mt-1">Stage: {cropData.currentStage}</p>
+                  <p className="text-xs text-gray-500 mt-1">Stage: {cropData.currentStage}</p>
                 </div>
                 <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center">
                   <AlertTriangle className="h-8 w-8 text-blue-500" />
@@ -919,11 +985,11 @@ export default function CropMonitoringSystem() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white/70 mb-2">NDVI Index</p>
-                  <p className="text-3xl font-bold text-white">
+                  <p className="text-sm font-medium text-gray-500 mb-2">NDVI Index</p>
+                  <p className="text-3xl font-bold text-gray-900">
                     {cropData.ndvi.toFixed(2)}
                   </p>
-                  <p className="text-xs text-white/60 mt-1">Healthy vegetation</p>
+                  <p className="text-xs text-gray-500 mt-1">Healthy vegetation</p>
                 </div>
                 <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center">
                   <Leaf className="h-8 w-8 text-teal-500" />
@@ -935,67 +1001,67 @@ export default function CropMonitoringSystem() {
 
         <Card className={`${dashboardTheme.card}`}>
           <CardHeader>
-            <CardTitle className="flex items-center text-white">
+            <CardTitle className="flex items-center text-gray-900">
               <AlertTriangle className="h-5 w-5 mr-2" />
               Threats Assessment
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className={`p-4 rounded-lg border ${cropData.threats.weedInfestation.detected ? 'border-yellow-500/30 bg-yellow-500/10' : 'border-gray-800 bg-gray-800/30'}`}>
+              <div className={`p-4 rounded-lg border ${cropData.threats.weedInfestation.detected ? 'border-yellow-500/30 bg-yellow-500/10' : 'border-gray-200 bg-gray-100/30'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">Weed Infestation</span>
+                  <span className="text-gray-900 font-medium">Weed Infestation</span>
                   <span className={`text-sm ${getThreatColor(cropData.threats.weedInfestation.detected, cropData.threats.weedInfestation.density)}`}>
                     {cropData.threats.weedInfestation.detected ? 'Detected' : 'None'}
                   </span>
                 </div>
                 {cropData.threats.weedInfestation.detected && (
-                  <div className="text-sm text-white/70">
+                  <div className="text-sm text-gray-500">
                     <p>Species: {cropData.threats.weedInfestation.species.join(', ')}</p>
                     <p>Density: {cropData.threats.weedInfestation.density} plants/m²</p>
                   </div>
                 )}
               </div>
 
-              <div className={`p-4 rounded-lg border ${cropData.threats.pestActivity.detected ? 'border-orange-500/30 bg-orange-500/10' : 'border-gray-800 bg-gray-800/30'}`}>
+              <div className={`p-4 rounded-lg border ${cropData.threats.pestActivity.detected ? 'border-orange-500/30 bg-orange-500/10' : 'border-gray-200 bg-gray-100/30'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">Pest Activity</span>
+                  <span className="text-gray-900 font-medium">Pest Activity</span>
                   <span className={`text-sm ${getThreatColor(cropData.threats.pestActivity.detected, cropData.threats.pestActivity.damage)}`}>
                     {cropData.threats.pestActivity.detected ? 'Detected' : 'None'}
                   </span>
                 </div>
                 {cropData.threats.pestActivity.detected && (
-                  <div className="text-sm text-white/70">
+                  <div className="text-sm text-gray-500">
                     <p>Type: {cropData.threats.pestActivity.pestType.join(', ')}</p>
                     <p>Population: {cropData.threats.pestActivity.population}</p>
                   </div>
                 )}
               </div>
 
-              <div className={`p-4 rounded-lg border ${cropData.threats.nutrientDeficiency.detected ? 'border-red-500/30 bg-red-500/10' : 'border-gray-800 bg-gray-800/30'}`}>
+              <div className={`p-4 rounded-lg border ${cropData.threats.nutrientDeficiency.detected ? 'border-red-500/30 bg-red-500/10' : 'border-gray-200 bg-gray-100/30'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">Nutrient Deficiency</span>
+                  <span className="text-gray-900 font-medium">Nutrient Deficiency</span>
                   <span className={`text-sm ${getThreatColor(cropData.threats.nutrientDeficiency.detected, cropData.threats.nutrientDeficiency.severity)}`}>
                     {cropData.threats.nutrientDeficiency.detected ? 'Detected' : 'None'}
                   </span>
                 </div>
                 {cropData.threats.nutrientDeficiency.detected && (
-                  <div className="text-sm text-white/70">
+                  <div className="text-sm text-gray-500">
                     <p>Nutrients: {cropData.threats.nutrientDeficiency.deficientNutrients.join(', ')}</p>
                     <p>Severity: {cropData.threats.nutrientDeficiency.severity}%</p>
                   </div>
                 )}
               </div>
 
-              <div className={`p-4 rounded-lg border ${cropData.threats.diseaseOutbreak.detected ? 'border-purple-500/30 bg-purple-500/10' : 'border-gray-800 bg-gray-800/30'}`}>
+              <div className={`p-4 rounded-lg border ${cropData.threats.diseaseOutbreak.detected ? 'border-purple-500/30 bg-purple-500/10' : 'border-gray-200 bg-gray-100/30'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">Disease Outbreak</span>
+                  <span className="text-gray-900 font-medium">Disease Outbreak</span>
                   <span className={`text-sm ${getThreatColor(cropData.threats.diseaseOutbreak.detected, cropData.threats.diseaseOutbreak.severity)}`}>
                     {cropData.threats.diseaseOutbreak.detected ? 'Detected' : 'None'}
                   </span>
                 </div>
                 {cropData.threats.diseaseOutbreak.detected && (
-                  <div className="text-sm text-white/70">
+                  <div className="text-sm text-gray-500">
                     <p>Type: {cropData.threats.diseaseOutbreak.diseaseType.join(', ')}</p>
                     <p>Severity: {cropData.threats.diseaseOutbreak.severity}%</p>
                   </div>
@@ -1007,12 +1073,12 @@ export default function CropMonitoringSystem() {
 
         <Card className={`${dashboardTheme.card}`}>
           <CardHeader>
-            <CardTitle className="text-white">Recommendations</CardTitle>
+            <CardTitle className="text-gray-900">Recommendations</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {cropData.recommendations.map((rec: string, idx: number) => (
-                <li key={idx} className="flex items-start text-white/80">
+                <li key={idx} className="flex items-start text-gray-600">
                   <span className="mr-2 text-teal-500">•</span>
                   {rec}
                 </li>
@@ -1041,8 +1107,8 @@ export default function CropMonitoringSystem() {
     const field = selectedField || activePolicy?.farmId;
     if (!field) {
       return (
-        <div className="p-6 text-center text-white/60">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-white/40" />
+        <div className="p-6 text-center text-gray-500">
+          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
           <p>No field data available for this monitoring cycle.</p>
           <Button onClick={handleBackToList} className="mt-4 bg-teal-600 hover:bg-teal-700 text-white">
             Back to History
@@ -1068,7 +1134,7 @@ export default function CropMonitoringSystem() {
           >
             Crop Monitoring
           </button>
-          <span className="text-white/60">/</span>
+          <span className="text-gray-500">/</span>
           <button 
             onClick={handleBackToFields}
             className="text-teal-400 hover:text-teal-300"
@@ -1078,40 +1144,40 @@ export default function CropMonitoringSystem() {
         </div>
         
         <div>
-          <h1 className="text-sm font-normal text-white">
+          <h1 className="text-sm font-normal text-gray-900">
             Field Detail View: {fieldDetails.fieldId}
           </h1>
-          <p className="text-white/70 mt-2">
+          <p className="text-gray-500 mt-2">
             {fieldDetails.farmer} - {fieldDetails.cropType}
           </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className={`${dashboardTheme.card} border border-gray-800`}>
+          <TabsList className={`${dashboardTheme.card} border border-gray-200`}>
             <TabsTrigger 
               value="basic-info" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 text-gray-500"
             >
               <FileSpreadsheet className="h-4 w-4 mr-2" />
               Basic Info
             </TabsTrigger>
             <TabsTrigger 
               value="weather" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 text-gray-500"
             >
               <CloudRain className="h-4 w-4 mr-2" />
               Weather Analysis
             </TabsTrigger>
             <TabsTrigger 
               value="crop" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 text-gray-500"
             >
               <Leaf className="h-4 w-4 mr-2" />
               Crop Analysis
             </TabsTrigger>
             <TabsTrigger 
               value="overview" 
-              className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 text-gray-500"
             >
               <FileText className="h-4 w-4 mr-2" />
               Overview
@@ -1122,48 +1188,48 @@ export default function CropMonitoringSystem() {
             <div className="grid gap-6 md:grid-cols-2">
               <Card className={`${dashboardTheme.card}`}>
                 <CardHeader>
-                  <CardTitle className="text-white">Field Information</CardTitle>
+                  <CardTitle className="text-gray-900">Field Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Field ID</span>
-                    <span className="text-white font-medium">{fieldDetails.fieldId}</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Field ID</span>
+                    <span className="text-gray-900 font-medium">{fieldDetails.fieldId}</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Field Name</span>
-                    <span className="text-white font-medium">{fieldDetails.fieldName}</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Field Name</span>
+                    <span className="text-gray-900 font-medium">{fieldDetails.fieldName}</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Farmer</span>
-                    <span className="text-white font-medium">{fieldDetails.farmer}</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Farmer</span>
+                    <span className="text-gray-900 font-medium">{fieldDetails.farmer}</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Crop Type</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Crop Type</span>
                     <div className="flex items-center gap-2">
                       <Leaf className="h-4 w-4 text-green-500" />
-                      <span className="text-white font-medium">{fieldDetails.cropType}</span>
+                      <span className="text-gray-900 font-medium">{fieldDetails.cropType}</span>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Area</span>
-                    <span className="text-white font-medium">{fieldDetails.area} hectares</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Area</span>
+                    <span className="text-gray-900 font-medium">{fieldDetails.area} hectares</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Season</span>
-                    <span className="text-white font-medium">Season {fieldDetails.season}</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Season</span>
+                    <span className="text-gray-900 font-medium">Season {fieldDetails.season}</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <span className="text-white/70">Sowing Date</span>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                    <span className="text-gray-500">Sowing Date</span>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-teal-500" />
-                      <span className="text-white font-medium">{fieldDetails.sowingDate}</span>
+                      <span className="text-gray-900 font-medium">{fieldDetails.sowingDate}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-center pb-3">
-                    <span className="text-white/70">Location</span>
+                    <span className="text-gray-500">Location</span>
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-teal-500" />
-                      <span className="text-white font-medium">{fieldDetails.location}</span>
+                      <span className="text-gray-900 font-medium">{fieldDetails.location}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1171,9 +1237,9 @@ export default function CropMonitoringSystem() {
 
               <Card className={`${dashboardTheme.card}`}>
                 <CardHeader>
-                  <CardTitle className="text-white">Field Map</CardTitle>
+                  <CardTitle className="text-gray-900">Field Map</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[500px] p-0 overflow-hidden rounded-lg border border-gray-800">
+                <CardContent className="h-[500px] p-0 overflow-hidden rounded-lg border border-gray-200">
                   <FieldMapWithLayers
                     fieldId={field?._id || field?.id}
                     showLayerControls={true}
@@ -1202,7 +1268,7 @@ export default function CropMonitoringSystem() {
               cropType={fieldDetails.cropType}
               area={fieldDetails.area}
               location={fieldDetails.location}
-              cycles={monitoringHistory}
+              cycles={fullMonitoringDetails?.monitoringCycles || []}
               activeCycle={activeMonitoring}
             />
           </TabsContent>
@@ -1214,7 +1280,7 @@ export default function CropMonitoringSystem() {
   const renderPoliciesView = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Active Policies</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Active Policies</h2>
         <Button 
           onClick={() => setViewMode('monitoring')}
           className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -1228,15 +1294,15 @@ export default function CropMonitoringSystem() {
           <CardContent className="p-12">
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mr-3"></div>
-              <span className="text-white/60">Loading policies...</span>
+              <span className="text-gray-500">Loading policies...</span>
             </div>
           </CardContent>
         </Card>
       ) : policies.length === 0 ? (
         <Card className={`${dashboardTheme.card}`}>
           <CardContent className="p-12">
-            <div className="text-center text-white/60">
-              <Activity className="h-12 w-12 mx-auto mb-4 text-white/40" />
+            <div className="text-center text-gray-500">
+              <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No active policies assigned to you.</p>
             </div>
           </CardContent>
@@ -1251,26 +1317,26 @@ export default function CropMonitoringSystem() {
             return (
               <Card key={policy._id} className={`${dashboardTheme.card}`}>
                 <CardHeader>
-                  <CardTitle className="text-white text-lg">
+                  <CardTitle className="text-gray-900 text-lg">
                     Policy {policy.policyNumber || policy._id.slice(-8)}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-white/70">Farmer:</span>
-                      <span className="text-white">{farmerName}</span>
+                      <span className="text-gray-500">Farmer:</span>
+                      <span className="text-gray-900">{farmerName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white/70">Crop Type:</span>
-                      <span className="text-white">{policy.cropType || 'N/A'}</span>
+                      <span className="text-gray-500">Crop Type:</span>
+                      <span className="text-gray-900">{policy.cropType || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white/70">Monitoring Cycles:</span>
-                      <span className="text-white">{monitoringCount}/2</span>
+                      <span className="text-gray-500">Monitoring Cycles:</span>
+                      <span className="text-gray-900">{monitoringCount}/{getRequiredMonitoringCycles(policy.cropType)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white/70">Status:</span>
+                      <span className="text-gray-500">Status:</span>
                       <span className={`px-2 py-1 rounded text-xs ${
                         policy.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
                       }`}>
@@ -1288,7 +1354,7 @@ export default function CropMonitoringSystem() {
                     className={`w-full ${
                       canStart 
                         ? 'bg-teal-600 hover:bg-teal-700 text-white' 
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
                     {canStart ? (
@@ -1306,7 +1372,7 @@ export default function CropMonitoringSystem() {
                   
                   {!canStart && (
                     <p className="text-xs text-yellow-400 text-center mt-2">
-                      Maximum 2 monitoring cycles completed
+                      Maximum {getRequiredMonitoringCycles(policy.cropType)} monitoring cycles completed
                     </p>
                   )}
                 </CardContent>
@@ -1318,17 +1384,17 @@ export default function CropMonitoringSystem() {
 
       {/* Start Monitoring Dialog */}
       <Dialog open={startMonitoringDialogOpen} onOpenChange={setStartMonitoringDialogOpen}>
-            <DialogContent className={`${dashboardTheme.card} border-gray-800`}>
+            <DialogContent className={`${dashboardTheme.card} border-gray-200`}>
               <DialogHeader>
-            <DialogTitle className="text-white">Start Crop Monitoring</DialogTitle>
+            <DialogTitle className="text-gray-900">Start Crop Monitoring</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
-            <p className="text-white/70">
+            <p className="text-gray-500">
               Are you sure you want to start a new monitoring cycle for this policy?
             </p>
             {selectedPolicyId && (
-              <div className="text-sm text-white/60">
-                Current cycles: {getMonitoringCount(selectedPolicyId)}/2
+              <div className="text-sm text-gray-500">
+                Current cycles: {getMonitoringCount(selectedPolicyId)}/{getRequiredMonitoringCycles(policies.find(p => p._id === selectedPolicyId)?.cropType)}
                 </div>
             )}
           </div>
@@ -1339,7 +1405,7 @@ export default function CropMonitoringSystem() {
                 setStartMonitoringDialogOpen(false);
                 setSelectedPolicyId(null);
               }}
-                    className="border-gray-700 text-white hover:bg-gray-800"
+                    className="border-gray-300 text-gray-900 hover:bg-gray-100"
                   >
               Cancel
                   </Button>
@@ -1359,8 +1425,50 @@ export default function CropMonitoringSystem() {
   const renderMonitoringHistory = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Monitoring History</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Monitoring History</h2>
         <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={`justify-start text-left font-normal ${!dateRange && "text-muted-foreground"} ${dashboardTheme.input} border-gray-300 w-[240px]`}
+              >
+                <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <span className="text-gray-700">
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </span>
+                  ) : (
+                    <span className="text-gray-700">{format(dateRange.from, "LLL dd, y")}</span>
+                  )
+                ) : (
+                  <span className="text-gray-500">Filter by Next Cycle...</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Button
+            variant="outline"
+            className={`${dashboardTheme.input} border-gray-300 w-[180px] text-gray-700`}
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+            title="Sort by Next Recommended Date"
+          >
+            Next Cycle: {sortOrder === "asc" ? "Earliest" : "Latest"}
+          </Button>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
@@ -1376,124 +1484,98 @@ export default function CropMonitoringSystem() {
             </SelectTrigger>
             <SelectContent className={dashboardTheme.card}>
               <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="PENDING">Pending Monitoring</SelectItem>
               <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
               <SelectItem value="COMPLETED">Completed</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
-            onClick={() => setViewMode('policies')}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            View Policies
-          </Button>
-        </div>
+          </div>
       </div>
 
       <Card className={`${dashboardTheme.card}`}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-800">
-                  <th className="text-left py-4 px-6 font-medium text-white/80">Monitoring #</th>
-                  <th className="text-left py-4 px-6 font-medium text-white/80">Policy ID</th>
-                  <th className="text-left py-4 px-6 font-medium text-white/80">Date</th>
-                  <th className="text-left py-4 px-6 font-medium text-white/80">Status</th>
-                  <th className="text-left py-4 px-6 font-medium text-white/80">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMonitoring.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-white/60">
-                      No monitoring records found.
-                    </td>
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Farm Name</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Crop Type</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Cycles Count</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Next Cycle</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+                    <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
                   </tr>
-                ) : (
-                  filteredMonitoring.map((monitoring, index) => (
-                    <tr
-                      key={monitoring._id}
-                      className={`border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors ${
-                        index % 2 === 0 ? "bg-gray-950/30" : ""
-                      }`}
-                    >
-                      <td className="py-4 px-6 text-white">{monitoring.monitoringNumber}</td>
-                      <td className="py-4 px-6 text-white">
-                        {typeof monitoring.policyId === "object"
-                          ? (monitoring.policyId.policyNumber || (monitoring.policyId._id ? `POL-${monitoring.policyId._id.slice(-6).toUpperCase()}` : "N/A"))
-                          : (monitoring.policyId?.startsWith("POL-") ? monitoring.policyId : `POL-${monitoring.policyId?.slice(-6).toUpperCase()}`)}
-                      </td>
-                      <td className="py-4 px-6 text-white/80">
-                        {new Date(monitoring.monitoringDate).toLocaleDateString()}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          monitoring.status === 'COMPLETED'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                            : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                        }`}>
-                          {monitoring.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2">
-                          {monitoring.status === 'IN_PROGRESS' && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedMonitoring(monitoring);
-                                  setUpdateData({
-                                    observations: monitoring.observations || [],
-                                    photoUrls: monitoring.photoUrls || [],
-                                    notes: monitoring.notes || ''
-                                  });
-                                  setUpdateDialogOpen(true);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
-                              >
-                                Update
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleGenerateReport(monitoring._id)}
-                                disabled={generateReportLoading}
-                                className="bg-teal-600 hover:bg-teal-700 text-white text-xs"
-                              >
-                                {generateReportLoading ? 'Generating...' : 'Generate Report'}
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMonitoring(monitoring);
-                              setViewMode('detail');
-                            }}
-                            className="bg-gray-600 hover:bg-gray-700 text-white text-xs"
-                          >
-                            View
-                          </Button>
-                        </div>
+                </thead>
+                  <tbody>
+                    {loading ? (
+                      Array.from({ length: 3 }).map((_, idx) => (
+                        <tr key={`skeleton-${idx}`} className="border-b border-gray-200">
+                          <td className="py-4 px-6"><div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div></td>
+                          <td className="py-4 px-6"><div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div></td>
+                          <td className="py-4 px-6"><div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div></td>
+                          <td className="py-4 px-6"><div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div></td>
+                          <td className="py-4 px-6"><div className="h-6 w-24 bg-gray-200 animate-pulse rounded-full"></div></td>
+                          <td className="py-4 px-6"><div className="h-8 w-24 bg-gray-200 animate-pulse rounded"></div></td>
+                        </tr>
+                      ))
+                    ) : filteredMonitoring.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-gray-500">
+                        No monitored fields found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredMonitoring.map((field: any, index: number) => (
+                      <tr
+                        key={field.farmId || index}
+                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? "bg-gray-50/50" : ""
+                        }`}
+                      >
+                        <td className="py-4 px-6 text-gray-900">{field.name}</td>
+                        <td className="py-4 px-6 text-gray-900">{field.cropType}</td>
+                        <td className="py-4 px-6 text-gray-600">{field.cyclesCount} cycles</td>
+                        <td className="py-4 px-6 text-gray-600">
+                          {field.nextRecommendedDate ? format(field.nextRecommendedDate, 'MMM dd, yyyy') : 'N/A'}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block border ${
+                            field.hasMonitoring
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {field.hasMonitoring ? 'Active Monitoring' : 'Pending Monitoring'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleViewFieldDetails(field)}
+                                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs"
+                              >
+                                View Details
+                              </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
           </div>
         </CardContent>
       </Card>
 
       {/* Update Monitoring Dialog */}
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className={`${dashboardTheme.card} border-gray-800 max-w-2xl`}>
+        <DialogContent className={`${dashboardTheme.card} border-gray-200 max-w-2xl`}>
           <DialogHeader>
-            <DialogTitle className="text-white">Update Monitoring Data</DialogTitle>
+            <DialogTitle className="text-gray-900">Update Monitoring Data</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
-              <Label htmlFor="observations" className="text-white/80">Observations</Label>
+              <Label htmlFor="observations" className="text-gray-600">Observations</Label>
               <Textarea
                 id="observations"
                 value={updateData.observations.join('\n')}
@@ -1507,7 +1589,7 @@ export default function CropMonitoringSystem() {
               />
             </div>
             <div>
-              <Label htmlFor="photoUrls" className="text-white/80">Photo URLs</Label>
+              <Label htmlFor="photoUrls" className="text-gray-600">Photo URLs</Label>
               <Textarea
                 id="photoUrls"
                 value={updateData.photoUrls.join('\n')}
@@ -1521,7 +1603,7 @@ export default function CropMonitoringSystem() {
               />
             </div>
             <div>
-              <Label htmlFor="notes" className="text-white/80">Notes</Label>
+              <Label htmlFor="notes" className="text-gray-600">Notes</Label>
               <Textarea
                 id="notes"
                 value={updateData.notes}
@@ -1536,7 +1618,7 @@ export default function CropMonitoringSystem() {
             <Button
               variant="outline"
               onClick={() => setUpdateDialogOpen(false)}
-              className="border-gray-700 text-white hover:bg-gray-800"
+              className="border-gray-300 text-gray-900 hover:bg-gray-100"
             >
               Cancel
             </Button>
@@ -1563,11 +1645,11 @@ export default function CropMonitoringSystem() {
           <Button
             onClick={() => setViewMode('monitoring')}
             variant="outline"
-            className="border-gray-700 text-white hover:bg-gray-800"
+            className="border-gray-300 text-gray-900 hover:bg-gray-100"
           >
             ← Back
           </Button>
-          <h2 className="text-2xl font-bold text-white">
+          <h2 className="text-2xl font-bold text-gray-900">
             Monitoring Details #{selectedMonitoring.monitoringNumber}
           </h2>
         </div>
@@ -1575,39 +1657,39 @@ export default function CropMonitoringSystem() {
         <div className="grid gap-6 md:grid-cols-2">
           <Card className={`${dashboardTheme.card}`}>
             <CardHeader>
-              <CardTitle className="text-white">Basic Information</CardTitle>
+              <CardTitle className="text-gray-900">Basic Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between">
-                <span className="text-white/70">Monitoring ID:</span>
-                <span className="text-white">
+                <span className="text-gray-500">Monitoring ID:</span>
+                <span className="text-gray-900">
                   {selectedMonitoring._id ? `MON-${selectedMonitoring._id.slice(-6).toUpperCase()}` : "N/A"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Policy ID:</span>
-                <span className="text-white">
+                <span className="text-gray-500">Policy ID:</span>
+                <span className="text-gray-900">
                   {typeof selectedMonitoring.policyId === "object"
                     ? (selectedMonitoring.policyId.policyNumber || (selectedMonitoring.policyId._id ? `POL-${selectedMonitoring.policyId._id.slice(-6).toUpperCase()}` : "N/A"))
                     : (selectedMonitoring.policyId?.startsWith("POL-") ? selectedMonitoring.policyId : `POL-${selectedMonitoring.policyId?.slice(-6).toUpperCase()}`)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Farm ID:</span>
-                <span className="text-white">
+                <span className="text-gray-500">Farm ID:</span>
+                <span className="text-gray-900">
                   {typeof selectedMonitoring.farmId === "object"
                     ? (selectedMonitoring.farmId.name || (selectedMonitoring.farmId._id ? `FLD-${selectedMonitoring.farmId._id.slice(-6).toUpperCase()}` : "N/A"))
                     : (selectedMonitoring.farmId?.startsWith("FLD-") ? selectedMonitoring.farmId : `FLD-${selectedMonitoring.farmId?.slice(-6).toUpperCase()}`)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Date:</span>
-                <span className="text-white">
+                <span className="text-gray-500">Date:</span>
+                <span className="text-gray-900">
                   {new Date(selectedMonitoring.monitoringDate).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Status:</span>
+                <span className="text-gray-500">Status:</span>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                   selectedMonitoring.status === 'COMPLETED'
                     ? 'bg-green-500/20 text-green-400 border border-green-500/30'
@@ -1621,13 +1703,13 @@ export default function CropMonitoringSystem() {
 
           <Card className={`${dashboardTheme.card}`}>
             <CardHeader>
-              <CardTitle className="text-white">Monitoring Data</CardTitle>
+              <CardTitle className="text-gray-900">Monitoring Data</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedMonitoring.observations && selectedMonitoring.observations.length > 0 && (
                 <div>
-                  <p className="text-white/70 mb-2">Observations:</p>
-                  <ul className="list-disc list-inside text-white space-y-1">
+                  <p className="text-gray-500 mb-2">Observations:</p>
+                  <ul className="list-disc list-inside text-gray-900 space-y-1">
                     {selectedMonitoring.observations.map((obs, idx) => (
                       <li key={idx} className="text-sm">{obs}</li>
                     ))}
@@ -1636,13 +1718,13 @@ export default function CropMonitoringSystem() {
               )}
               {selectedMonitoring.notes && (
                 <div>
-                  <p className="text-white/70 mb-2">Notes:</p>
-                  <p className="text-white text-sm">{selectedMonitoring.notes}</p>
+                  <p className="text-gray-500 mb-2">Notes:</p>
+                  <p className="text-gray-900 text-sm">{selectedMonitoring.notes}</p>
                 </div>
               )}
               {selectedMonitoring.photoUrls && selectedMonitoring.photoUrls.length > 0 && (
                 <div>
-                  <p className="text-white/70 mb-2">Photos:</p>
+                  <p className="text-gray-500 mb-2">Photos:</p>
                   <div className="grid grid-cols-2 gap-2">
                     {selectedMonitoring.photoUrls.map((url, idx) => (
                       <img key={idx} src={url} alt={`Photo ${idx + 1}`} className="rounded" />

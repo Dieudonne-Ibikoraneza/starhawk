@@ -213,9 +213,9 @@ export default function InsurerDashboard() {
 
     setLoadingSummary(true);
     try {
-      const [claimsResp, policiesResp] = await Promise.allSettled([
+      const [policiesResp, claimsResp] = await Promise.allSettled([
+        getPolicies(1, 1000),
         getClaims(),
-        getPolicies(),
       ]);
 
       if (claimsResp.status === "fulfilled") {
@@ -573,10 +573,10 @@ export default function InsurerDashboard() {
         return s === "SUBMITTED" || s === "PENDING";
       });
 
-      // Filter historical (approved/rejected) assessments
+      // Filter historical (approved/rejected/policy issued) assessments
       const historical = assessmentsArray.filter((assessment: any) => {
         const s = (assessment.status || "").toUpperCase();
-        return s === "APPROVED" || s === "REJECTED";
+        return s === "APPROVED" || s === "REJECTED" || s === "POLICY_ISSUED";
       });
 
       setSubmittedAssessments(pending);
@@ -872,7 +872,6 @@ export default function InsurerDashboard() {
           assessmentId={selectedRiskAssessmentId}
           onBack={() => setSelectedRiskAssessmentId(null)}
           onActionComplete={() => {
-            setSelectedRiskAssessmentId(null);
             loadSubmittedAssessments();
           }}
         />
@@ -933,6 +932,7 @@ export default function InsurerDashboard() {
               <th className="py-3 px-6 text-left">Crop · Hectares</th>
               <th className="py-3 px-6 text-center">NDVI</th>
               <th className="py-3 px-6 text-left">Risk Score</th>
+              <th className="py-3 px-6 text-center">Registered At</th>
               <th className="py-3 px-6 text-center">Status</th>
             </tr>
           </thead>
@@ -958,6 +958,15 @@ export default function InsurerDashboard() {
               const district =
                 farm.locationName?.split(",")[0] || farm.district || "N/A";
               const id = assessment._id || assessment.id || "0000";
+
+              // Find associated policy
+              const policy = recentPolicies.find((p: any) => p.assessmentId === id || (p.assessmentId && (p.assessmentId._id === id || p.assessmentId.id === id)));
+              let displayStatus = statusLower;
+              if (statusLower === 'policy_issued' && policy) {
+                displayStatus = policy.status.toLowerCase();
+              }
+              if (displayStatus === 'pending_acceptance') displayStatus = 'pending acceptance';
+              if (displayStatus === 'needs_correction') displayStatus = 'needs correction';
 
               return (
                 <tr
@@ -1041,27 +1050,34 @@ export default function InsurerDashboard() {
                     </div>
                   </td>
 
+                  {/* Registered At */}
+                  <td className="py-5 px-6 text-center">
+                    <p className="text-sm font-bold text-gray-700">
+                      {farm.createdAt ? new Date(farm.createdAt).toLocaleDateString() : "N/A"}
+                    </p>
+                  </td>
+
                   {/* Status */}
                   <td className="py-5 px-6 text-center">
                     <Badge
                       className={`shadow-none border-0 rounded-full px-4 py-1 gap-2 font-bold capitalize ${
-                        statusLower === "approved"
+                        displayStatus === "approved" || displayStatus === "active"
                           ? "bg-emerald-100/50 text-emerald-700"
-                          : statusLower === "rejected"
+                          : displayStatus === "rejected" || displayStatus === "declined"
                             ? "bg-rose-100/50 text-rose-700"
                             : "bg-amber-100/50 text-amber-700"
                       }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          statusLower === "approved"
+                          displayStatus === "approved" || displayStatus === "active"
                             ? "bg-emerald-500"
-                            : statusLower === "rejected"
+                            : displayStatus === "rejected" || displayStatus === "declined"
                               ? "bg-rose-500"
                               : "bg-amber-500"
                         }`}
                       />
-                      {statusLower}
+                      {displayStatus}
                     </Badge>
                   </td>
                 </tr>
@@ -1165,7 +1181,6 @@ export default function InsurerDashboard() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={renderDashboard()} />
         <Route path="farmers" element={<InsuredFarmersDirectory />} />
-        <Route path="requests" element={renderInsuranceRequests()} />
         <Route path="assessments" element={renderSubmittedAssessments()} />
         <Route
           path="assessments/:assessmentId"
@@ -1173,7 +1188,6 @@ export default function InsurerDashboard() {
             <InsurerRiskAssessmentDetail
               onBack={() => navigate("/insurer/assessments")}
               onActionComplete={() => {
-                navigate("/insurer/assessments");
                 loadSubmittedAssessments();
               }}
             />
@@ -1249,7 +1263,6 @@ export default function InsurerDashboard() {
   const navigationItems = [
     { id: "dashboard", label: "Overview", icon: BarChart3 },
     { id: "farmers", label: "Farmers", icon: Users },
-    { id: "requests", label: "Requests", icon: FileBadge },
     { id: "assessments", label: "Assessments", icon: ClipboardCheck },
     { id: "policies", label: "Policies", icon: Shield },
     { id: "monitoring", label: "Monitoring", icon: Leaf },

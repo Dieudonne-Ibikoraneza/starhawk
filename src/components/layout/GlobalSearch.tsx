@@ -53,6 +53,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   }, [open]);
 
   const loadData = async () => {
+    if (isGovernment) return; // Government only needs navigation links
     setLoading(true);
     try {
       const [p, c, a, m, i] = await Promise.allSettled([
@@ -137,7 +138,8 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   const isAssessor = role.toLowerCase() === 'assessor';
   const isFarmer = role.toLowerCase() === 'farmer';
   const isAdmin = role.toLowerCase() === 'admin';
-  const isInsurer = !isAssessor && !isFarmer && !isAdmin;
+  const isGovernment = role.toLowerCase() === 'government';
+  const isInsurer = !isAssessor && !isFarmer && !isAdmin && !isGovernment;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[750px] md:max-w-[850px]">
@@ -189,6 +191,15 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                   <CommandItem onSelect={() => go("/admin/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-slate-600" />Claims Management</CommandItem>
                   <CommandItem onSelect={() => go("/admin/assessments")} className="py-3 px-4 rounded-xl cursor-pointer"><ClipboardCheck className="mr-3 h-4 w-4 text-amber-600" />Assessments Management</CommandItem>
                 </>
+              ) : isGovernment ? (
+                <>
+                  <CommandItem onSelect={() => go("/government/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-emerald-600" />National Overview</CommandItem>
+                  <CommandItem onSelect={() => go("/government/leaderboard")} className="py-3 px-4 rounded-xl cursor-pointer"><Activity className="mr-3 h-4 w-4 text-amber-600" />Regional Leaderboard</CommandItem>
+                  <CommandItem onSelect={() => go("/government/policies")} className="py-3 px-4 rounded-xl cursor-pointer"><Shield className="mr-3 h-4 w-4 text-blue-600" />Policy Registry</CommandItem>
+                  <CommandItem onSelect={() => go("/government/claims")} className="py-3 px-4 rounded-xl cursor-pointer"><AlertTriangle className="mr-3 h-4 w-4 text-rose-600" />Claims & Losses</CommandItem>
+                  <CommandItem onSelect={() => go("/government/invoicing")} className="py-3 px-4 rounded-xl cursor-pointer"><Wallet className="mr-3 h-4 w-4 text-indigo-600" />Subsidies Overview</CommandItem>
+                  <CommandItem onSelect={() => go("/government/compare")} className="py-3 px-4 rounded-xl cursor-pointer"><History className="mr-3 h-4 w-4 text-purple-600" />Season Comparison</CommandItem>
+                </>
               ) : (
                 <>
                   <CommandItem onSelect={() => go("/insurer/dashboard")} className="py-3 px-4 rounded-xl cursor-pointer"><BarChart3 className="mr-3 h-4 w-4 text-indigo-500" />Overview Dashboard</CommandItem>
@@ -203,7 +214,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
 
             <CommandSeparator className="my-2 opacity-50" />
 
-            {assessments.length > 0 && (
+            {!isGovernment && assessments.length > 0 && (
               <CommandGroup heading="Active Assessments">
                 {assessments.map((a) => {
                   const farmerName = getFarmerName(a);
@@ -229,7 +240,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               </CommandGroup>
             )}
 
-            {!isAssessor && policies.length > 0 && (
+            {!isGovernment && policies.length > 0 && (
               <CommandGroup heading="Managed Policies">
                 {policies.map((p) => {
                   const pNum = p.policyNumber || `POL-${(p._id || p.id)?.slice(-6).toUpperCase()}`;
@@ -254,7 +265,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               </CommandGroup>
             )}
 
-            {claims.length > 0 && (
+            {!isGovernment && claims.length > 0 && (
               <CommandGroup heading="Insurance Claims">
                 {claims.map((c) => {
                   const cNum = c.claimNumber || `CLM-${(c._id || c.id)?.slice(-6).toUpperCase()}`;
@@ -280,7 +291,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               </CommandGroup>
             )}
 
-            {monitorings.length > 0 && (
+            {!isGovernment && monitorings.length > 0 && (
               <CommandGroup heading="Monitored Crop Fields">
                 {monitorings.map((f) => {
                   const mId = f._id || f.id;
@@ -294,7 +305,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                       </div>
                       <div className="flex flex-col flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-gray-900">FLD-{mId.slice(-4).toUpperCase()}</span>
+                          <span className="font-bold text-gray-900">FLD-{(mId?.toString() || "0000").slice(-4).toUpperCase()}</span>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100/50 text-rose-700 border border-rose-200/50 uppercase tracking-tighter shadow-sm">Live Monitor</span>
                         </div>
                         <span className="text-[11px] text-gray-500 font-medium">{farmName} · {farmerName} · {crop}</span>
@@ -305,7 +316,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               </CommandGroup>
             )}
 
-            {insurers.length > 0 && (
+            {!isGovernment && insurers.length > 0 && (
               <CommandGroup heading="Insurance Partners">
                 {insurers.map((i) => {
                   const name = i.name || i.companyName || "Insurer";

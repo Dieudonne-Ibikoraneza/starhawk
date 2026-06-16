@@ -18,10 +18,13 @@ import {
   CloudRain,
   Plane,
   History,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle
 } from "lucide-react";
-import cropMonitoringApiService from "@/services/cropMonitoringApi";
+import cropMonitoringApiService, { startCropMonitoring } from "@/services/cropMonitoringApi";
 import { getFarmById } from "@/services/farmsApi";
+import { getRequiredMonitoringCycles } from "@/lib/crops";
+import policiesApiService from "@/services/policiesApi";
 import { MonitoringBasicInfoTab } from "./tabs/MonitoringBasicInfoTab";
 import { MonitoringWeatherTab } from "./tabs/MonitoringWeatherTab";
 import { MonitoringDroneReportTab } from "./tabs/MonitoringDroneReportTab";
@@ -36,24 +39,29 @@ export default function CropMonitoringDetail() {
   const [farm, setFarm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("basic-info");
+  const [isStartingCycle, setIsStartingCycle] = useState(false);
+  const [activePolicy, setActivePolicy] = useState<any>(null);
   
   const loadData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
-      // 1. Load Farm details
-      const farmResp = await getFarmById(id);
-      const farmData = farmResp.data || farmResp;
-      setFarm(farmData);
+      // Load Crop Monitoring Details (which includes farm, policy, and nested cycles)
+      const monitoringResp = await cropMonitoringApiService.getMonitoringById(id);
+      const monitoringData = monitoringResp.data || monitoringResp;
       
-      // 2. Load Monitoring History for this field
-      const historyResp = await cropMonitoringApiService.getMonitoringHistory();
-      const allHistory = historyResp.data || historyResp || [];
-      // Filter for this specific farm
-      const fieldHistory = allHistory.filter((m: any) => 
-        (m.farmId?._id || m.farmId) === id || (m.fieldId?._id || m.fieldId) === id
-      );
-      setMonitoringHistory(fieldHistory);
+      if (monitoringData) {
+        setFarm(monitoringData.farmId);
+        setActivePolicy(monitoringData.policyId);
+        
+        // Sort descending by monitoringNumber so the newest is at index 0 (activeCycle)
+        const cycles = monitoringData.monitoringCycles || [];
+        const sortedHistory = [...cycles].sort((a: any, b: any) => b.monitoringNumber - a.monitoringNumber);
+        
+        // Map policyId down to cycles if needed by downstream components
+        const enrichedCycles = sortedHistory.map(c => ({...c, policyId: monitoringData.policyId, farmId: monitoringData.farmId}));
+        setMonitoringHistory(enrichedCycles);
+      }
       
     } catch (err: any) {
       console.error("Failed to load crop monitoring details:", err);
@@ -93,18 +101,93 @@ export default function CropMonitoringDetail() {
     );
   }
 
-  const activeCycle = monitoringHistory.length > 0 ? monitoringHistory[0] : null;
-  const monitoringId = activeCycle?._id || activeCycle?.id || "";
-  const policyId = activeCycle?.policyId?._id || activeCycle?.policyId || "";
-  
-  const farmerObj = farm?.farmerId || farm?.farmer;
-  const farmerName = typeof farmerObj === "object" && farmerObj
-    ? (farmerObj.name || `${farmerObj.firstName || ""} ${farmerObj.lastName || ""}`.trim())
-    : (farm?.farmerName || "N/A");
+  if (!loading && !activePolicy) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full border border-red-100 shadow-2xl bg-white rounded-2xl overflow-hidden text-center p-8 relative">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 to-amber-500" />
+          <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-100 animate-pulse">
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Access Denied</h2>
+          <Badge className="bg-red-50 text-red-700 border border-red-100 mb-4 px-3 py-1 font-semibold rounded-full select-none">
+            No Active Policy
+          </Badge>
+          <p className="text-slate-600 text-sm leading-relaxed mb-6">
+            Crop health and NDVI satellite monitoring are reserved exclusively for active, insured farm fields. 
+            This field does not currently have an active insurance policy.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Button 
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl py-2.5 transition-all shadow-md flex items-center justify-center gap-2"
+              onClick={() => navigate("/assessor/crop-monitoring")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Monitoring
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  const ndviValue = activeCycle?.ndvi?.average || 0.65;
-  const growthStage = activeCycle?.growthStage || "Vegetative";
-  const waterStress = activeCycle?.waterStress || "Low";
+  const activeCycle = monitoringHistory.find((c: any) => c.status === "IN_PROGRESS" || c.status === "DRAFT") || null;
+  const latestCycle = monitoringHistory.length > 0 ? monitoringHistory[0] : null;
+  const displayCycle = activeCycle || latestCycle;
+  const monitoringId = displayCycle?._id || displayCycle?.id || "";
+  const policyId = displayCycle?.policyId?._id || displayCycle?.policyId || "";
+  const totalRecommendedCycles = getRequiredMonitoringCycles(farm?.cropType);
+
+  const handleStartCycle = async () => {
+    // Resolve the policy ID from active policy state, active cycle, or farm
+    const resolvedPolicyId = activePolicy?._id || activePolicy?.id || policyId || farm?.policyId?._id || farm?.policyId || "";
+    if (!resolvedPolicyId) {
+      toast({
+        title: "Cannot Start Cycle",
+        description: "No active policy found for this field. Please assign a policy first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsStartingCycle(true);
+    try {
+      await startCropMonitoring(resolvedPolicyId);
+      toast({
+        title: "Success",
+        description: "Monitoring cycle started successfully."
+      });
+      await loadData();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to start monitoring cycle",
+        variant: "destructive"
+      });
+    } finally {
+      setIsStartingCycle(false);
+    }
+  };
+    const farmerObj = activePolicy?.farmerId || farm?.farmerId || farm?.farmer;
+    let farmerName = farm?.farmerName || "N/A";
+    if (farmerObj && typeof farmerObj === 'object') {
+      farmerName = farmerObj.name || `${farmerObj.firstName || ""} ${farmerObj.lastName || ""}`.trim() || farmerName;
+    }
+    
+    // If we only got IDs and no name was found
+    if (!farmerName || farmerName.trim() === "" || farmerName === "N/A") {
+       // Since the farm belongs to a farmer, maybe the policy has it
+       if (activePolicy?.farmerName) {
+         farmerName = activePolicy.farmerName;
+       } else if (farmerObj && typeof farmerObj === 'string') {
+         farmerName = "Loading Farmer...";
+       } else {
+         farmerName = "Unknown Farmer";
+       }
+    }
+
+  const ndviValue = displayCycle?.ndvi?.average || 0.65;
+  const growthStage = displayCycle?.growthStage || "Vegetative";
+  const waterStress = displayCycle?.waterStress || "Low";
   const healthStatus = ndviValue > 0.6 ? "Excellent" : ndviValue > 0.4 ? "Good" : "Poor";
 
   return (
@@ -223,9 +306,10 @@ export default function CropMonitoringDetail() {
               locationCoords={farm.location?.coordinates}
               cycles={monitoringHistory}
               activeCycle={activeCycle}
+              totalRecommendedCycles={totalRecommendedCycles}
               sowingDate={farm.sowingDate}
-              onStartCycle={() => setActiveTab("overview")} // Fallback action
-              isStartingCycle={false}
+              onStartCycle={handleStartCycle}
+              isStartingCycle={isStartingCycle}
               onStatusUpdate={loadData}
             />
           </TabsContent>

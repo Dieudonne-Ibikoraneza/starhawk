@@ -105,7 +105,7 @@ export function ClaimFilingSystem({ farmerId, onClaimSubmit, onCancel }: ClaimFi
       case 1:
         return !!(claim.policyId && claim.disasterType);
       case 2:
-        return !!(claim.incidentDate && claim.description && claim.estimatedLoss);
+        return !!(claim.incidentDate && claim.description);
       case 3:
         return !!(claim.coordinates && claim.affectedArea);
       case 4:
@@ -149,7 +149,6 @@ export function ClaimFilingSystem({ farmerId, onClaimSubmit, onCancel }: ClaimFi
         disasterType: claim.disasterType!,
         incidentDate: claim.incidentDate!,
         description: claim.description!,
-        estimatedLoss: parseFloat(claim.estimatedLoss?.toString() || '0'),
         affectedArea: parseFloat(claim.affectedArea?.toString() || '0'),
         coordinates: claim.coordinates!,
         priority: claim.priority || 'medium',
@@ -311,17 +310,6 @@ export function ClaimFilingSystem({ farmerId, onClaimSubmit, onCancel }: ClaimFi
                   value={claim.description || ''}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="estimatedLoss">Estimated Loss (RWF) *</Label>
-                <Input
-                  id="estimatedLoss"
-                  type="number"
-                  placeholder="Enter estimated financial loss"
-                  value={claim.estimatedLoss || ''}
-                  onChange={(e) => handleInputChange('estimatedLoss', e.target.value)}
                 />
               </div>
             </div>

@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import assessmentsApiService from "@/services/assessmentsApi";
+import farmsApiService from "@/services/farmsApi";
+import { agroTempToCelsius, extractAgroForecastRows } from "@/lib/weatherUnits";
 
 interface OverviewTabProps {
   assessment: any;
@@ -77,25 +79,93 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
   
   // Calculate risk using the utility
   const riskAssessment: RiskAssessment = calculateOverallRisk(
-    assessment.dronePdfs || [],
+    assessment.droneAnalysisPdfs || assessment.dronePdfs || [],
     assessment.weatherData
   );
 
   const handleDownloadReport = async () => {
     setIsGenerating(true);
     try {
+      let finalWeatherData = assessment.weatherData;
+
+      // If weatherData isn't completely populated, fetch it directly
+      if (!finalWeatherData || !finalWeatherData.forecast) {
+        try {
+          const fieldId = farm?._id || farm?.id;
+          if (fieldId) {
+            const today = new Date();
+            const endDate = new Date(today);
+            endDate.setDate(today.getDate() + 7);
+            
+            const todayStr = today.toISOString().split("T")[0];
+            const endDateStr = endDate.toISOString().split("T")[0];
+            
+            const forecastResponse = await farmsApiService.getWeatherForecast(fieldId, todayStr, endDateStr);
+            const rows = extractAgroForecastRows(forecastResponse) as any[];
+            
+            if (rows && rows.length > 0) {
+              const dailyData = new Map<string, any>();
+              rows.forEach((item) => {
+                const date = new Date(item.dt * 1000).toLocaleDateString();
+                if (!dailyData.has(date)) dailyData.set(date, item);
+              });
+          
+              const forecastList = Array.from(dailyData.values())
+                .slice(0, 7)
+                .map((item) => ({
+                  dt: item.dt,
+                  temp: Math.round(agroTempToCelsius(item.main.temp)),
+                  temp_max: Math.round(agroTempToCelsius(item.main.temp_max)),
+                  temp_min: Math.round(agroTempToCelsius(item.main.temp_min)),
+                  rainfall: item.rain?.["3h"] || item.rain?.["1h"] || 0,
+                  humidity: item.main.humidity,
+                  clouds: item.clouds.all,
+                  wind: Math.round(item.wind.speed * 10) / 10,
+                }));
+
+              finalWeatherData = {
+                current: {
+                  dt: rows[0].dt,
+                  temp: Math.round(agroTempToCelsius(rows[0].main.temp)),
+                  rainfall: rows[0].rain?.["3h"] || rows[0].rain?.["1h"] || 0,
+                  humidity: rows[0].main.humidity,
+                  clouds: rows[0].clouds.all,
+                  wind: Math.round(rows[0].wind.speed * 10) / 10,
+                },
+                forecast: forecastList
+              };
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to fetch weather data for report", e);
+        }
+      }
+
+      const normalizedPdfs = (assessment.droneAnalysisPdfs || assessment.dronePdfs || []).map((p: any) => ({
+        ...p,
+        droneAnalysisData: p.droneAnalysisData || p.extractedData
+      }));
+
       const generator = new ComprehensiveReportGenerator();
+      const getAssessorName = () => {
+        if (assessment.assessorId && typeof assessment.assessorId === 'object') {
+          return `${assessment.assessorId.firstName || ""} ${assessment.assessorId.lastName || ""}`.trim();
+        }
+        return "N/A";
+      };
+
       await generator.downloadReport({
         assessmentId: assessment._id || "N/A",
         farmDetails: {
           name: farm.name || "Unknown Farm",
           cropType: farm.cropType || "N/A",
           area: farm.area || 0,
-          location: farm.location || "N/A",
-          farmerName: `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || "N/A",
+          location: farm.locationName || (typeof farm.location === 'string' ? farm.location : "N/A"),
+          farmerName: `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || farm.farmerName || "N/A",
         },
-        dronePdfs: assessment.dronePdfs || [],
-        weatherData: assessment.weatherData,
+        assessorName: getAssessorName(),
+        dronePdfs: normalizedPdfs,
+        weatherData: finalWeatherData,
         comprehensiveNotes: notes || "No notes provided.",
         riskAssessment,
         reportGeneratedAt: new Date(),
@@ -199,11 +269,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Area</p>
-                <p className="text-sm font-semibold text-slate-900">{farm.area ? `${farm.area} ha` : "N/A"}</p>
+                <p className="text-sm font-semibold text-slate-900">{farm.area ? `${Number(farm.area).toFixed(2)} ha` : "N/A"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Farmer</p>
-                <p className="text-sm font-semibold text-slate-900">{farmer.firstName} {farmer.lastName}</p>
+                <p className="text-sm font-semibold text-slate-900">{`${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() || farm.farmerName || farmer.name || "N/A"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Status</p>
@@ -231,8 +301,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ assessment, farm: farmProp, f
                   value={notes}
                   onChange={(e) => setComprehensiveNotes(e.target.value)}
                   placeholder="Write comprehensive feedback about the field assessment..."
-                  className="min-h-[200px] text-sm text-slate-700 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500"
-                  disabled={
+                  className="min-h-[200px] text-sm text-slate-900 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 disabled:opacity-100 disabled:text-slate-900"
+                  readOnly={
                     isInsurerView ||
                     assessment.status === "SUBMITTED" ||
                     assessment.status === "APPROVED" ||

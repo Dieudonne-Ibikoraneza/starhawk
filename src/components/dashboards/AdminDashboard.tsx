@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../layout/DashboardLayout";
 import {
@@ -17,6 +17,7 @@ import {
   getUserProfile,
   updateUserProfile,
   getInsurers,
+  getAssessors,
 } from "@/services/usersAPI";
 import {
   getSystemStatistics,
@@ -55,9 +56,18 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RwandaLocationSelector from "@/components/common/RwandaLocationSelector";
 import {
   Select,
   SelectContent,
@@ -137,8 +147,92 @@ import {
   Loader2,
   FileCheck,
   AlertCircle,
+  SlidersHorizontal,
+  ArrowUpDown,
 } from "lucide-react";
 import ClaimDetailView from "../insurer/ClaimDetailView";
+
+// 100% self-contained Rwanda administrative geography to ensure absolute uptime and no null errors
+const RWANDA_GEOGRAPHY: Record<string, { id: string; name: string; districts: { id: string; name: string }[] }> = {
+  "kigali_city": {
+    id: "kigali_city",
+    name: "Kigali City",
+    districts: [
+      { id: "gasabo", name: "Gasabo" },
+      { id: "kicukiro", name: "Kicukiro" },
+      { id: "nyarugenge", name: "Nyarugenge" }
+    ]
+  },
+  "northern_province": {
+    id: "northern_province",
+    name: "Northern Province",
+    districts: [
+      { id: "burera", name: "Burera" },
+      { id: "gakenke", name: "Gakenke" },
+      { id: "gicumbi", name: "Gicumbi" },
+      { id: "musanze", name: "Musanze" },
+      { id: "rulindo", name: "Rulindo" }
+    ]
+  },
+  "southern_province": {
+    id: "southern_province",
+    name: "Southern Province",
+    districts: [
+      { id: "gisagara", name: "Gisagara" },
+      { id: "huye", name: "Huye" },
+      { id: "kamonyi", name: "Kamonyi" },
+      { id: "muhanga", name: "Muhanga" },
+      { id: "nyamagabe", name: "Nyamagabe" },
+      { id: "nyanza", name: "Nyanza" },
+      { id: "nyaruguru", name: "Nyaruguru" },
+      { id: "ruhango", name: "Ruhango" }
+    ]
+  },
+  "eastern_province": {
+    id: "eastern_province",
+    name: "Eastern Province",
+    districts: [
+      { id: "bugesera", name: "Bugesera" },
+      { id: "gatsibo", name: "Gatsibo" },
+      { id: "kayonza", name: "Kayonza" },
+      { id: "kirehe", name: "Kirehe" },
+      { id: "ngoma", name: "Ngoma" },
+      { id: "nyagatare", name: "Nyagatare" },
+      { id: "rwamagana", name: "Rwamagana" }
+    ]
+  },
+  "western_province": {
+    id: "western_province",
+    name: "Western Province",
+    districts: [
+      { id: "karongi", name: "Karongi" },
+      { id: "ngororero", name: "Ngororero" },
+      { id: "nyabihu", name: "Nyabihu" },
+      { id: "nyamasheke", name: "Nyamasheke" },
+      { id: "rubavu", name: "Rubavu" },
+      { id: "rusizi", name: "Rusizi" },
+      { id: "rutsiro", name: "Rutsiro" }
+    ]
+  }
+};
+
+// Bilingual translation mapping to support both English and Kinyarwanda stored values in the database
+const PROVINCE_TRANSLATIONS: Record<string, string[]> = {
+  "kigali city": ["kigali", "umujyi wa kigali", "kigali city"],
+  "northern province": ["northern", "amajyaruguru", "northern province"],
+  "southern province": ["southern", "amajyepfo", "southern province"],
+  "eastern province": ["eastern", "iburasirazuba", "eastern province", "iburasirazuba province"],
+  "western province": ["western", "iburengerazuba", "western province"]
+};
+
+const GOVERNMENT_LEVELS = [
+  { value: "COUNTRY", label: "Country Level" },
+  { value: "PROVINCE", label: "Province Level" },
+  { value: "DISTRICT", label: "District Level" },
+  { value: "SECTOR", label: "Sector Level" },
+  { value: "CELL", label: "Cell Level" },
+  { value: "VILLAGE", label: "Village Level" },
+] as const;
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -475,6 +569,129 @@ export const AdminDashboard = () => {
   const [showAddUserDialog, setShowAddUserDialog] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
 
+  // User filtering & sorting advanced state
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [sortBy, setSortBy] = useState<string>("name_asc");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [side, setSide] = useState<"right" | "bottom">("right");
+
+  // Selected administrative keys inside active filter form
+  const [selectedProvinceKey, setSelectedProvinceKey] = useState<string>("ALL");
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>("ALL");
+
+  // Filter form states
+  const [roleFilter, setRoleFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [provinceFilter, setProvinceFilter] = useState<string>("");
+  const [districtFilter, setDistrictFilter] = useState<string>("");
+  const [joinDateStart, setJoinDateStart] = useState<string>("");
+  const [joinDateEnd, setJoinDateEnd] = useState<string>("");
+
+  // Applied filters
+  const [appliedFilters, setAppliedFilters] = useState({
+    role: "ALL",
+    status: "ALL",
+    province: "",
+    district: "",
+    joinDateStart: "",
+    joinDateEnd: "",
+  });
+
+  // Handle mobile drawer responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 640) {
+        setSide("bottom");
+      } else {
+        setSide("right");
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (appliedFilters.role !== "ALL") count++;
+    if (appliedFilters.status !== "ALL") count++;
+    if (appliedFilters.province !== "") count++;
+    if (appliedFilters.district !== "") count++;
+    if (appliedFilters.joinDateStart !== "") count++;
+    if (appliedFilters.joinDateEnd !== "") count++;
+    return count;
+  }, [appliedFilters]);
+
+  const availableDistricts = useMemo(() => {
+    if (selectedProvinceKey === "ALL" || !RWANDA_GEOGRAPHY[selectedProvinceKey]) {
+      return [];
+    }
+    return RWANDA_GEOGRAPHY[selectedProvinceKey].districts;
+  }, [selectedProvinceKey]);
+
+  const handleProvinceChange = (provinceKey: string) => {
+    setSelectedProvinceKey(provinceKey);
+    setSelectedDistrictId("ALL");
+    setDistrictFilter("");
+
+    if (provinceKey === "ALL") {
+      setProvinceFilter("");
+    } else {
+      setProvinceFilter(RWANDA_GEOGRAPHY[provinceKey].name);
+    }
+  };
+
+  const handleDistrictChange = (districtId: string) => {
+    setSelectedDistrictId(districtId);
+    if (districtId === "ALL" || selectedProvinceKey === "ALL") {
+      setDistrictFilter("");
+    } else {
+      const dist = RWANDA_GEOGRAPHY[selectedProvinceKey].districts.find(d => d.id === districtId);
+      setDistrictFilter(dist ? dist.name : "");
+    }
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      role: roleFilter,
+      status: statusFilter,
+      province: provinceFilter,
+      district: districtFilter,
+      joinDateStart: joinDateStart,
+      joinDateEnd: joinDateEnd,
+    });
+    setIsFilterOpen(false);
+    toast({
+      title: "Filters applied",
+      description: "User directory filtered successfully.",
+    });
+  };
+
+  const handleResetFilters = () => {
+    setRoleFilter("ALL");
+    setStatusFilter("ALL");
+    setProvinceFilter("");
+    setDistrictFilter("");
+    setSelectedProvinceKey("ALL");
+    setSelectedDistrictId("ALL");
+    setJoinDateStart("");
+    setJoinDateEnd("");
+
+    setAppliedFilters({
+      role: "ALL",
+      status: "ALL",
+      province: "",
+      district: "",
+      joinDateStart: "",
+      joinDateEnd: "",
+    });
+    setIsFilterOpen(false);
+    toast({
+      title: "Filters cleared",
+      description: "Displaying all registered users.",
+    });
+  };
+
   // Admin API State
   const [systemStats, setSystemStats] = useState<any | null>(null);
   const [policyOverview, setPolicyOverview] = useState<any | null>(null);
@@ -648,7 +865,27 @@ export const AdminDashboard = () => {
     email: "",
     phoneNumber: "",
     role: "FARMER",
+    governmentProfile: {
+      level: "COUNTRY",
+      title: "",
+      department: "",
+      province: "",
+      district: "",
+      sector: "",
+      cell: "",
+      village: "",
+      parentGovernmentUserId: "",
+      officeEmail: "",
+      officePhone: "",
+    },
   });
+  const [selectedGovernmentLocation, setSelectedGovernmentLocation] = useState<{
+    province?: { id: string; name: string };
+    district?: { id: string; name: string };
+    sector?: { id: string; name: string };
+    village?: { id: string; name: string };
+    cell?: { id: string; name: string };
+  }>({});
 
   // Computed User Statistics from real data
   const userStats = {
@@ -1686,10 +1923,68 @@ export const AdminDashboard = () => {
       toast({
         title: "Validation Error",
         description:
-          "Please fill in all required fields (National ID, Email, Phone Number, Role)",
+        "Please fill in all required fields (National ID, Email, Phone Number, Role)",
         variant: "destructive",
       });
       return;
+    }
+
+      if (newUserData.role === "GOVERNMENT") {
+        const gov = newUserData.governmentProfile;
+        if (!gov.title.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Government title is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (gov.level !== "COUNTRY" && !gov.province.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Province is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        ["DISTRICT", "SECTOR", "CELL", "VILLAGE"].includes(gov.level) &&
+        !gov.district.trim()
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "District is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        ["SECTOR", "CELL", "VILLAGE"].includes(gov.level) &&
+        !gov.sector.trim()
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "Sector is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (["CELL", "VILLAGE"].includes(gov.level) && !gov.cell.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Cell is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (gov.level === "VILLAGE" && !gov.village.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Village is required for this government level.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setCreatingUser(true);
@@ -1704,6 +1999,23 @@ export const AdminDashboard = () => {
         phoneNumber: newUserData.phoneNumber,
         role: newUserData.role,
       };
+
+      if (newUserData.role === "GOVERNMENT") {
+        const gov = newUserData.governmentProfile;
+        userDataToSend.governmentProfile = {
+          level: gov.level,
+          title: gov.title.trim(),
+          department: gov.department?.trim() || undefined,
+          province: selectedGovernmentLocation.province?.name || gov.province?.trim() || undefined,
+          district: selectedGovernmentLocation.district?.name || gov.district?.trim() || undefined,
+          sector: selectedGovernmentLocation.sector?.name || gov.sector?.trim() || undefined,
+          cell: selectedGovernmentLocation.cell?.name || gov.cell?.trim() || undefined,
+          village: selectedGovernmentLocation.village?.name || gov.village?.trim() || undefined,
+          parentGovernmentUserId: gov.parentGovernmentUserId?.trim() || undefined,
+          officeEmail: gov.officeEmail?.trim() || undefined,
+          officePhone: gov.officePhone?.trim() || undefined,
+        };
+      }
 
       console.log(
         "Creating user with data:",
@@ -1729,7 +2041,21 @@ export const AdminDashboard = () => {
         email: "",
         phoneNumber: "",
         role: "FARMER",
+        governmentProfile: {
+          level: "COUNTRY",
+          title: "",
+          department: "",
+          province: "",
+          district: "",
+          sector: "",
+          cell: "",
+          village: "",
+          parentGovernmentUserId: "",
+          officeEmail: "",
+          officePhone: "",
+        },
       });
+      setSelectedGovernmentLocation({});
       setShowAddUserDialog(false);
       // Reload users
       await loadUsers();
@@ -1758,24 +2084,113 @@ export const AdminDashboard = () => {
     }
   };
 
-  // Filter users based on search query
-  const filteredUsers = systemUsers.filter((user) => {
-    const query = searchQuery.toLowerCase();
-    const userName = typeof user.name === "string" ? user.name : "";
-    const userEmail = typeof user.email === "string" ? user.email : "";
-    const userPhone =
-      typeof user.phoneNumber === "string" ? user.phoneNumber : "";
-    const userRole = typeof user.role === "string" ? user.role : "";
-    const userRegion = typeof user.region === "string" ? user.region : "";
+  // Filter users based on search query, advanced filters, and sort options
+  const filteredUsers = useMemo(() => {
+    return systemUsers.filter((user) => {
+      // 1. Search Query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const userName = typeof user.name === "string" ? user.name : "";
+        const userEmail = typeof user.email === "string" ? user.email : "";
+        const userPhone = typeof user.phoneNumber === "string" ? user.phoneNumber : "";
+        const userRole = typeof user.role === "string" ? user.role : "";
+        const userRegion = typeof user.region === "string" ? user.region : "";
 
-    return (
-      userName.toLowerCase().includes(query) ||
-      userEmail.toLowerCase().includes(query) ||
-      userPhone.toLowerCase().includes(query) ||
-      userRole.toLowerCase().includes(query) ||
-      userRegion.toLowerCase().includes(query)
-    );
-  });
+        if (
+          !userName.toLowerCase().includes(query) &&
+          !userEmail.toLowerCase().includes(query) &&
+          !userPhone.toLowerCase().includes(query) &&
+          !userRole.toLowerCase().includes(query) &&
+          !userRegion.toLowerCase().includes(query)
+        ) {
+          return false;
+        }
+      }
+
+      // 2. Role Filter
+      if (appliedFilters.role !== "ALL") {
+        const userRole = (user.role || "").toUpperCase();
+        if (userRole !== appliedFilters.role.toUpperCase()) return false;
+      }
+
+      // 3. Status Filter
+      if (appliedFilters.status !== "ALL") {
+        const userStatus = user.active !== false ? "ACTIVE" : "INACTIVE";
+        if (userStatus !== appliedFilters.status) return false;
+      }
+
+      // 4. Province Match (with Rwanda Translations)
+      if (appliedFilters.province) {
+        const userProv = (user.region || "").toLowerCase().trim();
+        const filterProv = appliedFilters.province.toLowerCase().trim();
+        const allowedTerms = PROVINCE_TRANSLATIONS[filterProv] || [filterProv];
+        const isMatch = allowedTerms.some(term => 
+          userProv.includes(term) || term.includes(userProv)
+        );
+        if (!isMatch) return false;
+      }
+
+      // 5. District Match
+      if (appliedFilters.district) {
+        const userDist = (user.region || "").toLowerCase().trim();
+        const filterDist = appliedFilters.district.toLowerCase().trim();
+        if (!userDist.includes(filterDist) && !filterDist.includes(userDist)) return false;
+      }
+
+      // 6. Join Date Start
+      if (appliedFilters.joinDateStart && user.createdAt) {
+        const joinDate = new Date(user.createdAt);
+        const filterStart = new Date(appliedFilters.joinDateStart);
+        if (joinDate < filterStart) return false;
+      }
+
+      // 7. Join Date End
+      if (appliedFilters.joinDateEnd && user.createdAt) {
+        const joinDate = new Date(user.createdAt);
+        const filterEnd = new Date(appliedFilters.joinDateEnd);
+        if (joinDate > filterEnd) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === "name_asc") {
+        return (a.name || "").localeCompare(b.name || "");
+      }
+      if (sortBy === "name_desc") {
+        return (b.name || "").localeCompare(a.name || "");
+      }
+      if (sortBy === "role_asc") {
+        return (a.role || "").localeCompare(b.role || "");
+      }
+      if (sortBy === "date_newest") {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }
+      if (sortBy === "date_oldest") {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      }
+      return 0;
+    });
+  }, [systemUsers, searchQuery, appliedFilters, sortBy]);
+
+  const isCreateUserFormValid = useMemo(() => {
+    if (!newUserData.nationalId || !newUserData.email || !newUserData.phoneNumber || !newUserData.role) {
+      return false;
+    }
+    if (newUserData.role === "GOVERNMENT") {
+      const gov = newUserData.governmentProfile;
+      if (!gov.title?.trim()) return false;
+      if (gov.level !== "COUNTRY" && !gov.province?.trim()) return false;
+      if (["DISTRICT", "SECTOR", "CELL", "VILLAGE"].includes(gov.level) && !gov.district?.trim()) return false;
+      if (["SECTOR", "CELL", "VILLAGE"].includes(gov.level) && !gov.sector?.trim()) return false;
+      if (["CELL", "VILLAGE"].includes(gov.level) && !gov.cell?.trim()) return false;
+      if (gov.level === "VILLAGE" && !gov.village?.trim()) return false;
+    }
+    return true;
+  }, [newUserData]);
 
   // User Management Page
   const renderUserManagement = () => (
@@ -1875,6 +2290,190 @@ export const AdminDashboard = () => {
               </div>
             </div>
 
+            {newUserData.role === "GOVERNMENT" && (
+              <div className="space-y-4 rounded-xl border border-red-200 bg-red-50/40 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Government Profile
+                    </h3>
+                    <p className="text-xs text-gray-600">
+                      Select the hierarchy level and fill the matching office details.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-900">Level *</Label>
+                    <Select
+                      value={newUserData.governmentProfile.level}
+                      onValueChange={(value) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            level: value as any,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger className={dashboardTheme.select}>
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent className={dashboardTheme.card}>
+                        {GOVERNMENT_LEVELS.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="govTitle" className="text-gray-900">
+                      Title *
+                    </Label>
+                    <Input
+                      id="govTitle"
+                      value={newUserData.governmentProfile.title}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            title: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="District Agriculture Officer"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="govDepartment" className="text-gray-900">
+                      Department
+                    </Label>
+                    <Input
+                      id="govDepartment"
+                      value={newUserData.governmentProfile.department}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            department: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="Agriculture"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="govOfficeEmail" className="text-gray-900">
+                      Office Email
+                    </Label>
+                    <Input
+                      id="govOfficeEmail"
+                      type="email"
+                      value={newUserData.governmentProfile.officeEmail}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            officeEmail: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="office@example.gov"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="govOfficePhone" className="text-gray-900">
+                      Office Phone
+                    </Label>
+                    <Input
+                      id="govOfficePhone"
+                      value={newUserData.governmentProfile.officePhone}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            officePhone: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="0781234567"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="govParentId" className="text-gray-900">
+                      Parent Government User ID
+                    </Label>
+                    <Input
+                      id="govParentId"
+                      value={newUserData.governmentProfile.parentGovernmentUserId}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          governmentProfile: {
+                            ...newUserData.governmentProfile,
+                            parentGovernmentUserId: e.target.value,
+                          },
+                        })
+                      }
+                      className={`${dashboardTheme.input} border-gray-300`}
+                      placeholder="Optional for hierarchy linking"
+                    />
+                  </div>
+                </div>
+
+                {newUserData.governmentProfile.level !== "COUNTRY" && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <RwandaLocationSelector
+                      levels={
+                        newUserData.governmentProfile.level === "PROVINCE"
+                          ? ["province"]
+                          : newUserData.governmentProfile.level === "DISTRICT"
+                            ? ["province", "district"]
+                            : newUserData.governmentProfile.level === "SECTOR"
+                              ? ["province", "district", "sector"]
+                              : newUserData.governmentProfile.level === "CELL"
+                                ? ["province", "district", "sector", "village", "cell"]
+                                : ["province", "district", "sector", "village", "cell"]
+                      }
+                      onLocationChange={(location) => {
+                        setSelectedGovernmentLocation(location);
+                        setNewUserData((prev) => ({
+                          ...prev,
+                          governmentProfile: {
+                            ...prev.governmentProfile,
+                            province: location.province?.name || "",
+                            district: location.district?.name || "",
+                            sector: location.sector?.name || "",
+                            village: location.village?.name || "",
+                            cell: location.cell?.name || "",
+                          },
+                        }));
+                      }}
+                      className="space-y-4"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
               <Button
@@ -1886,8 +2485,8 @@ export const AdminDashboard = () => {
               </Button>
               <Button
                 onClick={handleCreateUser}
-                disabled={creatingUser}
-                className="bg-red-600 hover:bg-red-700 text-gray-900"
+                disabled={creatingUser || !isCreateUserFormValid}
+                className={`text-white ${creatingUser || !isCreateUserFormValid ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
               >
                 {creatingUser ? (
                   <>
@@ -2643,18 +3242,229 @@ export const AdminDashboard = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="p-4 border-b border-gray-200 bg-white">
-            <div className="relative">
+          <div className="p-4 border-b border-gray-200 bg-white flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search users by name, email, or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-sm"
               />
             </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 min-w-[200px] flex-1 md:flex-initial">
+                <ArrowUpDown className="h-4 w-4 text-gray-400 shrink-0" />
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="bg-white border-gray-300 text-gray-900 h-9 text-xs">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+                    <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+                    <SelectItem value="role_asc">Role (A-Z)</SelectItem>
+                    <SelectItem value="date_newest">Newest Joined</SelectItem>
+                    <SelectItem value="date_oldest">Oldest Joined</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50 relative flex items-center gap-2 h-9 text-xs"
+                  >
+                    <SlidersHorizontal className="h-4 w-4 text-gray-500" />
+                    Advanced Filters
+                    {activeFiltersCount > 0 && (
+                      <Badge className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center p-0 text-[10px] font-bold">
+                        {activeFiltersCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side={side} className="bg-white border-l border-gray-200 p-6 overflow-y-auto max-w-md w-full">
+                  <SheetHeader className="border-b border-gray-100 pb-4 mb-4">
+                    <SheetTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                      <Filter className="h-5 w-5 text-red-600" />
+                      Filter Directory
+                    </SheetTitle>
+                    <SheetDescription className="text-gray-500 text-sm">
+                      Narrow down users directory list using multiple attributes.
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="space-y-5">
+                    {/* Role Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-700">User Role</Label>
+                      <Select value={roleFilter} onValueChange={setRoleFilter}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="ALL">All Roles</SelectItem>
+                          <SelectItem value="FARMER">Farmer</SelectItem>
+                          <SelectItem value="ASSESSOR">Assessor</SelectItem>
+                          <SelectItem value="INSURER">Insurer</SelectItem>
+                          <SelectItem value="GOVERNMENT">Government</SelectItem>
+                          <SelectItem value="ADMIN">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-700">Account Status</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="ALL">All Statuses</SelectItem>
+                          <SelectItem value="ACTIVE">Active Account</SelectItem>
+                          <SelectItem value="INACTIVE">Inactive Account</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Province Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-700">Province</Label>
+                      <Select value={selectedProvinceKey} onValueChange={handleProvinceChange}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="ALL">All Provinces</SelectItem>
+                          {Object.entries(RWANDA_GEOGRAPHY).map(([key, value]) => (
+                            <SelectItem key={key} value={key}>
+                              {value.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* District Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-700">District</Label>
+                      <Select
+                        value={selectedDistrictId}
+                        onValueChange={handleDistrictChange}
+                        disabled={selectedProvinceKey === "ALL"}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900 disabled:opacity-50">
+                          <SelectValue placeholder={selectedProvinceKey === "ALL" ? "Select province first" : "Select District"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="ALL">All Districts</SelectItem>
+                          {availableDistricts.map((district) => (
+                            <SelectItem key={district.id} value={district.id}>
+                              {district.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Join Date Range */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-700">Join Date Range</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400">From</span>
+                          <Input
+                            type="date"
+                            value={joinDateStart}
+                            onChange={(e) => setJoinDateStart(e.target.value)}
+                            className="bg-white border-gray-300 text-gray-900"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400">To</span>
+                          <Input
+                            type="date"
+                            value={joinDateEnd}
+                            onChange={(e) => setJoinDateEnd(e.target.value)}
+                            className="bg-white border-gray-300 text-gray-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Controls */}
+                    <div className="flex gap-2 pt-6 border-t border-gray-100 mt-6">
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                        onClick={handleResetFilters}
+                      >
+                        Reset Filters
+                      </Button>
+                      <Button
+                        className="flex-grow-[2] bg-red-600 hover:bg-red-700 text-white font-medium"
+                        onClick={handleApplyFilters}
+                      >
+                        Apply Filters
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
+
+          {activeFiltersCount > 0 && (
+            <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-gray-500 flex items-center gap-1.5 mr-1">
+                <Filter className="h-3 w-3" />
+                Active Filters:
+              </span>
+              {appliedFilters.role !== "ALL" && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  Role: {appliedFilters.role}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { setRoleFilter("ALL"); setAppliedFilters(prev => ({ ...prev, role: "ALL" })); }} />
+                </Badge>
+              )}
+              {appliedFilters.status !== "ALL" && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  Status: {appliedFilters.status === "ACTIVE" ? "Active" : "Inactive"}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { setStatusFilter("ALL"); setAppliedFilters(prev => ({ ...prev, status: "ALL" })); }} />
+                </Badge>
+              )}
+              {appliedFilters.province && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  Province: {appliedFilters.province}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { handleProvinceChange("ALL"); setAppliedFilters(prev => ({ ...prev, province: "", district: "" })); }} />
+                </Badge>
+              )}
+              {appliedFilters.district && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  District: {appliedFilters.district}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { handleDistrictChange("ALL"); setAppliedFilters(prev => ({ ...prev, district: "" })); }} />
+                </Badge>
+              )}
+              {appliedFilters.joinDateStart && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  From: {appliedFilters.joinDateStart}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { setJoinDateStart(""); setAppliedFilters(prev => ({ ...prev, joinDateStart: "" })); }} />
+                </Badge>
+              )}
+              {appliedFilters.joinDateEnd && (
+                <Badge variant="secondary" className="bg-white border-gray-300 text-gray-700 flex items-center gap-1 text-xs">
+                  To: {appliedFilters.joinDateEnd}
+                  <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => { setJoinDateEnd(""); setAppliedFilters(prev => ({ ...prev, joinDateEnd: "" })); }} />
+                </Badge>
+              )}
+              <Button variant="ghost" size="sm" className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-transparent p-0" onClick={handleResetFilters}>
+                Clear all
+              </Button>
+            </div>
+          )}
           {usersLoading ? (
             <Card className={dashboardTheme.card}>
               <CardContent className="p-0">
@@ -6430,7 +7240,7 @@ export const AdminDashboard = () => {
                 <div>
                   <Label className="text-gray-900/80">Select Farmer</Label>
                   <Select
-                    value={policyFormData.farmerId || undefined}
+                    value={policyFormData.farmerId}
                     onValueChange={(value) => {
                       const selectedFarmer = systemUsers.find((u: any) => {
                         const role = u.role?.toLowerCase() || "";
@@ -6900,10 +7710,10 @@ export const AdminDashboard = () => {
                   },
                   {
                     key: "amount",
-                    label: "Estimated Loss",
+                    label: "Claim Amount",
                     render: (_, row) => (
                       <span className="text-gray-900">
-                        RWF {(row.estimatedLoss || row.payoutAmount || row.amount || row.claimAmount || 0).toLocaleString()}
+                        RWF {(row.payoutAmount || row.amount || row.claimAmount || 0).toLocaleString()}
                       </span>
                     ),
                   },
@@ -7247,91 +8057,91 @@ export const AdminDashboard = () => {
   // Load assessors for assessment creation and assignment
   const loadAssessors = async () => {
     try {
-      console.log("🔄 Loading assessors...");
-      // Fetch all users and filter for assessors
-      const response: any = await getAllUsers();
-      console.log("✅ All users API response:", response);
+      console.log("🔄 Loading assessors via dedicated endpoint...");
+      const response = await getAssessors(0, 100);
+      console.log("✅ Assessors API response:", response);
 
-      let allUsers: any[] = [];
+      let assessorUsers: any[] = [];
 
       // Handle different response structures
       if (Array.isArray(response)) {
-        allUsers = response;
+        assessorUsers = response;
       } else if (response && typeof response === "object") {
-        // Try multiple possible response structures
-        if (Array.isArray(response.users)) {
-          allUsers = response.users;
-        } else if (Array.isArray(response.data)) {
-          allUsers = response.data;
-        } else if (Array.isArray(response.results)) {
-          allUsers = response.results;
-        } else if (Array.isArray(response.items)) {
-          allUsers = response.items;
-        } else if (Array.isArray(response.list)) {
-          allUsers = response.list;
-        } else if (response.data) {
-          if (Array.isArray(response.data)) {
-            allUsers = response.data;
-          } else if (response.data.data && Array.isArray(response.data.data)) {
-            allUsers = response.data.data;
-          } else if (
-            response.data.users &&
-            Array.isArray(response.data.users)
-          ) {
-            allUsers = response.data.users;
-          } else if (
-            response.data.results &&
-            Array.isArray(response.data.results)
-          ) {
-            allUsers = response.data.results;
-          } else if (
-            response.data.items &&
-            Array.isArray(response.data.items)
-          ) {
-            allUsers = response.data.items;
-          } else if (response.data.list && Array.isArray(response.data.list)) {
-            allUsers = response.data.list;
-          }
-        } else {
-          // Try to find any array property
-          const keys = Object.keys(response);
+        assessorUsers =
+          response.data?.items ||
+          response.data?.content ||
+          response.items ||
+          response.content ||
+          response.data ||
+          response.users ||
+          response.results ||
+          response.list ||
+          [];
+          
+        if (!Array.isArray(assessorUsers)) {
+          const keys = Object.keys(response.data || response);
           for (const key of keys) {
-            if (Array.isArray(response[key])) {
-              allUsers = response[key];
+            const target = response.data || response;
+            if (Array.isArray(target[key])) {
+              assessorUsers = target[key];
               break;
             }
           }
         }
       }
 
-      // Ensure allUsers is an array
-      if (!Array.isArray(allUsers)) {
-        console.warn("⚠️ allUsers is not an array, converting:", allUsers);
-        allUsers = [];
+      // Ensure assessorUsers is an array
+      if (!Array.isArray(assessorUsers)) {
+        console.warn("⚠️ assessorUsers is not an array, converting:", assessorUsers);
+        assessorUsers = [];
       }
 
-      // Filter users by role to get only assessors
-      const assessorUsers = allUsers.filter((user: any) => {
+      // Filter as fallback just in case some other roles got in,
+      // but also handle directly returned assessor lists
+      const filtered = assessorUsers.filter((user: any) => {
         const role = user.role || "";
         return role.toUpperCase() === "ASSESSOR" || role === "Assessor";
       });
 
-      setAssessors(assessorUsers);
-      console.log(
-        `✅ Filtered ${assessorUsers.length} assessors from ${allUsers.length} total users`,
-      );
-      if (assessorUsers.length > 0) {
-        console.log("📊 Sample assessor:", assessorUsers[0]);
-      }
+      const finalAssessors = filtered.length > 0 ? filtered : assessorUsers;
+
+      setAssessors(finalAssessors);
+      console.log(`✅ Loaded ${finalAssessors.length} assessors`);
     } catch (err: any) {
-      console.error("❌ Failed to load assessors:", err);
-      setAssessors([]);
-      toast({
-        title: "Warning",
-        description:
-          "Could not load assessors. Please try refreshing the page.",
-        variant: "default",
-      });
+      console.error("❌ Failed to load assessors via dedicated endpoint, falling back to getAllUsers:", err);
+      // Fallback: use getAllUsers and filter
+      try {
+        const response: any = await getAllUsers();
+        let allUsers: any[] = [];
+        if (Array.isArray(response)) {
+          allUsers = response;
+        } else if (response && typeof response === "object") {
+          allUsers =
+            response.data?.items ||
+            response.data?.content ||
+            response.items ||
+            response.content ||
+            response.data ||
+            response.users ||
+            response.results ||
+            [];
+          if (!Array.isArray(allUsers)) allUsers = [];
+        }
+        const filtered = allUsers.filter((user: any) => {
+          const role = user.role || "";
+          return role.toUpperCase() === "ASSESSOR" || role === "Assessor";
+        });
+        setAssessors(filtered);
+        console.log(`✅ Fallback: Filtered ${filtered.length} assessors from ${allUsers.length} users`);
+      } catch (fallbackErr: any) {
+        console.error("❌ Fallback also failed:", fallbackErr);
+        setAssessors([]);
+        toast({
+          title: "Warning",
+          description: "Could not load assessors. Please try refreshing the page.",
+          variant: "default",
+        });
+      }
     }
   };
 
@@ -7397,7 +8207,15 @@ export const AdminDashboard = () => {
         if (Array.isArray(usersResponse)) {
           allUsers = usersResponse;
         } else if (usersResponse && typeof usersResponse === "object") {
-          allUsers = usersResponse.data || usersResponse.users || usersResponse.items || usersResponse.results || [];
+          allUsers =
+            usersResponse.data?.items ||
+            usersResponse.data?.content ||
+            usersResponse.items ||
+            usersResponse.content ||
+            usersResponse.data ||
+            usersResponse.users ||
+            usersResponse.results ||
+            [];
           if (!Array.isArray(allUsers)) allUsers = [];
         }
         const filtered = allUsers.filter((user: any) => {
@@ -7883,10 +8701,16 @@ export const AdminDashboard = () => {
                             </td>
                             <td className="py-3 px-6 text-gray-900">
                               {(() => {
-                                const prefInsurerId = farm.insurerId || farm.preferredInsurerId;
-                                if (!prefInsurerId) return <span className="text-gray-400 text-xs italic">None preferred</span>;
+                                const prefInsurerIdVal = farm.insurerId || farm.preferredInsurerId;
+                                if (!prefInsurerIdVal) return <span className="text-gray-400 text-xs italic">None preferred</span>;
                                 
-                                const insurer = insurers.find(i => (i.id || i._id) === prefInsurerId);
+                                const prefInsurerIdStr = typeof prefInsurerIdVal === "object"
+                                  ? (prefInsurerIdVal._id || prefInsurerIdVal.id || "")
+                                  : String(prefInsurerIdVal);
+                                  
+                                if (!prefInsurerIdStr) return <span className="text-gray-400 text-xs italic">None preferred</span>;
+                                
+                                const insurer = insurers.find(i => (i.id || i._id) === prefInsurerIdStr);
                                 if (insurer) {
                                   const companyName = insurer.insurerProfile?.companyName;
                                   const personalName = (insurer.firstName && insurer.lastName) 
@@ -7902,17 +8726,21 @@ export const AdminDashboard = () => {
                                     </div>
                                   );
                                 }
-                                return <span className="text-gray-500 text-xs">ID: {prefInsurerId.substring(0, 8)}...</span>;
+                                return <span className="text-gray-500 text-xs">ID: {prefInsurerIdStr.substring(0, 8)}...</span>;
                               })()}
                             </td>
                             <td className="py-3 px-6">
                               <Button
                                 onClick={() => {
                                   if (farm && farmId) {
+                                    const prefInsurerIdVal = farm.insurerId || farm.preferredInsurerId;
+                                    const prefInsurerIdStr = prefInsurerIdVal
+                                      ? (typeof prefInsurerIdVal === "object" ? (prefInsurerIdVal._id || prefInsurerIdVal.id || "") : String(prefInsurerIdVal))
+                                      : "";
                                     setSelectedFarmForAssignment(farm);
                                     setAssignFormData({
                                       assessorId: "",
-                                      insurerId: farm.insurerId || farm.preferredInsurerId || "",
+                                      insurerId: prefInsurerIdStr,
                                     });
                                     setShowAssignDialog(true);
                                   } else {
@@ -8523,11 +9351,11 @@ export const AdminDashboard = () => {
                   Insurer *
                 </Label>
                 <Select
-                  value={assignFormData.insurerId || "none-insurer"}
+                  value={assignFormData.insurerId}
                   onValueChange={(value) =>
                     setAssignFormData({
                       ...assignFormData,
-                      insurerId: value === "none-insurer" ? "" : value,
+                      insurerId: value,
                     })
                   }
                   disabled={!!(selectedFarmForAssignment?.insurerId || selectedFarmForAssignment?.preferredInsurerId)}
@@ -8552,8 +9380,8 @@ export const AdminDashboard = () => {
                         const insurerName = (() => {
                           const companyName = insurer.insurerProfile?.companyName;
                           const personalName = (insurer.firstName && insurer.lastName) 
-                            ? `${insurer.firstName} ${insurer.lastName}` 
-                            : insurer.firstName || insurer.lastName || "";
+                             ? `${insurer.firstName} ${insurer.lastName}` 
+                             : insurer.firstName || insurer.lastName || "";
                           
                           if (companyName) {
                             return personalName ? `${companyName} (${personalName})` : companyName;
@@ -8590,8 +9418,7 @@ export const AdminDashboard = () => {
                   disabled={
                     assigningAssessor ||
                     !assignFormData.assessorId ||
-                    !assignFormData.insurerId ||
-                    assignFormData.insurerId === "none-insurer"
+                    !assignFormData.insurerId
                   }
                   className="bg-green-600 hover:bg-green-700"
                 >

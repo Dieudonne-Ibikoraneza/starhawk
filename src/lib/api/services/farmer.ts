@@ -134,6 +134,13 @@ export const farmerService = {
   },
 
   /**
+   * Start a new crop cycle on an existing farm
+   */
+  renewFarmCycle: async (farmId: string, body: { cropType: string; sowingDate: string }): Promise<Farm> => {
+    return apiClient.post<Farm>(`/farms/${farmId}/renew`, body);
+  },
+
+  /**
    * Get aggregated dashboard statistics (no per-farm monitoring calls — avoids duplicate load vs farm rows)
    */
   getDashboardStats: async (): Promise<DashboardStats> => {

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,8 @@ import {
   AlertTriangle,
   X,
   Sprout,
-  Maximize2
+  Maximize2,
+  FileEdit
 } from "lucide-react";
 
 interface Policy {
@@ -27,7 +29,7 @@ interface Policy {
   premiumAmount: number;
   startDate: string;
   endDate: string;
-  status: "active" | "pending" | "expired" | "cancelled";
+  status: "active" | "pending" | "expired" | "cancelled" | "needs correction";
   location: string;
   farmSize: number;
   farmName: string;
@@ -35,6 +37,8 @@ interface Policy {
   deductible: number;
   createdAt: string;
   coverageLevel: string;
+  rejectionReason?: string;
+  assessmentId?: string;
 }
 
 interface PolicyDetailsViewProps {
@@ -49,6 +53,7 @@ export default function PolicyDetailsView({ policy, onBack }: PolicyDetailsViewP
       case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "expired": return "bg-red-100 text-red-800 border-red-200";
       case "cancelled": return "bg-gray-100 text-gray-800 border-gray-200";
+      case "needs correction": return "bg-orange-100 text-orange-800 border-orange-200";
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
@@ -59,6 +64,7 @@ export default function PolicyDetailsView({ policy, onBack }: PolicyDetailsViewP
       case "pending": return <Clock className="h-4 w-4 text-yellow-600" />;
       case "expired": return <AlertTriangle className="h-4 w-4 text-red-600" />;
       case "cancelled": return <X className="h-4 w-4 text-gray-600" />;
+      case "needs correction": return <AlertTriangle className="h-4 w-4 text-orange-600" />;
       default: return <Clock className="h-4 w-4 text-gray-600" />;
     }
   };
@@ -146,6 +152,26 @@ export default function PolicyDetailsView({ policy, onBack }: PolicyDetailsViewP
                 </div>
               </div>
             </div>
+            
+            {policy.status === 'needs correction' && policy.rejectionReason && (
+              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-bold text-orange-900">Correction Requested</h4>
+                    <p className="text-sm text-orange-800 mt-1">{policy.rejectionReason}</p>
+                  </div>
+                </div>
+                {policy.assessmentId && (
+                  <Button asChild className="w-full bg-orange-600 hover:bg-orange-700 text-white mt-2">
+                    <Link to={`/insurer/assessments/${policy.assessmentId}`}>
+                      <FileEdit className="mr-2 h-4 w-4" />
+                      Review & Revise Policy
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
