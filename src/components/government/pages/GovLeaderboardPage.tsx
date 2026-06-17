@@ -51,14 +51,12 @@ export function GovLeaderboardPage({
   onSectorSelect?: (sectorId: string) => void;
 }) {
   const [view, setView] = useState<View>("attention");
-  const [localCrop, setLocalCrop] = useState(crop);
-  const [localSeason, setLocalSeason] = useState(season);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
     let list = [...regions];
-    if (localCrop !== "All Crops") list = list.filter((r) => r.dominantCrop === localCrop);
+    if (crop !== "All Crops") list = list.filter((r) => r.dominantCrop === crop);
 
     if (sortConfig) {
       list.sort((a, b) => {
@@ -82,7 +80,7 @@ export function GovLeaderboardPage({
       }
     }
     return list;
-  }, [view, localCrop, sortConfig]);
+  }, [view, crop, sortConfig]);
 
   const needle = query.trim().toLowerCase();
   const searchResults = useMemo(() => {
@@ -170,29 +168,6 @@ export function GovLeaderboardPage({
             </TabsTrigger>
           </TabsList>
         </Tabs>
-
-        <div className="flex items-center gap-2">
-          <Select value={localCrop} onValueChange={setLocalCrop}>
-            <SelectTrigger className="w-[150px] cursor-pointer">
-              <SelectValue placeholder="Crop" />
-            </SelectTrigger>
-            <SelectContent>
-              {crops.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={localSeason} onValueChange={setLocalSeason}>
-            <SelectTrigger className="w-[170px] cursor-pointer">
-              <SelectValue placeholder="Season" />
-            </SelectTrigger>
-            <SelectContent>
-              {seasons.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {/* Search */}
@@ -279,8 +254,8 @@ export function GovLeaderboardPage({
                 <SortableHeader label="Cultivated" sortKey="cultivatedHa" />
                 <SortableHeader label="Dominant Crop" sortKey="dominantCrop" />
                 <SortableHeader label="Avg NDVI" sortKey="ndvi" />
-                <SortableHeader label="7d Δ" sortKey="change7d" />
-                <SortableHeader label="30d Δ" sortKey="change30d" />
+                <SortableHeader label="7D" sortKey="change7d" />
+                <SortableHeader label="30D" sortKey="change30d" />
                 <SortableHeader label="Insurance" sortKey="insurancePenetration" />
                 <SortableHeader label="Claims" sortKey="activeClaims" />
                 <SortableHeader label="Risk" sortKey="riskLevel" className="pr-6" />

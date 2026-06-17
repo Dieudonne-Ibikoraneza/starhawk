@@ -32,6 +32,7 @@ import {
   GovClaimsPage,
   GovSubsidiesPage,
   GovSeasonComparePage,
+  GovSectorPage,
 } from "@/components/government/pages";
 
 // ─── Navigation items ──────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ export const GovernmentDashboard = () => {
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("govSidebarCollapsed") === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
 
   const governmentEmail = getEmail() || "";
   const governmentPhone = getPhoneNumber() || "";
@@ -90,6 +92,7 @@ export const GovernmentDashboard = () => {
 
   useEffect(() => { document.documentElement.classList.remove("dark"); }, []);
   useEffect(() => { localStorage.setItem("govSidebarCollapsed", String(collapsed)); }, [collapsed]);
+  useEffect(() => { setSelectedSectorId(null); }, [activePage]);
 
   useEffect(() => {
     if (!profileLoading && !governmentProfile) {
@@ -297,9 +300,13 @@ export const GovernmentDashboard = () => {
           <main className="flex-1 overflow-auto bg-gray-50">
             <CustomScrollbar className="h-full">
               <div className="px-6 py-6">
-                {activePage === "leaderboard" 
-                  ? <GovLeaderboardPage crop={crop} season={season} /> 
-                  : renderPage(activePage)}
+                {activePage === "leaderboard" && selectedSectorId ? (
+                  <GovSectorPage sectorId={selectedSectorId} onBack={() => setSelectedSectorId(null)} />
+                ) : activePage === "leaderboard" ? (
+                  <GovLeaderboardPage crop={crop} season={season} onSectorSelect={setSelectedSectorId} />
+                ) : (
+                  renderPage(activePage)
+                )}
               </div>
             </CustomScrollbar>
           </main>
