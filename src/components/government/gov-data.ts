@@ -308,3 +308,154 @@ export function pctChange(a: number, b: number): number {
   if (a === 0) return b === 0 ? 0 : 100;
   return ((b - a) / Math.abs(a)) * 100;
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// SECTOR DETAIL LAYER
+// Drill down from a sector (leaderboard row) into its cells, villages, and
+// individual farmers registered there — with illustrative descriptive stats.
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface Farmer {
+  id: string;
+  name: string;
+  sectorId: string;
+  cell: string;
+  village: string;
+  crops: string[];
+  plotsHa: number;
+  insured: boolean;
+  ndvi: number;
+  riskLevel: "low" | "medium" | "high";
+}
+
+export interface VillageNode {
+  name: string;
+  farmers: number;
+  cultivatedHa: number;
+}
+
+export interface CellNode {
+  name: string;
+  villages: VillageNode[];
+  farmers: number;
+  cultivatedHa: number;
+  ndvi: number;
+  insurancePenetration: number;
+}
+
+export interface SectorDetail {
+  sector: RegionRow;
+  cells: CellNode[];
+  farmers: Farmer[];
+  stats: {
+    totalFarmers: number;
+    insuredFarmers: number;
+    totalCells: number;
+    totalVillages: number;
+    cropMix: { crop: string; ha: number }[];
+  };
+}
+
+const FIRST_NAMES = ["J.", "E.", "P.", "C.", "A.", "D.", "M.", "S.", "T.", "B.", "F.", "G.", "L.", "R.", "V."];
+const SURNAMES = [
+  "Uwimana", "Mukamana", "Habimana", "Niyonsaba", "Ingabire", "Bizimana", "Uwase",
+  "Nkurunziza", "Mukandayisenga", "Hakizimana", "Nshimiyimana", "Uwineza", "Munyaneza",
+  "Iradukunda", "Tuyishime", "Mugisha", "Cyizere", "Byiringiro", "Gatete", "Umutoni",
+];
+const CELL_NAMES = ["Kabuye", "Nyabugogo", "Karama", "Gikondo", "Rwampara", "Kanombe", "Murama", "Bweramvura"];
+const VILLAGE_NAMES = ["Akabuga", "Kanyinya", "Ruhango", "Gitega", "Nyakabanda", "Cyahafi", "Rebero", "Kimisagara"];
+const CROP_POOL = ["Maize", "Beans", "Rice", "Cassava", "Vegetables", "Irish Potato", "Soybean"];
+
+function seededInt(seed: string, min: number, max: number): number {
+  return min + Math.floor(hashSeed(seed) * (max - min + 1));
+}
+
+function pickRandom<T>(arr: T[], seed: string): T {
+  return arr[Math.floor(hashSeed(seed) * arr.length)];
+}
+
+/** Builds a deterministic detail tree for a given sector id. */
+export function getSectorDetail(sectorId: string): SectorDetail | null {
+  const sector = regions.find((r) => r.id === sectorId);
+  if (!sector) return null;
+
+  const numCells = seededInt(sectorId + "cells", 3, 5);
+  const cells: CellNode[] = [];
+  const farmers: Farmer[] = [];
+
+  for (let c = 0; c < numCells; c++) {
+    const cellName = CELL_NAMES[(seededInt(sectorId + "c" + c, 0, 1000) + c) % CELL_NAMES.length];
+    const numVillages = seededInt(sectorId + cellName + "v", 2, 4);
+    const villages: VillageNode[] = [];
+
+    for (let v = 0; v < numVillages; v++) {
+      const villageName = VILLAGE_NAMES[(seededInt(sectorId + cellName + v, 0, 1000) + v) % VILLAGE_NAMES.length];
+      const vFarmers = seededInt(sectorId + cellName + villageName + "f", 4, 9);
+      const vHa = seededInt(sectorId + cellName + villageName + "ha", 40, 180);
+      villages.push({ name: villageName, farmers: vFarmers, cultivatedHa: vHa });
+
+      for (let f = 0; f < vFarmers; f++) {
+        const fseed = sectorId + cellName + villageName + f;
+        const name = `${pickRandom(FIRST_NAMES, fseed + "fn")} ${pickRandom(SURNAMES, fseed + "sn")}`;
+        const numCrops = seededInt(fseed + "nc", 1, 3);
+        const cropSet = new Set<string>();
+        for (let k = 0; k < numCrops; k++) cropSet.add(pickRandom(CROP_POOL, fseed + "crop" + k));
+        const ndvi = +(0.5 + hashSeed(fseed + "ndvi") * 0.35).toFixed(2);
+        farmers.push({
+          id: `${sectorId}-F${farmers.length + 1}`,
+          name,
+          sectorId,
+          cell: cellName,
+          village: villageName,
+          crops: [...cropSet],
+          plotsHa: +(0.5 + hashSeed(fseed + "ha") * 4).toFixed(1),
+          insured: hashSeed(fseed + "ins") < sector.insurancePenetration / 100,
+          ndvi,
+          riskLevel: ndvi < 0.6 ? "high" : ndvi < 0.7 ? "medium" : "low",
+        });
+      }
+    }
+
+    const cellFarmers = villages.reduce((s, v) => s + v.farmers, 0);
+    const cellHa = villages.reduce((s, v) => s + v.cultivatedHa, 0);
+    cells.push({
+      name: cellName,
+      villages,
+      farmers: cellFarmers,
+      cultivatedHa: cellHa,
+      ndvi: +(sector.ndvi + (hashSeed(sectorId + cellName) - 0.5) * 0.12).toFixed(2),
+      insurancePenetration: Math.max(
+        20,
+        Math.min(95, sector.insurancePenetration + seededInt(sectorId + cellName + "ins", -12, 12)),
+      ),
+    });
+  }
+
+  const cropMixMap = new Map<string, number>();
+  for (const f of farmers) {
+    const per = f.plotsHa / f.crops.length;
+    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
+  }
+  const cropMix = [...cropMixMap.entries()]
+    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
+    .sort((a, b) => b.ha - a.ha);
+
+  const villageCount = cells.reduce((s, c) => s + c.villages.length, 0);
+
+  return {
+    sector,
+    cells,
+    farmers,
+    stats: {
+      totalFarmers: farmers.length,
+      insuredFarmers: farmers.filter((f) => f.insured).length,
+      totalCells: cells.length,
+      totalVillages: villageCount,
+      cropMix,
+    },
+  };
+}
+
+/** Flattened farmer index across all sectors — used for global name search. */
+export const allFarmers: Farmer[] = regions.flatMap((r) => getSectorDetail(r.id)?.farmers ?? []);
+

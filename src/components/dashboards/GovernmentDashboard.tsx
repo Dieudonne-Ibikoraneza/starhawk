@@ -58,7 +58,7 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
 function renderPage(page: PageId) {
   switch (page) {
     case "dashboard":   return <GovDashboardPage />;
-    case "leaderboard": return <GovLeaderboardPage />;
+    case "leaderboard": return <GovLeaderboardPage crop="All Crops" season="Season A 2026" />;
     case "policies":    return <GovPoliciesPage />;
     case "claims":      return <GovClaimsPage />;
     case "invoicing":   return <GovSubsidiesPage />;

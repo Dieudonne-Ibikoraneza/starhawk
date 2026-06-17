@@ -1,37 +1,75 @@
 import { useMemo, useState } from "react";
 import { Panel, DeltaPill, StatusBadge } from "@/components/government/gov-widgets";
-import { regions, crops, seasons, type RegionRow } from "@/components/government/gov-data";
+import {
+  regions,
+  crops,
+  seasons,
+  allFarmers,
+  type RegionRow,
+  type Farmer,
+} from "@/components/government/gov-data";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, TrendingUp, List, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertTriangle,
+  TrendingUp,
+  List,
+  Search,
+  X,
+  ChevronRight,
+  User,
+  MapPin,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type View = "attention" | "top" | "all";
 type SortConfig = { key: keyof RegionRow | "rank"; direction: "asc" | "desc" } | null;
 
-export function GovLeaderboardPage({ crop, season }: { crop: string; season: string }) {
+export function GovLeaderboardPage({
+  crop,
+  season,
+  onSectorSelect,
+}: {
+  crop: string;
+  season: string;
+  onSectorSelect?: (sectorId: string) => void;
+}) {
   const [view, setView] = useState<View>("attention");
+  const [localCrop, setLocalCrop] = useState(crop);
+  const [localSeason, setLocalSeason] = useState(season);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
     let list = [...regions];
-    if (crop !== "All Crops") list = list.filter((r) => r.dominantCrop === crop);
+    if (localCrop !== "All Crops") list = list.filter((r) => r.dominantCrop === localCrop);
 
     if (sortConfig) {
       list.sort((a, b) => {
-        let valA = a[sortConfig.key as keyof RegionRow];
-        let valB = b[sortConfig.key as keyof RegionRow];
-
-        if (sortConfig.key === "rank") {
-          return sortConfig.direction === "asc" ? -1 : 1; 
-        }
-
+        const valA = a[sortConfig.key as keyof RegionRow];
+        const valB = b[sortConfig.key as keyof RegionRow];
         if (typeof valA === "string" && typeof valB === "string") {
           return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
-        
         if (typeof valA === "number" && typeof valB === "number") {
           return sortConfig.direction === "asc" ? valA - valB : valB - valA;
         }
-        
         return 0;
       });
     } else {
@@ -44,33 +82,67 @@ export function GovLeaderboardPage({ crop, season }: { crop: string; season: str
       }
     }
     return list;
-  }, [view, crop, sortConfig]);
+  }, [view, localCrop, sortConfig]);
+
+  const needle = query.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!needle) return { sectors: [] as RegionRow[], farmers: [] as Farmer[] };
+    const sectors = regions.filter(
+      (r) => r.name.toLowerCase().includes(needle) || r.dominantCrop.toLowerCase().includes(needle),
+    );
+    const farmers = allFarmers
+      .filter(
+        (f) =>
+          f.name.toLowerCase().includes(needle) ||
+          f.cell.toLowerCase().includes(needle) ||
+          f.village.toLowerCase().includes(needle) ||
+          f.crops.join(" ").toLowerCase().includes(needle),
+      )
+      .slice(0, 8);
+    return { sectors, farmers };
+  }, [needle]);
+
+  const sectorName = (id: string) => regions.find((r) => r.id === id)?.name ?? id;
 
   const handleSort = (key: keyof RegionRow | "rank") => {
     let direction: "asc" | "desc" = "asc";
     if (sortConfig && sortConfig.key === key) {
       if (sortConfig.direction === "asc") direction = "desc";
-      else {
-        setSortConfig(null);
-        return;
-      }
+      else { setSortConfig(null); return; }
     }
     setSortConfig({ key, direction });
   };
 
-  const SortableHeader = ({ label, sortKey, className = "" }: { label: string, sortKey: keyof RegionRow | "rank", className?: string }) => {
+  const handleSectorClick = (sectorId: string) => {
+    setQuery("");
+    onSectorSelect?.(sectorId);
+  };
+
+  const SortableHeader = ({
+    label,
+    sortKey,
+    className = "",
+  }: {
+    label: string;
+    sortKey: keyof RegionRow | "rank";
+    className?: string;
+  }) => {
     const isActive = sortConfig?.key === sortKey;
     return (
       <th className={`px-4 py-3 font-medium ${className}`}>
-        <button 
+        <button
           onClick={() => handleSort(sortKey)}
-          className="flex items-center gap-1.5 uppercase tracking-wide hover:text-gray-900 focus:outline-none"
+          className="flex items-center gap-1.5 uppercase tracking-wide hover:text-foreground focus:outline-none"
         >
           {label}
           {isActive ? (
-            sortConfig.direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+            sortConfig!.direction === "asc" ? (
+              <ArrowUp className="h-3 w-3 text-primary" />
+            ) : (
+              <ArrowDown className="h-3 w-3 text-primary" />
+            )
           ) : (
-            <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 text-gray-400" />
+            <ArrowUpDown className="h-3 w-3 opacity-30" />
           )}
         </button>
       </th>
@@ -78,43 +150,151 @@ export function GovLeaderboardPage({ crop, season }: { crop: string; season: str
   };
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={view} onValueChange={(v) => { setView(v as View); setSortConfig(null); }} className="w-full sm:w-auto">
-          <TabsList className="grid w-full grid-cols-3 bg-white border border-gray-200 sm:w-auto h-10">
-            <TabsTrigger value="attention" className="gap-1.5 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+    <div className="flex flex-col space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={view}
+          onValueChange={(v) => { setView(v as View); setSortConfig(null); }}
+          className="w-full sm:w-auto"
+        >
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+            <TabsTrigger value="attention" className="gap-1.5">
               <AlertTriangle className="h-4 w-4" /> Needs Attention
             </TabsTrigger>
-            <TabsTrigger value="top" className="gap-1.5 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+            <TabsTrigger value="top" className="gap-1.5">
               <TrendingUp className="h-4 w-4" /> Top Performers
             </TabsTrigger>
-            <TabsTrigger value="all" className="gap-1.5 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+            <TabsTrigger value="all" className="gap-1.5">
               <List className="h-4 w-4" /> All Sectors
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="flex items-center gap-2">
+          <Select value={localCrop} onValueChange={setLocalCrop}>
+            <SelectTrigger className="w-[150px] cursor-pointer">
+              <SelectValue placeholder="Crop" />
+            </SelectTrigger>
+            <SelectContent>
+              {crops.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={localSeason} onValueChange={setLocalSeason}>
+            <SelectTrigger className="w-[170px] cursor-pointer">
+              <SelectValue placeholder="Season" />
+            </SelectTrigger>
+            <SelectContent>
+              {seasons.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {/* Search */}
+      <div>
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by sector, farmer name, cell, village or crop…"
+            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {needle && (
+          <Panel className="mt-2 p-2">
+            {searchResults.sectors.length === 0 && searchResults.farmers.length === 0 ? (
+              <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                No matches for "{query}".
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {searchResults.sectors.length > 0 && (
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Sectors
+                  </p>
+                )}
+                {searchResults.sectors.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleSectorClick(r.id)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-secondary/60"
+                  >
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <span className="flex-1 text-sm font-medium text-foreground">{r.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {r.dominantCrop} · {r.cultivatedHa.toLocaleString()} ha
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+                {searchResults.farmers.length > 0 && (
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Farmers
+                  </p>
+                )}
+                {searchResults.farmers.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => handleSectorClick(f.sectorId)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-secondary/60"
+                  >
+                    <User className="h-4 w-4 text-blue-500" />
+                    <span className="flex-1 text-sm font-medium text-foreground">{f.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {sectorName(f.sectorId)} · {f.cell}, {f.village}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </Panel>
+        )}
+      </div>
+
+      {/* Table */}
       <Panel className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
-              <tr className="group border-b border-gray-200 text-left text-xs text-gray-500">
-                <th className="px-4 py-3 font-medium pl-6 uppercase tracking-wide">#</th>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-3 pl-6 font-medium uppercase tracking-wide">#</th>
                 <SortableHeader label="Region" sortKey="name" />
                 <SortableHeader label="Cultivated" sortKey="cultivatedHa" />
                 <SortableHeader label="Dominant Crop" sortKey="dominantCrop" />
                 <SortableHeader label="Avg NDVI" sortKey="ndvi" />
-                <SortableHeader label="7d" sortKey="change7d" />
-                <SortableHeader label="30d" sortKey="change30d" />
+                <SortableHeader label="7d Δ" sortKey="change7d" />
+                <SortableHeader label="30d Δ" sortKey="change30d" />
                 <SortableHeader label="Insurance" sortKey="insurancePenetration" />
                 <SortableHeader label="Claims" sortKey="activeClaims" />
                 <SortableHeader label="Risk" sortKey="riskLevel" className="pr-6" />
+                <th className="px-4 py-3 pr-6" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <LeaderRow key={r.id} rank={i + 1} r={r} />
+                <LeaderRow
+                  key={r.id}
+                  rank={i + 1}
+                  r={r}
+                  onOpen={() => handleSectorClick(r.id)}
+                />
               ))}
             </tbody>
           </table>
@@ -124,25 +304,31 @@ export function GovLeaderboardPage({ crop, season }: { crop: string; season: str
   );
 }
 
-function LeaderRow({ rank, r }: { rank: number; r: RegionRow }) {
+function LeaderRow({ rank, r, onOpen }: { rank: number; r: RegionRow; onOpen: () => void }) {
   return (
-    <tr className="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50">
-      <td className="px-4 py-3 font-mono text-gray-500 pl-6">{rank}</td>
+    <tr
+      onClick={onOpen}
+      className={cn(
+        "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40",
+      )}
+    >
+      <td className="px-4 py-3 pl-6 font-mono text-muted-foreground">{rank}</td>
       <td className="px-4 py-3">
-        <div className="font-medium text-gray-900">{r.name}</div>
-        <div className="text-xs text-gray-500">{r.level}</div>
+        <div className="font-medium text-foreground">{r.name}</div>
+        <div className="text-xs text-muted-foreground">{r.level}</div>
       </td>
-      <td className="px-4 py-3 font-mono text-gray-900">{r.cultivatedHa.toLocaleString()} ha</td>
-      <td className="px-4 py-3 text-gray-900">{r.dominantCrop}</td>
+      <td className="px-4 py-3 font-mono text-foreground">{r.cultivatedHa.toLocaleString()} ha</td>
+      <td className="px-4 py-3 text-foreground">{r.dominantCrop}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-semibold text-gray-900">{r.ndvi.toFixed(2)}</span>
-          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100">
+          <span className="font-mono font-semibold text-foreground">{r.ndvi.toFixed(2)}</span>
+          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full"
-              style={{ 
-                width: `${r.ndvi * 100}%`, 
-                backgroundColor: r.ndvi < 0.62 ? "#ef4444" : r.ndvi < 0.7 ? "#f59e0b" : "#10b981" 
+              className="h-full rounded-full transition-[width] duration-500"
+              style={{
+                width: `${r.ndvi * 100}%`,
+                backgroundColor:
+                  r.ndvi < 0.62 ? "#ef4444" : r.ndvi < 0.7 ? "#f59e0b" : "#10b981",
               }}
             />
           </div>
@@ -150,9 +336,80 @@ function LeaderRow({ rank, r }: { rank: number; r: RegionRow }) {
       </td>
       <td className="px-4 py-3"><DeltaPill value={r.change7d} /></td>
       <td className="px-4 py-3"><DeltaPill value={r.change30d} /></td>
-      <td className="px-4 py-3 font-mono text-gray-900">{r.insurancePenetration}%</td>
-      <td className="px-4 py-3 font-mono text-gray-900">{r.activeClaims}</td>
+      <td className="px-4 py-3 font-mono text-foreground">{r.insurancePenetration}%</td>
+      <td className="px-4 py-3 font-mono text-foreground">{r.activeClaims}</td>
       <td className="px-4 py-3 pr-6"><StatusBadge status={r.riskLevel} /></td>
+      <td className="px-4 py-3 pr-6 text-right">
+        <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+      </td>
     </tr>
+  );
+}
+
+// ─── Farmer Quick-View Dialog (for future farmer search result clicks) ────────
+
+export function FarmerDialog({
+  farmer,
+  sectorName,
+  onClose,
+}: {
+  farmer: Farmer | null;
+  sectorName: string;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={!!farmer} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        {farmer && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">{farmer.name}</DialogTitle>
+              <DialogDescription>
+                {farmer.village} Village · {farmer.cell} Cell · {sectorName} Sector
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <StatCard label="Farmer ID" value={farmer.id} mono />
+              <StatCard label="Plots" value={`${farmer.plotsHa} ha`} mono />
+              <StatCard label="NDVI" value={farmer.ndvi.toFixed(2)} mono />
+              <StatCard label="Insurance" value={farmer.insured ? "Insured" : "Uninsured"} />
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                Crops cultivated
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {farmer.crops.map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-md bg-secondary px-2 py-1 text-sm text-secondary-foreground"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+              <span className="text-sm text-muted-foreground">Risk level</span>
+              <StatusBadge status={farmer.riskLevel} />
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StatCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-3 py-2.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn("mt-0.5 text-sm font-semibold text-foreground", mono && "font-mono")}>
+        {value}
+      </p>
+    </div>
   );
 }
