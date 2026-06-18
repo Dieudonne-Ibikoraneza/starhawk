@@ -69,28 +69,34 @@ export interface ClaimRow {
   crop: string;
   cause: "Drought" | "Flood" | "Pest" | "Hail";
   value: number;
+  areaLostHa: number;
   status: "Pending" | "Approved" | "Rejected" | "Paid";
   filed: string;
   insurer: string;
 }
 
 export const claims: ClaimRow[] = [
-  { id: "CLM-2041", farmer: "J. Uwimana", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1850000, status: "Pending", filed: "2026-06-08", insurer: "Radiant Yacu" },
-  { id: "CLM-2042", farmer: "E. Mukamana", region: "Bumbogo", crop: "Rice", cause: "Flood", value: 2400000, status: "Approved", filed: "2026-06-07", insurer: "Prime Insurance" },
-  { id: "CLM-2043", farmer: "P. Habimana", region: "Ndera", crop: "Cassava", cause: "Pest", value: 720000, status: "Paid", filed: "2026-06-05", insurer: "Sanlam" },
-  { id: "CLM-2044", farmer: "C. Niyonsaba", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1320000, status: "Pending", filed: "2026-06-09", insurer: "Radiant Yacu" },
-  { id: "CLM-2045", farmer: "A. Ingabire", region: "Jabana", crop: "Beans", cause: "Hail", value: 540000, status: "Rejected", filed: "2026-06-04", insurer: "Prime Insurance" },
-  { id: "CLM-2046", farmer: "D. Bizimana", region: "Bumbogo", crop: "Rice", cause: "Flood", value: 2810000, status: "Approved", filed: "2026-06-06", insurer: "Sanlam" },
-  { id: "CLM-2047", farmer: "M. Uwase", region: "Remera", crop: "Maize", cause: "Drought", value: 980000, status: "Paid", filed: "2026-06-02", insurer: "Radiant Yacu" },
-  { id: "CLM-2048", farmer: "S. Nkurunziza", region: "Nduba", crop: "Cassava", cause: "Pest", value: 610000, status: "Pending", filed: "2026-06-09", insurer: "Prime Insurance" },
+  { id: "CLM-2041", farmer: "J. Uwimana", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1850000, areaLostHa: 12.5, status: "Pending", filed: "2026-06-08", insurer: "Radiant Yacu" },
+  { id: "CLM-2042", farmer: "E. Mukamana", region: "Bumbogo", crop: "Rice", cause: "Flood", value: 2400000, areaLostHa: 18.1, status: "Approved", filed: "2026-06-07", insurer: "Prime Insurance" },
+  { id: "CLM-2043", farmer: "P. Habimana", region: "Ndera", crop: "Cassava", cause: "Pest", value: 720000, areaLostHa: 5.2, status: "Paid", filed: "2026-06-05", insurer: "Sanlam" },
+  { id: "CLM-2044", farmer: "C. Niyonsaba", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1320000, areaLostHa: 9.7, status: "Pending", filed: "2026-06-09", insurer: "Radiant Yacu" },
+  { id: "CLM-2045", farmer: "A. Ingabire", region: "Jabana", crop: "Beans", cause: "Hail", value: 540000, areaLostHa: 3.4, status: "Rejected", filed: "2026-06-04", insurer: "Prime Insurance" },
+  { id: "CLM-2046", farmer: "D. Bizimana", region: "Bumbogo", crop: "Rice", cause: "Flood", value: 2810000, areaLostHa: 21.6, status: "Approved", filed: "2026-06-06", insurer: "Sanlam" },
+  { id: "CLM-2047", farmer: "M. Uwase", region: "Remera", crop: "Maize", cause: "Drought", value: 980000, areaLostHa: 7.1, status: "Paid", filed: "2026-06-02", insurer: "Radiant Yacu" },
+  { id: "CLM-2048", farmer: "S. Nkurunziza", region: "Nduba", crop: "Cassava", cause: "Pest", value: 610000, areaLostHa: 4.5, status: "Pending", filed: "2026-06-09", insurer: "Prime Insurance" },
 ];
 
+// Disaster epicenters by cause — sized either by share of claims or share of damaged area.
 export const claimCauses = [
-  { cause: "Drought", count: 60, fill: "var(--color-chart-3)" },
-  { cause: "Flood", count: 30, fill: "var(--color-chart-2)" },
-  { cause: "Pest", count: 7, fill: "var(--color-chart-1)" },
-  { cause: "Hail", count: 3, fill: "var(--color-chart-5)" },
+  { cause: "Drought", count: 60, area: 1840, fill: "var(--color-chart-3)" },
+  { cause: "Flood", count: 30, area: 2210, fill: "var(--color-chart-2)" },
+  { cause: "Pest", count: 7, area: 420, fill: "var(--color-chart-1)" },
+  { cause: "Hail", count: 3, area: 180, fill: "var(--color-chart-5)" },
 ];
+
+export const claimInsurers = ["All Insurers", "Radiant Yacu", "Prime Insurance", "Sanlam"] as const;
+export const claimStatuses = ["All Statuses", "Pending", "Approved", "Paid", "Rejected"] as const;
+export const claimCauseList = ["All Causes", "Drought", "Flood", "Pest", "Hail"] as const;
 
 export interface PolicyRow {
   id: string;
