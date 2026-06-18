@@ -50,7 +50,7 @@ export function GovSubsidiesPage() {
                 <XAxis dataKey="crop" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip
-                  cursor={{ fill: "var(--color-secondary)", opacity: 0.4 }}
+                  cursor={{ fill: "#f3f4f6", opacity: 0.8 }}
                   contentStyle={{
                     backgroundColor: "white",
                     border: "1px solid #e5e7eb",
