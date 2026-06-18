@@ -60,7 +60,7 @@ export function GovSubsidiesPage() {
                   itemStyle={{ color: "#111827", fontWeight: 500 }}
                   formatter={(value: number, name: string) => [`${value}M RWF`, name === "amount" ? "Subsidy" : name]}
                 />
-                <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="var(--color-primary)" />
+                <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#0ea5e9" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -93,7 +93,7 @@ export function GovSubsidiesPage() {
                     <td className="px-4 py-3 text-foreground font-medium">{inv.insurer}</td>
                     <td className="px-4 py-3 text-muted-foreground">{inv.period}</td>
                     <td className="px-4 py-3 font-mono text-foreground">{inv.farmsCovered.toLocaleString()}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{rwf(inv.premiumTotal)}</td>
+                    <td className="px-4 py-3 font-mono text-muted-foreground">{rwf(inv.subsidyAmount / 0.4)}</td>
                     <td className="px-4 py-3 font-mono font-semibold text-foreground">{rwf(inv.subsidyAmount)}</td>
                     <td className="px-4 py-3 pr-5"><StatusBadge status={inv.status} /></td>
                   </tr>
