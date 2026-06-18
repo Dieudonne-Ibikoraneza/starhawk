@@ -14,14 +14,21 @@ import {
 } from "recharts";
 import { Wallet, ShieldCheck, FileText, FileWarning, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
-const cropTypes = [
-  "Maize", "Beans", "Rice", "Wheat", "Sorghum", "Potatoes", 
-  "Cassava", "Bananas", "Coffee", "Tea", "Other"
+const cropAdoptionData = [
+  { crop: "Maize", policies: 8420 },
+  { crop: "Beans", policies: 6100 },
+  { crop: "Rice", policies: 5300 },
+  { crop: "Wheat", policies: 4200 },
+  { crop: "Sorghum", policies: 3800 },
+  { crop: "Potatoes", policies: 3100 },
+  { crop: "Cassava", policies: 2400 },
+  { crop: "Bananas", policies: 1900 },
+  { crop: "Coffee", policies: 1500 },
+  { crop: "Tea", policies: 950 },
+  { crop: "Other", policies: 630 },
 ];
 
 export function GovPoliciesPage() {
-  const [selectedCrop, setSelectedCrop] = useState("Maize");
-
   const genderData = [
     { name: "Female", value: 54, color: "#10b981" }, // emerald-500
     { name: "Male", value: 46, color: "#0ea5e9" },   // sky-500
@@ -228,31 +235,43 @@ export function GovPoliciesPage() {
         </Panel>
       </div>
 
-      {/* Adoption by Crop Grid */}
-      <Panel className="p-0" title="">
-        <div className="px-5 pt-5 pb-2">
-          <h3 className="text-base font-semibold text-gray-900">Adoption by Crop</h3>
-          <p className="mt-0.5 text-xs text-gray-500">Filter registry and view adoption metrics per crop</p>
-        </div>
-        <div className="p-5">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {cropTypes.map((crop) => {
-              const isSelected = selectedCrop === crop;
-              return (
-                <button
-                  key={crop}
-                  onClick={() => setSelectedCrop(crop)}
-                  className={`px-4 py-3 text-sm font-medium rounded-xl border transition-all duration-200 ${
-                    isSelected 
-                      ? "bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm" 
-                      : "bg-white border-gray-200 text-gray-600 hover:border-emerald-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {crop}
-                </button>
-              );
-            })}
-          </div>
+      {/* Adoption by Crop Chart */}
+      <Panel title="Adoption by Crop" subtitle="Active policies per crop type">
+        <div className="h-[280px] w-full pt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={cropAdoptionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis 
+                dataKey="crop" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: "#6b7280", fontSize: 12 }}
+                dy={10}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: "#6b7280", fontSize: 12 }} 
+              />
+              <RechartsTooltip
+                cursor={{ fill: "#f9fafb" }}
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                }}
+                itemStyle={{ color: "#111827", fontWeight: 500 }}
+                formatter={(value: number) => [value.toLocaleString(), "Active Policies"]}
+              />
+              <Bar 
+                dataKey="policies" 
+                fill="#10b981" 
+                radius={[4, 4, 0, 0]}
+                barSize={40}
+              />
+            </RechartsBarChart>
+          </ResponsiveContainer>
         </div>
       </Panel>
 
