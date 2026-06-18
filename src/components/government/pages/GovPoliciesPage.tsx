@@ -239,7 +239,7 @@ export function GovPoliciesPage() {
       <Panel title="Adoption by Crop" subtitle="Active policies per crop type">
         <div className="h-[280px] w-full pt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <RechartsBarChart data={cropAdoptionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <RechartsBarChart data={cropAdoptionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis 
                 dataKey="crop" 
