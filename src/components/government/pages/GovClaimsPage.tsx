@@ -19,14 +19,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-const tooltipStyle = {
-  background: "var(--color-popover)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 12,
-  color: "var(--color-foreground)",
-  fontSize: 12,
-};
-
 type EpicenterMode = "area" | "claims";
 
 export function GovClaimsPage() {
@@ -86,8 +78,14 @@ export function GovClaimsPage() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(v: number) => (mode === "area" ? [`${v.toLocaleString()} ha`, "Damaged area"] : [`${v}%`, "Share of claims"])}
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  itemStyle={{ color: "#111827", fontWeight: 500 }}
+                  formatter={(v: number, name: string) => (mode === "area" ? [`${v.toLocaleString()} ha`, name] : [`${v}%`, name])}
                 />
               </PieChart>
             </ResponsiveContainer>

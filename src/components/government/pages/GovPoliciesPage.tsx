@@ -159,7 +159,7 @@ export function GovPoliciesPage() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                   itemStyle={{ color: "#111827", fontWeight: 500 }}
-                  formatter={(value: number) => [`${value}%`, "Adoption"]}
+                  formatter={(value: number, name: string) => [`${value}%`, name]}
                 />
               </PieChart>
             </ResponsiveContainer>
