@@ -30,7 +30,7 @@ export function GovSubsidiesPage() {
             <span className="text-sm text-muted-foreground">{subsidyBudget.utilized}M / {subsidyBudget.allocated}M</span>
           </div>
           <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${utilizedPct}%` }} />
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${utilizedPct}%` }} />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             {subsidyBudget.allocated - subsidyBudget.utilized}M RWF remaining for Season A disbursements.
@@ -60,7 +60,7 @@ export function GovSubsidiesPage() {
                   itemStyle={{ color: "#111827", fontWeight: 500 }}
                   formatter={(value: number, name: string) => [`${value}M RWF`, name === "amount" ? "Subsidy" : name]}
                 />
-                <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#0ea5e9" />
+                <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
           </div>
