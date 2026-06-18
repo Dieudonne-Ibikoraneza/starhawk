@@ -88,10 +88,10 @@ export const claims: ClaimRow[] = [
 
 // Disaster epicenters by cause — sized either by share of claims or share of damaged area.
 export const claimCauses = [
-  { cause: "Drought", count: 60, area: 1840, fill: "var(--color-chart-3)" },
-  { cause: "Flood", count: 30, area: 2210, fill: "var(--color-chart-2)" },
-  { cause: "Pest", count: 7, area: 420, fill: "var(--color-chart-1)" },
-  { cause: "Hail", count: 3, area: 180, fill: "var(--color-chart-5)" },
+  { cause: "Drought", count: 60, area: 1840, fill: "#f59e0b" }, // amber
+  { cause: "Flood", count: 30, area: 2210, fill: "#0ea5e9" },   // sky
+  { cause: "Pest", count: 7, area: 420, fill: "#10b981" },      // emerald
+  { cause: "Hail", count: 3, area: 180, fill: "#8b5cf6" },      // violet
 ];
 
 export const claimInsurers = ["All Insurers", "Radiant Yacu", "Prime Insurance", "Sanlam"] as const;

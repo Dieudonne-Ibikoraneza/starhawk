@@ -65,7 +65,7 @@ export function GovClaimsPage() {
         <KpiCard label="Claims Approved" value="842" delta={4} icon={CheckCircle2} accent="info" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 items-start">
         <Panel
           title="Disaster Epicenters"
           subtitle={mode === "area" ? "Damaged area by cause (ha)" : "Claims filed by cause"}
