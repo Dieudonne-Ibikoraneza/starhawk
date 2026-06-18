@@ -268,7 +268,7 @@ export function GovPoliciesPage() {
                 dataKey="policies" 
                 fill="#10b981" 
                 radius={[4, 4, 0, 0]}
-                barSize={40}
+                maxBarSize={80}
               />
             </RechartsBarChart>
           </ResponsiveContainer>
