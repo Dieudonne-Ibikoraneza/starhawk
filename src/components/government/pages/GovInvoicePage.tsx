@@ -13,29 +13,29 @@ export function GovInvoicePage({
   return (
     <div className="flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start md:items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0 mt-1 md:mt-0">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Invoice {invoice.id}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate">Invoice {invoice.id}</h1>
               <StatusBadge status={invoice.status} />
             </div>
-            <p className="text-muted-foreground flex items-center gap-2 mt-1">
-              <ShieldCheck className="h-4 w-4" />
-              Issued by {invoice.insurer} on {invoice.issued}
+            <p className="text-sm md:text-base text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <span className="truncate">Issued by {invoice.insurer} on {invoice.issued}</span>
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
+        <div className="flex items-center gap-3 w-full md:w-auto pl-14 md:pl-0">
+          <Button variant="outline" className="gap-2 flex-1 md:flex-none">
             <XCircle className="h-4 w-4" /> Reject
           </Button>
-          <Button className="gap-2" disabled={invoice.status === "Paid"}>
+          <Button className="gap-2 flex-1 md:flex-none" disabled={invoice.status === "Paid"}>
             <CheckCircle2 className="h-4 w-4" /> 
-            {invoice.status === "Paid" ? "Already Paid" : "Process Payment"}
+            <span className="truncate">{invoice.status === "Paid" ? "Already Paid" : "Process Payment"}</span>
           </Button>
         </div>
       </div>
@@ -104,7 +104,7 @@ export function GovInvoicePage({
         </div>
 
         {/* Right Side: PDF Viewer */}
-        <div className="lg:col-span-7 rounded-2xl border border-gray-200 bg-[#525659] shadow-inner overflow-hidden flex flex-col h-[800px]">
+        <div className="lg:col-span-7 rounded-2xl border border-gray-200 bg-[#525659] shadow-inner overflow-hidden flex flex-col h-[500px] lg:h-[800px]">
           {/* PDF Toolbar */}
           <div className="bg-[#323639] border-b border-[#1f2122] p-2 flex items-center justify-between text-gray-300 shadow-sm shrink-0">
             <div className="flex items-center gap-1">
