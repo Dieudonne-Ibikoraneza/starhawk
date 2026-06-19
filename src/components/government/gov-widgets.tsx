@@ -93,7 +93,7 @@ export function KpiCard({
         </span>
       </div>
       <div className="relative mt-3 flex items-end gap-1.5">
-        <span className={cn("font-mono text-3xl font-bold tracking-tight", valueColorMap[accent])}>{value}</span>
+        <span className={cn("text-3xl font-bold tracking-tight tabular-nums", valueColorMap[accent])}>{value}</span>
         {unit && <span className="mb-1 text-sm text-gray-500">{unit}</span>}
       </div>
       {delta !== undefined && (

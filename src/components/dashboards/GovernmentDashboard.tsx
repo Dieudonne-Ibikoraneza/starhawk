@@ -36,6 +36,7 @@ import {
   GovCellPage,
   GovVillagePage,
 } from "@/components/government/pages";
+import { GovFarmerPage } from "@/components/government/pages/GovFarmerPage";
 
 // ─── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -80,7 +81,7 @@ export const GovernmentDashboard = () => {
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("govSidebarCollapsed") === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [viewStack, setViewStack] = useState<{ id: string, level: "Sector" | "Cell" | "Village" }[]>([]);
+  const [viewStack, setViewStack] = useState<{ id: string, level: "Sector" | "Cell" | "Village" | "Farmer" }[]>([]);
 
   const governmentEmail = getEmail() || "";
   const governmentPhone = getPhoneNumber() || "";
@@ -295,20 +296,7 @@ export const GovernmentDashboard = () => {
               <p className="mt-0.5 text-sm text-gray-500">{meta.description}</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              {activePage === "leaderboard" && (
-                <div className="hidden sm:block">
-                  <Select value={crop} onValueChange={setCrop}>
-                    <SelectTrigger className="w-[150px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
-                      <SelectValue placeholder="Crop" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {crops.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+
               <div className="hidden sm:block">
                 <Select value={season} onValueChange={setSeason}>
                   <SelectTrigger className="w-[170px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
@@ -332,7 +320,7 @@ export const GovernmentDashboard = () => {
                   (() => {
                     const currentView = viewStack[viewStack.length - 1];
                     const popView = () => setViewStack(prev => prev.slice(0, prev.length - 1));
-                    const handleNavigate = (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => {
+                    const handleNavigate = (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village" | "Farmer"; id?: string }) => {
                       if (target.level === "Leaderboard") {
                         setViewStack([]);
                       } else if (target.level === "Sector" && target.id) {
@@ -352,25 +340,40 @@ export const GovernmentDashboard = () => {
                           { id: cId, level: "Cell" },
                           { id: target.id, level: "Village" }
                         ]);
+                      } else if (target.level === "Farmer" && target.id) {
+                        const parts = target.id.split("-");
+                        const sId = parts[0];
+                        const cId = parts[0] + "-" + parts[1];
+                        const vId = parts[0] + "-" + parts[1] + "-" + parts[2];
+                        setViewStack([
+                          { id: sId, level: "Sector" },
+                          { id: cId, level: "Cell" },
+                          { id: vId, level: "Village" },
+                          { id: target.id, level: "Farmer" }
+                        ]);
                       }
                     };
                     
                     if (currentView.level === "Sector") {
                       return <GovSectorPage sectorId={currentView.id} onBack={popView} onNavigate={handleNavigate} onCellSelect={(cellId) => {
                         setViewStack(prev => [...prev, { id: cellId, level: "Cell" }]);
-                      }} />;
+                      }} onFarmerSelect={(farmerId) => setViewStack(prev => [...prev, { id: farmerId, level: "Farmer" }])} />;
                     } else if (currentView.level === "Cell") {
                       return <GovCellPage cellId={currentView.id} onBack={popView} onNavigate={handleNavigate} onVillageSelect={(villageId) => {
                         setViewStack(prev => [...prev, { id: villageId, level: "Village" }]);
-                      }} />;
+                      }} onFarmerSelect={(farmerId) => setViewStack(prev => [...prev, { id: farmerId, level: "Farmer" }])} />;
                     } else if (currentView.level === "Village") {
-                      return <GovVillagePage villageId={currentView.id} onBack={popView} onNavigate={handleNavigate} />;
+                      return <GovVillagePage villageId={currentView.id} onBack={popView} onNavigate={handleNavigate} onFarmerSelect={(farmerId) => {
+                        setViewStack(prev => [...prev, { id: farmerId, level: "Farmer" }]);
+                      }} />;
+                    } else if (currentView.level === "Farmer") {
+                      return <GovFarmerPage farmerId={currentView.id} onBack={popView} onNavigate={handleNavigate} />;
                     }
                   })()
                 ) : activePage === "leaderboard" ? (
                   <GovLeaderboardPage crop={crop} season={season} onSectorSelect={(id, level) => {
                     setViewStack([{ id, level }]);
-                  }} />
+                  }} onCropChange={setCrop} />
                 ) : (
                   renderPage(activePage)
                 )}
