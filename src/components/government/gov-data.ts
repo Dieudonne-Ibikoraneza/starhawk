@@ -32,6 +32,7 @@ export const regions: RegionRow[] = [
 ];
 
 export const crops = ["All Crops", "Maize", "Beans", "Rice", "Cassava", "Vegetables"] as const;
+export const SUBSIDY_RATE = 0.4;
 export const seasons = ["Season A 2026", "Season B 2025", "Season A 2025"] as const;
 
 // NDVI trajectory — current season vs last year (12 weeks)
@@ -267,6 +268,10 @@ export const concepts: ConceptDef[] = [
 
 export type ConceptValues = Record<ConceptKey, number>;
 
+function pick<T>(arr: readonly T[] | T[], seed: string): T {
+  return arr[Math.floor(hashSeed(seed) * arr.length)];
+}
+
 function hashSeed(str: string): number {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -327,6 +332,10 @@ export interface Farmer {
   sectorId: string;
   cell: string;
   village: string;
+  villageId: string;
+  cellId: string;
+  phone: string;
+  registeredOn: string;
   crops: string[];
   plotsHa: number;
   insured: boolean;
@@ -411,12 +420,24 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
         const cropSet = new Set<string>();
         for (let k = 0; k < numCrops; k++) cropSet.add(pickRandom(CROP_POOL, fseed + "crop" + k));
         const ndvi = +(0.5 + hashSeed(fseed + "ndvi") * 0.35).toFixed(2);
+
+        const phone = `+250 7${seededInt(fseed + "ph0", 2, 9)}${seededInt(fseed + "ph1", 0, 9)} ${String(seededInt(fseed + "ph2", 100, 999))} ${String(seededInt(fseed + "ph3", 100, 999))}`;
+        const regYear = seededInt(fseed + "ry", 2021, 2025);
+        const regMonth = String(seededInt(fseed + "rm", 1, 12)).padStart(2, "0");
+        const regDay = String(seededInt(fseed + "rd", 1, 28)).padStart(2, "0");
+
         farmers.push({
+          phone,
+          registeredOn: `${regYear}-${regMonth}-${regDay}`,
+          cellId,
+          villageId,
           id: `${sectorId}-F${farmers.length + 1}`,
           name,
           sectorId,
           cell: cellName,
+          cellId,
           village: villageName,
+          villageId,
           crops: [...cropSet],
           plotsHa: +(0.5 + hashSeed(fseed + "ha") * 4).toFixed(1),
           insured: hashSeed(fseed + "ins") < sector.insurancePenetration / 100,
@@ -618,4 +639,326 @@ export function getVillageDetail(villageId: string): VillageDetail | null {
 
 /** Flattened farmer index across all sectors — used for global name search. */
 export const allFarmers: Farmer[] = regions.flatMap((r) => getSectorDetail(r.id)?.farmers ?? []);
+
+
+// --------------------------------------------------------------------------
+// FARMER PROFILE LAYER
+// Deep, deterministic per-farmer detail: plantings (with planting dates,
+// season, area & insurance status) and the insurance policies covering them.
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface FarmerPlanting {
+  id: string;
+  crop: string;
+  season: string;
+  plantedOn: string;
+  expectedHarvest: string;
+  areaHa: number;
+  insured: boolean;
+  policyId?: string;
+  status: "Growing" | "Harvested" | "Failed";
+  expectedYieldT: number;
+}
+
+export interface FarmerPolicy {
+  id: string;
+  crop: string;
+  insurer: string;
+  sumInsured: number;
+  premium: number;
+  govShare: number;
+  status: "Active" | "Expired";
+  startDate: string;
+  expiry: string;
+}
+
+export interface FarmerIdentity {
+  nationalId: string;
+  cooperative: string;
+  province: string;
+  district: string;
+  sector: string;
+  cell: string;
+  village: string;
+}
+
+export interface FarmerCropPortfolio {
+  crop: string;
+  areaHa: number;
+  share: number; // % of cultivated area
+}
+
+export interface FarmerNdviPoint {
+  week: string;
+  farmer: number;
+  sectorAvg: number;
+}
+
+export interface FarmerClaim {
+  id: string;
+  crop: string;
+  cause: "Drought" | "Flood" | "Pest" | "Hail";
+  filed: string;
+  areaLostHa: number;
+  payout: number;
+  status: "Pending" | "Approved" | "Paid" | "Rejected";
+  insurer: string;
+}
+
+export interface FarmerAlert {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail: string;
+  time: string;
+}
+
+export interface FarmerProfile {
+  farmer: Farmer;
+  sectorName: string;
+  identity: FarmerIdentity;
+  portfolio: FarmerCropPortfolio[];
+  ndviSeries: FarmerNdviPoint[];
+  claimsHistory: FarmerClaim[];
+  alerts: FarmerAlert[];
+  plantings: FarmerPlanting[];
+  policies: FarmerPolicy[];
+  totals: {
+    plantings: number;
+    insuredPlantings: number;
+    totalAreaHa: number;
+    cultivatedAreaHa: number;
+    sumInsured: number;
+    totalPayout: number;
+    openClaims: number;
+  };
+}
+
+const PLANTING_SEASONS = ["Season A 2026", "Season B 2025", "Season A 2025"] as const;
+const INSURERS = ["Radiant Yacu", "Prime Insurance", "Sanlam"] as const;
+const COOPERATIVES = [
+  "COAMV Twiyubake",
+  "Abahuzamugambi Coop",
+  "Imbaraga Farmers Coop",
+  "Tuzamurane Coop",
+  "Indatwa Agri Coop",
+  "Dukundane Coop",
+];
+const CAUSES = ["Drought", "Flood", "Pest", "Hail"] as const;
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Looks up a single farmer by id across all sectors. */
+export function getFarmer(farmerId: string): Farmer | null {
+  return allFarmers.find((f) => f.id === farmerId) ?? null;
+}
+
+/** Builds a deterministic, share-ready profile for a single farmer. */
+export function getFarmerProfile(farmerId: string): FarmerProfile | null {
+  const farmer = getFarmer(farmerId);
+  if (!farmer) return null;
+
+  const plantings: FarmerPlanting[] = [];
+  const policies: FarmerPolicy[] = [];
+
+  farmer.crops.forEach((crop, ci) => {
+    PLANTING_SEASONS.forEach((season, si) => {
+      // Not every crop is planted every season.
+      const pseed = `${farmer.id}${crop}${season}`;
+      if (si > 0 && hashSeed(pseed + "skip") < 0.45) return;
+
+      const seasonYear = season.slice(-4);
+      const baseMonth = season.startsWith("Season A") ? 9 : 2; // A=Sept, B=Feb
+      const month = String(baseMonth).padStart(2, "0");
+      const day = String(seededInt(pseed + "day", 1, 26)).padStart(2, "0");
+      const plantedOn = `${seasonYear}-${month}-${day}`;
+      const growDays = seededInt(pseed + "grow", 95, 140);
+      const expectedHarvest = addDays(plantedOn, growDays);
+      const areaHa = +(0.3 + hashSeed(pseed + "area") * (farmer.plotsHa - 0.2)).toFixed(1);
+
+      const insured = farmer.insured && hashSeed(pseed + "ins") < 0.7;
+      const isCurrent = season === "Season A 2026";
+      const status: FarmerPlanting["status"] = isCurrent
+        ? "Growing"
+        : hashSeed(pseed + "fail") < 0.12
+          ? "Failed"
+          : "Harvested";
+
+      let policyId: string | undefined;
+      if (insured) {
+        policyId = `POL-${farmer.id.replace(/[^0-9]/g, "")}${ci}${si}`;
+        const sumInsured = Math.round((600000 + hashSeed(pseed + "sum") * 2600000) / 1000) * 1000;
+        const premium = Math.round((sumInsured * (0.06 + hashSeed(pseed + "prem") * 0.04)) / 100) * 100;
+        policies.push({
+          id: policyId,
+          crop,
+          insurer: pick([...INSURERS], pseed + "insurer"),
+          sumInsured,
+          premium,
+          govShare: Math.round(premium * SUBSIDY_RATE),
+          status: isCurrent ? "Active" : "Expired",
+          startDate: plantedOn,
+          expiry: addDays(plantedOn, 240),
+        });
+      }
+
+      plantings.push({
+        id: `${farmer.id}-P${plantings.length + 1}`,
+        crop,
+        season,
+        plantedOn,
+        expectedHarvest,
+        areaHa,
+        insured,
+        policyId,
+        status,
+        expectedYieldT: +(areaHa * (2 + hashSeed(pseed + "yield") * 3)).toFixed(1),
+      });
+    });
+  });
+
+  plantings.sort((a, b) => (a.plantedOn < b.plantedOn ? 1 : -1));
+
+  const sector = regions.find((r) => r.id === farmer.sectorId);
+  const sectorName = sector?.name ?? farmer.sectorId;
+
+  // Identity & location (all illustrative sectors sit in Gasabo, Kigali City).
+  const identity: FarmerIdentity = {
+    nationalId: `1 ${seededInt(farmer.id + "nid0", 1985, 2002)} 8 ${String(seededInt(farmer.id + "nid1", 1000000, 9999999))} ${seededInt(farmer.id + "nid2", 0, 9)} ${seededInt(farmer.id + "nid3", 10, 99)}`,
+    cooperative: pick(COOPERATIVES, farmer.id + "coop"),
+    province: "Kigali City",
+    district: "Gasabo",
+    sector: sectorName,
+    cell: farmer.cell,
+    village: farmer.village,
+  };
+
+  // Crop portfolio — total cultivated area split by crop (current plantings).
+  const current = plantings.filter((p) => p.status === "Growing");
+  const portfolioBase = current.length > 0 ? current : plantings;
+  const portMap = new Map<string, number>();
+  for (const p of portfolioBase) portMap.set(p.crop, (portMap.get(p.crop) ?? 0) + p.areaHa);
+  const cultivatedAreaHa = +[...portMap.values()].reduce((s, v) => s + v, 0).toFixed(1);
+  const portfolio: FarmerCropPortfolio[] = [...portMap.entries()]
+    .map(([crop, areaHa]) => ({
+      crop,
+      areaHa: +areaHa.toFixed(1),
+      share: cultivatedAreaHa === 0 ? 0 : Math.round((areaHa / cultivatedAreaHa) * 100),
+    }))
+    .sort((a, b) => b.areaHa - a.areaHa);
+
+  // NDVI trajectory for this farmer's plots vs the sector average (12 weeks).
+  const sectorNdvi = sector?.ndvi ?? 0.65;
+  const ndviSeries: FarmerNdviPoint[] = Array.from({ length: 12 }, (_, i) => {
+    const wseed = farmer.id + "w" + i;
+    const wobble = (hashSeed(wseed) - 0.5) * 0.06;
+    const trend = (i - 6) * 0.004 * (farmer.ndvi - 0.6) * 10;
+    const farmerVal = Math.max(0.3, Math.min(0.92, farmer.ndvi + wobble + trend));
+    const sectorVal = Math.max(0.3, Math.min(0.92, sectorNdvi + (hashSeed(wseed + "s") - 0.5) * 0.04 + (i - 6) * 0.002));
+    return { week: `W${i + 1}`, farmer: +farmerVal.toFixed(3), sectorAvg: +sectorVal.toFixed(3) };
+  });
+
+  // Claims & payout history — failed plantings or weather-hit insured crops.
+  const claimsHistory: FarmerClaim[] = [];
+  plantings.forEach((p, idx) => {
+    const cseed = farmer.id + p.id;
+    const hasClaim = p.status === "Failed" || (p.insured && hashSeed(cseed + "claim") < 0.3);
+    if (!hasClaim) return;
+    const cause = pick([...CAUSES], cseed + "cause");
+    const areaLostHa = +(p.areaHa * (0.3 + hashSeed(cseed + "loss") * 0.7)).toFixed(1);
+    const roll = hashSeed(cseed + "status");
+    const isCurrent = p.season === "Season A 2026";
+    const status: FarmerClaim["status"] = isCurrent
+      ? roll < 0.5
+        ? "Pending"
+        : "Approved"
+      : roll < 0.7
+        ? "Paid"
+        : roll < 0.85
+          ? "Approved"
+          : "Rejected";
+    const payout =
+      status === "Rejected"
+        ? 0
+        : Math.round((areaLostHa * (220000 + hashSeed(cseed + "pay") * 180000)) / 1000) * 1000;
+    claimsHistory.push({
+      id: `CLM-${farmer.id.replace(/[^0-9]/g, "")}${idx}`,
+      crop: p.crop,
+      cause,
+      filed: addDays(p.plantedOn, seededInt(cseed + "fd", 40, 120)),
+      areaLostHa,
+      payout,
+      status,
+      insurer: pick([...INSURERS], cseed + "ins"),
+    });
+  });
+  claimsHistory.sort((a, b) => (a.filed < b.filed ? 1 : -1));
+
+  // Targeted risk alerts for this farmer's location & crop health.
+  const alerts: FarmerAlert[] = [];
+  if (farmer.ndvi < 0.62) {
+    alerts.push({
+      id: farmer.id + "al1",
+      severity: "critical",
+      title: "Sharp NDVI decline detected",
+      detail: `Crop health on your plots dropped below the drought-stress threshold in ${farmer.village} Village.`,
+      time: "2 hrs ago",
+    });
+  }
+  if ((sector?.change7d ?? 0) < -0.04) {
+    alerts.push({
+      id: farmer.id + "al2",
+      severity: "warning",
+      title: "Severe weather incoming",
+      detail: `Heavy rainfall & flood risk forecast for ${sectorName} Sector over the next 72 hours.`,
+      time: "5 hrs ago",
+    });
+  }
+  if (!farmer.insured) {
+    alerts.push({
+      id: farmer.id + "al3",
+      severity: "warning",
+      title: "Plots are uninsured",
+      detail: "Enroll before the season cut-off to qualify for the 40% government premium subsidy.",
+      time: "Yesterday",
+    });
+  }
+  if (alerts.length === 0) {
+    alerts.push({
+      id: farmer.id + "al0",
+      severity: "info",
+      title: "No active threats",
+      detail: `Conditions in ${farmer.village} Village are stable. Crop health is tracking the sector average.`,
+      time: "Today",
+    });
+  }
+
+  const totalPayout = claimsHistory.filter((c) => c.status === "Paid").reduce((s, c) => s + c.payout, 0);
+  const openClaims = claimsHistory.filter((c) => c.status === "Pending" || c.status === "Approved").length;
+
+  return {
+    farmer,
+    sectorName,
+    identity,
+    portfolio,
+    ndviSeries,
+    claimsHistory,
+    alerts,
+    plantings,
+    policies,
+    totals: {
+      plantings: plantings.length,
+      insuredPlantings: plantings.filter((p) => p.insured).length,
+      totalAreaHa: +plantings.reduce((s, p) => s + p.areaHa, 0).toFixed(1),
+      cultivatedAreaHa,
+      sumInsured: policies.reduce((s, p) => s + p.sumInsured, 0),
+      totalPayout,
+      openClaims,
+    },
+  };
+}
 
