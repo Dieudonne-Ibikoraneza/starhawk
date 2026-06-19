@@ -161,14 +161,14 @@ export function GovLeaderboardPage({
           onValueChange={(v) => { setView(v as View); setSortConfig(null); }}
           className="w-full sm:w-auto"
         >
-          <TabsList className="grid w-full grid-cols-3 sm:w-auto">
-            <TabsTrigger value="attention" className="gap-1.5">
+          <TabsList className="flex w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-start sm:justify-center sm:w-auto p-1">
+            <TabsTrigger value="attention" className="gap-1.5 shrink-0 whitespace-nowrap">
               <AlertTriangle className="h-4 w-4" /> Needs Attention
             </TabsTrigger>
-            <TabsTrigger value="top" className="gap-1.5">
+            <TabsTrigger value="top" className="gap-1.5 shrink-0 whitespace-nowrap">
               <TrendingUp className="h-4 w-4" /> Top Performers
             </TabsTrigger>
-            <TabsTrigger value="all" className="gap-1.5">
+            <TabsTrigger value="all" className="gap-1.5 shrink-0 whitespace-nowrap">
               <List className="h-4 w-4" /> All {level}s
             </TabsTrigger>
           </TabsList>

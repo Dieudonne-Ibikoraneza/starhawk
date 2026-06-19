@@ -291,16 +291,16 @@ export const GovernmentDashboard = () => {
           />
 
           {/* Page header */}
-          <div className="border-b border-gray-200 bg-white px-6 py-5 flex items-end justify-between gap-4">
+          <div className="border-b border-gray-200 bg-white px-6 py-5 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{meta.title}</h1>
               <p className="mt-0.5 text-sm text-gray-500">{meta.description}</p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
 
-              <div className="hidden sm:block">
+              <div className="w-full sm:w-auto">
                 <Select value={season} onValueChange={setSeason}>
-                  <SelectTrigger className="w-[170px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
+                  <SelectTrigger className="w-full sm:w-[170px] bg-white h-10 border-gray-200 focus:ring-0 focus:ring-offset-0">
                     <SelectValue placeholder="Season" />
                   </SelectTrigger>
                   <SelectContent>
