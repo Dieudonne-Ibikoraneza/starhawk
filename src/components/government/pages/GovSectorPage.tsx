@@ -32,11 +32,13 @@ export function GovSectorPage({
   onBack,
   onCellSelect,
   onNavigate,
+  onFarmerSelect,
 }: {
   sectorId: string;
   onBack: () => void;
   onCellSelect?: (cellId: string) => void;
-  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => void;
+  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village" | "Farmer"; id?: string }) => void;
+  onFarmerSelect?: (farmerId: string) => void;
 }) {
   const detail = useMemo(() => getSectorDetail(sectorId), [sectorId]);
 
@@ -140,7 +142,7 @@ export function GovSectorPage({
       </div>
 
       {/* Farmers */}
-      <FarmersTable farmers={farmers} cells={cells} sectorName={sector.name} />
+      <FarmersTable farmers={farmers} cells={cells} sectorName={sector.name} onFarmerSelect={onFarmerSelect} />
     </div>
   );
 }
@@ -244,7 +246,7 @@ function CellCard({ cell, onClick }: { cell: CellNode; onClick?: () => void }) {
 
 const PAGE_SIZE = 20;
 
-function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells: CellNode[]; sectorName: string }) {
+function FarmersTable({ farmers, cells, sectorName, onFarmerSelect }: { farmers: Farmer[]; cells: CellNode[]; sectorName: string; onFarmerSelect?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [cell, setCell] = useState("All Cells");
   const [ins, setIns] = useState("all");
@@ -326,7 +328,7 @@ function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells
               {pageRows.map((f) => (
                 <tr
                   key={f.id}
-                  onClick={() => setSelected(f)}
+                  onClick={() => onFarmerSelect?.(f.id)}
                   className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40"
                 >
                   <td className="px-4 py-3 pl-6 font-medium text-foreground">{f.name}</td>
@@ -386,8 +388,6 @@ function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells
           </div>
         )}
       </Panel>
-
-      <FarmerDialog farmer={selected} sectorName={sectorName} onClose={() => setSelected(null)} />
     </>
   );
 }

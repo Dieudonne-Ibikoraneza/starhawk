@@ -32,11 +32,13 @@ export function GovCellPage({
   onBack,
   onVillageSelect,
   onNavigate,
+  onFarmerSelect,
 }: {
   cellId: string;
   onBack: () => void;
   onVillageSelect?: (villageId: string) => void;
-  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => void;
+  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village" | "Farmer"; id?: string }) => void;
+  onFarmerSelect?: (farmerId: string) => void;
 }) {
   const detail = useMemo(() => getCellDetail(cellId), [cellId]);
 
@@ -147,7 +149,7 @@ export function GovCellPage({
       </div>
 
       {/* Farmers */}
-      <FarmersTable farmers={farmers} villages={villages} regionName={cell.name} />
+      <FarmersTable farmers={farmers} villages={villages} regionName={cell.name} onFarmerSelect={onFarmerSelect} />
     </div>
   );
 }
@@ -237,7 +239,7 @@ function VillageCard({ village, onClick }: { village: VillageNode; onClick?: () 
 
 const PAGE_SIZE = 20;
 
-function FarmersTable({ farmers, villages, regionName }: { farmers: Farmer[]; villages: VillageNode[]; regionName: string }) {
+function FarmersTable({ farmers, villages, regionName, onFarmerSelect }: { farmers: Farmer[]; villages: VillageNode[]; regionName: string; onFarmerSelect?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [village, setVillage] = useState("All Villages");
   const [ins, setIns] = useState("all");
@@ -319,7 +321,7 @@ function FarmersTable({ farmers, villages, regionName }: { farmers: Farmer[]; vi
               {pageRows.map((f) => (
                 <tr
                   key={f.id}
-                  onClick={() => setSelected(f)}
+                  onClick={() => onFarmerSelect?.(f.id)}
                   className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40"
                 >
                   <td className="px-4 py-3 pl-6 font-medium text-foreground">{f.name}</td>
@@ -379,8 +381,6 @@ function FarmersTable({ farmers, villages, regionName }: { farmers: Farmer[]; vi
           </div>
         )}
       </Panel>
-
-      <FarmerDialog farmer={selected} sectorName={regionName} onClose={() => setSelected(null)} />
     </>
   );
 }

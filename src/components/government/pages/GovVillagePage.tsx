@@ -30,10 +30,12 @@ export function GovVillagePage({
   villageId,
   onBack,
   onNavigate,
+  onFarmerSelect,
 }: {
   villageId: string;
   onBack: () => void;
-  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => void;
+  onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village" | "Farmer"; id?: string }) => void;
+  onFarmerSelect?: (farmerId: string) => void;
 }) {
   const detail = useMemo(() => getVillageDetail(villageId), [villageId]);
 
@@ -133,7 +135,7 @@ export function GovVillagePage({
       </div>
 
       {/* Farmers */}
-      <FarmersTable farmers={farmers} regionName={village.name} />
+      <FarmersTable farmers={farmers} regionName={village.name} onFarmerSelect={onFarmerSelect} />
     </div>
   );
 }
@@ -204,7 +206,7 @@ function CropMix({ data }: { data: { crop: string; ha: number }[] }) {
 
 const PAGE_SIZE = 20;
 
-function FarmersTable({ farmers, regionName }: { farmers: Farmer[]; regionName: string }) {
+function FarmersTable({ farmers, regionName, onFarmerSelect }: { farmers: Farmer[]; regionName: string; onFarmerSelect?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [ins, setIns] = useState("all");
   const [page, setPage] = useState(1);
@@ -275,7 +277,7 @@ function FarmersTable({ farmers, regionName }: { farmers: Farmer[]; regionName: 
               {pageRows.map((f) => (
                 <tr
                   key={f.id}
-                  onClick={() => setSelected(f)}
+                  onClick={() => onFarmerSelect?.(f.id)}
                   className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40"
                 >
                   <td className="px-4 py-3 pl-6 font-medium text-foreground">{f.name}</td>
@@ -335,8 +337,6 @@ function FarmersTable({ farmers, regionName }: { farmers: Farmer[]; regionName: 
           </div>
         )}
       </Panel>
-
-      <FarmerDialog farmer={selected} sectorName={regionName} onClose={() => setSelected(null)} />
     </>
   );
 }

@@ -45,10 +45,12 @@ export function GovLeaderboardPage({
   crop,
   season,
   onSectorSelect,
+  onCropChange,
 }: {
   crop: string;
   season: string;
   onSectorSelect?: (id: string, level: "Sector" | "Cell" | "Village") => void;
+  onCropChange?: (crop: string) => void;
 }) {
   const [view, setView] = useState<View>("attention");
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
@@ -183,7 +185,7 @@ export function GovLeaderboardPage({
               ))}
             </SelectContent>
           </Select>
-          <Select defaultValue={crop}>
+          <Select value={crop} onValueChange={(val) => onCropChange?.(val)}>
             <SelectTrigger className="w-[140px] bg-white">
               <SelectValue placeholder="All Crops" />
             </SelectTrigger>
