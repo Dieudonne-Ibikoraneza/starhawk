@@ -137,14 +137,9 @@ export function GovCellPage({
           <MapPinned className="h-5 w-5 text-primary" /> Villages
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {villages.slice(0, 4).map((village) => (
+          {villages.map((village) => (
             <VillageCard key={village.id} village={village} onClick={() => onVillageSelect?.(village.id)} />
           ))}
-          {villages.length > 4 && (
-            <div className="flex items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-4 text-muted-foreground hover:bg-card/80 transition-colors cursor-pointer text-sm font-medium">
-              +{villages.length - 4} more
-            </div>
-          )}
         </div>
       </div>
 

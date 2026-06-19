@@ -130,14 +130,9 @@ export function GovSectorPage({
           <MapPinned className="h-5 w-5 text-primary" /> Cells
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {cells.slice(0, 4).map((cell) => (
+          {cells.map((cell) => (
             <CellCard key={cell.id} cell={cell} onClick={() => onCellSelect?.(cell.id)} />
           ))}
-          {cells.length > 4 && (
-            <div className="flex items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-4 text-muted-foreground hover:bg-card/80 transition-colors cursor-pointer text-sm font-medium">
-              +{cells.length - 4} more
-            </div>
-          )}
         </div>
       </div>
 
