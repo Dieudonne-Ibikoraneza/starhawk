@@ -642,7 +642,7 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
   );
 
   return (
-    <div className="h-80 w-full">
+    <div className="h-[26rem] md:h-80 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ left: -16, right: 8, top: 8 }} barGap={2}>
           <CartesianGrid
@@ -660,7 +660,7 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
             angle={-35}
             textAnchor="end"
             dy={8}
-            height={60}
+            height={80}
           />
           <YAxis
             stroke="#9ca3af"
@@ -691,7 +691,7 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 12 }}
+            wrapperStyle={{ fontSize: 12, paddingTop: "10px" }}
             formatter={(value) => String(value).replace(/#\d+$/, "")}
           />
           {selected.map((x) => (
