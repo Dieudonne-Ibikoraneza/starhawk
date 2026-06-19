@@ -97,6 +97,32 @@ export const GovernmentDashboard = () => {
   useEffect(() => { setViewStack([]); }, [activePage]);
 
   useEffect(() => {
+    const handleScroll = () => {
+      const scrollContainer = document.getElementById("gov-main-scroll-area");
+      if (scrollContainer) {
+        scrollContainer.scrollTop = 0;
+        const scrollableChildren = scrollContainer.querySelectorAll("*");
+        scrollableChildren.forEach((child) => {
+          if (child.scrollTop > 0) {
+            child.scrollTop = 0;
+          }
+        });
+      }
+      window.scrollTo({ top: 0 });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    handleScroll();
+    const t1 = setTimeout(handleScroll, 50);
+    const t2 = setTimeout(handleScroll, 150);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [viewStack]);
+
+  useEffect(() => {
     if (!profileLoading && !governmentProfile) {
       setProfileLoading(true);
       getUserProfile()
@@ -299,24 +325,46 @@ export const GovernmentDashboard = () => {
           </div>
 
           {/* Page content */}
-          <main className="flex-1 overflow-auto bg-gray-50">
-            <CustomScrollbar className="h-full">
+          <main className="flex-1 min-h-0 bg-gray-50 flex flex-col">
+            <CustomScrollbar id="gov-main-scroll-area" className="flex-1 overflow-auto">
               <div className="px-6 py-6">
                 {activePage === "leaderboard" && viewStack.length > 0 ? (
                   (() => {
                     const currentView = viewStack[viewStack.length - 1];
                     const popView = () => setViewStack(prev => prev.slice(0, prev.length - 1));
+                    const handleNavigate = (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => {
+                      if (target.level === "Leaderboard") {
+                        setViewStack([]);
+                      } else if (target.level === "Sector" && target.id) {
+                        setViewStack([{ id: target.id, level: "Sector" }]);
+                      } else if (target.level === "Cell" && target.id) {
+                        const sId = target.id.split("-")[0];
+                        setViewStack([
+                          { id: sId, level: "Sector" },
+                          { id: target.id, level: "Cell" }
+                        ]);
+                      } else if (target.level === "Village" && target.id) {
+                        const parts = target.id.split("-");
+                        const sId = parts[0];
+                        const cId = parts[0] + "-" + parts[1];
+                        setViewStack([
+                          { id: sId, level: "Sector" },
+                          { id: cId, level: "Cell" },
+                          { id: target.id, level: "Village" }
+                        ]);
+                      }
+                    };
                     
                     if (currentView.level === "Sector") {
-                      return <GovSectorPage sectorId={currentView.id} onBack={popView} onCellSelect={(cellId) => {
+                      return <GovSectorPage sectorId={currentView.id} onBack={popView} onNavigate={handleNavigate} onCellSelect={(cellId) => {
                         setViewStack(prev => [...prev, { id: cellId, level: "Cell" }]);
                       }} />;
                     } else if (currentView.level === "Cell") {
-                      return <GovCellPage cellId={currentView.id} onBack={popView} onVillageSelect={(villageId) => {
+                      return <GovCellPage cellId={currentView.id} onBack={popView} onNavigate={handleNavigate} onVillageSelect={(villageId) => {
                         setViewStack(prev => [...prev, { id: villageId, level: "Village" }]);
                       }} />;
                     } else if (currentView.level === "Village") {
-                      return <GovVillagePage villageId={currentView.id} onBack={popView} />;
+                      return <GovVillagePage villageId={currentView.id} onBack={popView} onNavigate={handleNavigate} />;
                     }
                   })()
                 ) : activePage === "leaderboard" ? (

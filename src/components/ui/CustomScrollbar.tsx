@@ -3,9 +3,10 @@ import { useEffect } from 'react';
 interface CustomScrollbarProps {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }
 
-export const CustomScrollbar = ({ children, className = '' }: CustomScrollbarProps) => {
+export const CustomScrollbar = ({ children, className = '', id }: CustomScrollbarProps) => {
   useEffect(() => {
     // Add custom scrollbar styles to the document
     const style = document.createElement('style');
@@ -137,7 +138,7 @@ export const CustomScrollbar = ({ children, className = '' }: CustomScrollbarPro
   }, []);
 
   return (
-    <div className={`main-scrollbar ${className}`}>
+    <div id={id} className={`main-scrollbar ${className}`}>
       {children}
     </div>
   );
