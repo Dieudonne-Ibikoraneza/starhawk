@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FarmerDialog } from "./GovLeaderboardPage";
+import { GovBreadcrumb } from "./GovBreadcrumb";
 import {
   ArrowLeft,
   Users,
@@ -66,16 +67,13 @@ export function GovSectorPage({
     <div className="flex flex-col space-y-6">
       {/* Header Actions */}
       <div className="flex items-center justify-between">
-        <nav className="flex flex-nowrap items-center gap-1.5 text-sm text-muted-foreground overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-1 max-w-full">
-          <button
-            onClick={() => onNavigate?.({ level: "Leaderboard" })}
-            className="flex items-center gap-1 hover:text-foreground transition-colors shrink-0"
-          >
-            <Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Leaderboard</span>
-          </button>
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          <span className="font-medium text-foreground truncate max-w-[100px] sm:max-w-none shrink-0">{sector.name}</span>
-        </nav>
+        <GovBreadcrumb 
+          items={[
+            { level: "Leaderboard", name: "Leaderboard" },
+            { level: "Sector", name: sector.name }
+          ]} 
+          onNavigate={onNavigate} 
+        />
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/20"

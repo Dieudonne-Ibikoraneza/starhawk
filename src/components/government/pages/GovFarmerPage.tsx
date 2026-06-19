@@ -83,25 +83,18 @@ export function GovFarmerPage({
       </div>
 
       {/* Breadcrumb */}
-      <nav className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
-        <button onClick={() => onNavigate?.({ level: "Leaderboard" })} className="flex items-center gap-1 hover:text-gray-900 transition-colors">
-          <Home className="h-3.5 w-3.5" /> Leaderboard
-        </button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <button onClick={() => onNavigate?.({ level: "Sector", id: farmer.sectorId })} className="hover:text-gray-900 transition-colors">
-          {sectorName}
-        </button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <button onClick={() => onNavigate?.({ level: "Cell", id: farmer.cellId })} className="hover:text-gray-900 transition-colors">
-          {identity.cell}
-        </button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <button onClick={() => onNavigate?.({ level: "Village", id: farmer.villageId })} className="hover:text-gray-900 transition-colors">
-          {identity.village}
-        </button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <span className="font-medium text-emerald-400">{farmer.name}</span>
-      </nav>
+      <div className="mb-6">
+        <GovBreadcrumb 
+          items={[
+            { level: "Leaderboard", name: "Leaderboard" },
+            { level: "Sector", id: farmer.sectorId, name: sectorName },
+            { level: "Cell", id: farmer.cellId, name: identity.cell },
+            { level: "Village", id: farmer.villageId, name: identity.village },
+            { level: "Farmer", id: farmer.id, name: farmer.name }
+          ]} 
+          onNavigate={onNavigate} 
+        />
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
