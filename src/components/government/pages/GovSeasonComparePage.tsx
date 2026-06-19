@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Panel } from "@/components/government/gov-widgets";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -44,8 +43,27 @@ import {
   type ConceptDef,
 } from "@/components/government/gov-data";
 
-// ─── Accent palette (matches crop-watch-command) ──────────────────────────────
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
+// --- Accent palette --------------------------------------------------------
 type Accent = {
   bar: string;
   text: string;
@@ -69,106 +87,162 @@ interface Side {
   season: CompareSeason;
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
+interface SideSlot {
+  id: string;
+  side: Side | null;
+}
+
+// --- Main page -----------------------------------------------------------------
 
 export function GovSeasonComparePage() {
-  const [sides, setSides] = useState<(Side | null)[]>([null, null]);
-  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [slots, setSlots] = useState<SideSlot[]>([
+    { id: "slot-0", side: null },
+    { id: "slot-1", side: null },
+  ]);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSides((prev) => (prev.length > MAX_SIDES ? prev.slice(0, MAX_SIDES) : prev));
+    setSlots((prev) => (prev.length > MAX_SIDES ? prev.slice(0, MAX_SIDES) : prev));
   }, []);
 
+  const sides = slots.map(s => s.side);
   const selected = sides.filter((s): s is Side => Boolean(s));
   const anySelected = selected.length > 0;
 
-  function updateSide(index: number, side: Side | null) {
-    setSides((prev) => prev.map((s, i) => (i === index ? side : s)));
+  function updateSide(id: string, side: Side | null) {
+    setSlots((prev) => prev.map(s => (s.id === id ? { ...s, side } : s)));
   }
 
   function addSide() {
-    setSides((prev) => (prev.length < MAX_SIDES ? [...prev, null] : prev));
+    setSlots((prev) => {
+      if (prev.length >= MAX_SIDES) return prev;
+      // create a unique id based on timestamp so react keys are stable
+      return [...prev, { id: `slot-${Date.now()}`, side: null }];
+    });
   }
 
-  function removeSlot(index: number) {
-    setSides((prev) =>
+  function removeSlot(id: string) {
+    setSlots((prev) =>
       prev.length <= 2
-        ? prev.map((s, i) => (i === index ? null : s))
-        : prev.filter((_, i) => i !== index)
+        ? prev.map((s) => (s.id === id ? { ...s, side: null } : s))
+        : prev.filter((s) => s.id !== id)
     );
   }
 
-  function handleDragStart(i: number) { setDragFrom(i); }
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  function handleDrop(i: number) {
-    if (dragFrom === null || dragFrom === i) return;
-    setSides((prev) => {
-      const next = [...prev];
-      [next[dragFrom], next[i]] = [next[i], next[dragFrom]];
-      return next;
-    });
-    setDragFrom(null);
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
   }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setSlots((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+
+    setActiveId(null);
+  }
+
+  const activeSlotIndex = activeId ? slots.findIndex(s => s.id === activeId) : null;
+  const activeSlot = activeId ? slots.find(s => s.id === activeId) : null;
 
   return (
     <div className="space-y-6">
-      {/* Base-reference info strip */}
       <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
         <span>
-          <strong>Side A is the base reference</strong> — all percentage changes (↑ / ↓) on Side B
+          <strong>Side A is the base reference</strong> � all percentage changes (? / ?) on Side B
           and C are calculated relative to Side A. Drag the cards left or right to change which
           side acts as the baseline.
         </span>
       </div>
 
-      {/* Selector cards — responsive grid */}
-      <div className="grid grid-cols-2 gap-3 md:gap-0 md:grid-cols-[repeat(14,minmax(0,1fr))]">
-        {/* Add comparison button (col-span-2) */}
-        <div className="hidden md:flex col-span-2 pr-1 flex-col items-center justify-center">
-          <button
-            onClick={addSide}
-            disabled={sides.length >= MAX_SIDES}
-            className={cn(
-              "flex flex-col items-center justify-center gap-3 text-indigo-400 transition-all",
-              sides.length >= MAX_SIDES
-                ? "cursor-not-allowed opacity-40"
-                : "cursor-pointer hover:text-indigo-600 hover:scale-105"
-            )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-2 gap-3 md:gap-0 md:grid-cols-[repeat(14,minmax(0,1fr))]">
+          <div className="hidden md:flex col-span-2 pr-1 flex-col items-center justify-center">
+            <button
+              onClick={addSide}
+              disabled={slots.length >= MAX_SIDES}
+              className={cn(
+                "flex flex-col items-center justify-center gap-3 text-indigo-400 transition-all",
+                slots.length >= MAX_SIDES
+                  ? "cursor-not-allowed opacity-40"
+                  : "cursor-pointer hover:text-indigo-600 hover:scale-105"
+              )}
+            >
+              <span className="grid h-12 w-12 place-items-center rounded-full border-[1.5px] border-current">
+                <Plus className="h-6 w-6" />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-center leading-tight px-2">
+                {slots.length >= MAX_SIDES ? "Max reached" : "Add comparison"}
+              </span>
+            </button>
+          </div>
+
+          <SortableContext
+            items={slots.map(s => s.id)}
+            strategy={horizontalListSortingStrategy}
           >
-            <span className="grid h-12 w-12 place-items-center rounded-full border-[1.5px] border-current">
-              <Plus className="h-6 w-6" />
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-center leading-tight px-2">
-              {sides.length >= MAX_SIDES ? "Max reached" : "Add comparison"}
-            </span>
-          </button>
+            {slots.map((slot, i) => {
+              const paddingClass = i === slots.length - 1 ? "md:pl-1" : "md:px-1";
+              const colSpanClass = slots.length === 2 ? "md:col-span-6" : slots.length === 3 ? "md:col-span-4" : "md:col-span-12";
+
+              return (
+                <div key={slot.id} className={cn("col-span-1", colSpanClass, paddingClass, i === 2 ? "hidden md:block" : "")}>
+                  <SortableSideSelector
+                    id={slot.id}
+                    accent={SIDE_ACCENTS[i]}
+                    label={SIDE_LABELS[i]}
+                    isReference={i === 0}
+                    side={slot.side}
+                    onChange={(s) => updateSide(slot.id, s)}
+                    onClear={() => removeSlot(slot.id)}
+                    removable={slots.length > 2 || Boolean(slot.side)}
+                  />
+                </div>
+              );
+            })}
+          </SortableContext>
         </div>
 
-        {/* Dynamic side slots */}
-        {sides.map((side, i) => {
-          const paddingClass = i === sides.length - 1 ? "md:pl-1" : "md:px-1";
-          const colSpanClass = sides.length === 2 ? "md:col-span-6" : sides.length === 3 ? "md:col-span-4" : "md:col-span-12";
-
-          return (
-            <div key={i} className={cn("col-span-1", colSpanClass, paddingClass, i === 2 ? "hidden md:block" : "")}>
-              <SideSelector
-                accent={SIDE_ACCENTS[i]}
-                label={SIDE_LABELS[i]}
-                isReference={i === 0}
-                side={side}
-                onChange={(s) => updateSide(i, s)}
-                onClear={() => removeSlot(i)}
-                removable={sides.length > 2 || Boolean(side)}
-                onDragStart={() => handleDragStart(i)}
-                onDrop={() => handleDrop(i)}
-                onDragEnd={() => setDragFrom(null)}
-                isDragging={dragFrom === i}
-              />
-            </div>
-          );
-        })}
-      </div>
+        <DragOverlay>
+          {activeSlot && activeSlotIndex !== null ? (
+            <SideSelector
+              accent={SIDE_ACCENTS[activeSlotIndex]}
+              label={SIDE_LABELS[activeSlotIndex]}
+              isReference={activeSlotIndex === 0}
+              side={activeSlot.side}
+              onChange={() => {}}
+              onClear={() => {}}
+              removable={slots.length > 2 || Boolean(activeSlot.side)}
+              isDragging={true}
+              isOverlay={true}
+              dragListeners={{}}
+              dragAttributes={{}}
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Data table + chart */}
       {!anySelected ? (
@@ -176,15 +250,17 @@ export function GovSeasonComparePage() {
       ) : (
         <div className="mt-8 space-y-8">
           <div>
-            {/* Sofascore-style General header */}
-            <div className="mb-4 text-center text-[13px] font-bold uppercase tracking-widest text-gray-500">
-              General
-            </div>
-
-            {/* Table */}
-            <div className="flex flex-col gap-y-0.5">
-              {/* Concept rows */}
-              {concepts.map((c, rowIdx) => {
+            {["General", "Agricultural", "Financial"].map(category => {
+              const categoryConcepts = concepts.filter(c => c.category === category);
+              return (
+                <div key={category} className="mb-8 last:mb-0">
+                  <div className="mb-4 text-center text-[13px] font-bold uppercase tracking-widest text-gray-500">
+                    {category}
+                  </div>
+                  <div className="flex flex-col gap-y-0.5">
+                    {categoryConcepts.map((c, rowIdx) => {
+                      
+                      const isLast = rowIdx === categoryConcepts.length - 1;
                 const allValues = sides.map((side) =>
                   side ? getConceptValues(side.scope, side.season)[c.key] : null
                 );
@@ -200,22 +276,23 @@ export function GovSeasonComparePage() {
                     : null;
 
                 const isFirst = rowIdx === 0;
-                const isLast = rowIdx === concepts.length - 1;
+                
 
                 return (
                   <div
                     key={c.key}
                     className={cn(
-                      "grid items-center transition-colors",
-                      "grid-cols-[1fr_auto_1fr] bg-white border-x border-b border-gray-200 px-4 py-3 hover:bg-gray-50/50",
+                      "flex flex-col md:flex-row items-stretch transition-colors",
+                      "bg-white border-x border-b border-gray-200 px-4 py-3 hover:bg-gray-50/50",
                       isFirst && "rounded-t-2xl border-t",
                       isLast && "rounded-b-2xl",
-                      "md:grid-cols-[repeat(14,minmax(0,1fr))] md:bg-transparent md:border-0 md:p-0 md:hover:bg-transparent"
+                      "md:bg-transparent md:border-0 md:p-0 md:hover:bg-transparent md:gap-2"
                     )}
                   >
-                    <div className="order-2 md:order-1 col-span-1 md:col-span-2 flex items-center justify-center md:justify-start px-2 md:py-3 md:pl-1 md:pr-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left">
+                    <div className="order-2 md:order-1 flex items-center justify-center md:justify-start px-2 py-1 md:py-3 md:pr-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left md:w-[220px] md:shrink-0">
                       {c.label.replace(/ \(.*\)/, "")}
                     </div>
+                    <div className="order-1 md:order-2 flex flex-1 items-stretch gap-1.5 md:gap-2">
                     {sides.map((side, i) => {
                       const v = allValues[i];
                       const isBest = best !== null && v !== null && v !== undefined && v === best;
@@ -224,17 +301,10 @@ export function GovSeasonComparePage() {
                           ? pctChange(baselineVal, v)
                           : null;
                       
-                      const paddingClass = i === sides.length - 1 ? "md:pl-1" : "md:px-1";
-                      const colSpanClass = sides.length === 2 ? "md:col-span-6" : sides.length === 3 ? "md:col-span-4" : "md:col-span-12";
-                      const orderClass = i === 0 ? "order-1 md:order-2" : i === 1 ? "order-3 md:order-3" : "order-4 md:order-4";
-
                       return (
                         <div key={i} className={cn(
-                          "col-span-1",
-                          colSpanClass,
-                          orderClass,
-                          paddingClass,
-                          i === 2 ? "hidden md:flex md:flex-col" : "flex flex-col"
+                          "flex-1 flex flex-col",
+                          i === 2 ? "hidden md:flex" : "flex"
                         )}>
                           <div
                             className={cn(
@@ -249,7 +319,7 @@ export function GovSeasonComparePage() {
                             )}
                           >
                             {sides[i] === null || sides[i] === undefined || v === null || v === undefined ? (
-                              <span className="text-sm text-gray-300">—</span>
+                              <span className="text-sm text-gray-300">�</span>
                             ) : (
                               <>
                                 <span
@@ -284,11 +354,16 @@ export function GovSeasonComparePage() {
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
+        );
+      })}
+    </div>
+
 
           {selected.length >= 2 && (
             <Panel title="Concept Breakdown" subtitle="Normalized index (%) across selected regions & seasons">
@@ -301,7 +376,7 @@ export function GovSeasonComparePage() {
   );
 }
 
-// ─── Empty state ───────────────────────────────────────────────────────────────
+// --- Empty state ---------------------------------------------------------------
 
 function EmptyState() {
   return (
@@ -320,7 +395,7 @@ function EmptyState() {
   );
 }
 
-// ─── Region picker ─────────────────────────────────────────────────────────────
+// --- Region picker -------------------------------------------------------------
 
 function RegionSelect({
   value,
@@ -354,7 +429,7 @@ function RegionSelect({
   );
 }
 
-// ─── Season picker ─────────────────────────────────────────────────────────────
+// --- Season picker -------------------------------------------------------------
 
 function SeasonSelect({
   value,
@@ -379,7 +454,37 @@ function SeasonSelect({
   );
 }
 
-// ─── Side selector card ────────────────────────────────────────────────────────
+// --- Sortable Side Selector Wrapper --------------------------------------------
+
+function SortableSideSelector(props: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="h-full">
+      <SideSelector
+        {...props}
+        isDragging={isDragging}
+        dragListeners={listeners}
+        dragAttributes={attributes}
+      />
+    </div>
+  );
+}
+
+// --- Side selector card --------------------------------------------------------
 
 function SideSelector({
   accent,
@@ -389,9 +494,10 @@ function SideSelector({
   onChange,
   onClear,
   removable,
-  onDragStart,
-  onDrop,
   isDragging,
+  isOverlay,
+  dragListeners,
+  dragAttributes,
 }: {
   accent: Accent;
   label: string;
@@ -400,13 +506,12 @@ function SideSelector({
   onChange: (s: Side) => void;
   onClear: () => void;
   removable: boolean;
-  onDragStart: () => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
   isDragging: boolean;
+  isOverlay?: boolean;
+  dragListeners: any;
+  dragAttributes: any;
 }) {
   const [draftSeason, setDraftSeason] = useState<CompareSeason>(compareSeasons[0]);
-  const [dragOver, setDragOver] = useState(false);
   const season = side?.season ?? draftSeason;
 
   function setSeason(s: CompareSeason) {
@@ -420,17 +525,12 @@ function SideSelector({
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={() => { setDragOver(false); onDrop(); }}
-      onDragEnd={() => { setDragOver(false); onDragEnd(); }}
+      {...dragListeners}
+      {...dragAttributes}
       className={cn(
-        "relative h-full flex flex-col overflow-hidden rounded-2xl border bg-white p-3 md:p-5 transition-all shadow-sm cursor-grab active:cursor-grabbing select-none",
-        isDragging && "opacity-50 scale-[0.97]",
-        dragOver && cn("ring-2 ring-offset-1", accent.ring),
-        side ? cn("border-transparent shadow-md ring-1", accent.ring) : "border-gray-200"
+        "relative h-full flex flex-col overflow-hidden rounded-2xl border bg-white p-3 md:p-5 transition-all shadow-sm cursor-grab active:cursor-grabbing select-none outline-none focus:outline-none",
+        isOverlay && "scale-105 z-50 shadow-2xl ring-[1.5px] ring-indigo-400",
+        side ? cn("border-transparent shadow-md ring-[1.5px]", accent.ring) : "border-gray-200"
       )}
     >
       {/* Gradient glow */}
@@ -463,7 +563,8 @@ function SideSelector({
         {removable && (
           <button
             type="button"
-            onClick={onClear}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
             aria-label="Clear selection"
             className="z-10 inline-flex cursor-pointer items-center rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           >
@@ -489,17 +590,18 @@ function SideSelector({
       </div>
 
       {/* Pickers */}
-      <div className="relative mt-3 md:mt-4 flex flex-wrap items-center gap-2">
-        <RegionSelect value={side?.scope} onValueChange={setRegion} placeholder="Region…" />
+      <div 
+        className="relative mt-3 md:mt-4 flex flex-wrap items-center gap-2"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <RegionSelect value={side?.scope} onValueChange={setRegion} placeholder="Region..." />
         <SeasonSelect value={season} onValueChange={setSeason} />
       </div>
     </div>
   );
 }
 
-
-
-// ─── Bar chart ─────────────────────────────────────────────────────────────────
+// --- Bar chart -----------------------------------------------------------------
 
 function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
   const selected = sides
@@ -578,13 +680,13 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
           />
           <Legend
             wrapperStyle={{ fontSize: 12 }}
-            formatter={(value) => String(value).replace(/#\d+$/, "")}
+            formatter={(value) => String(value).replace(/#d+$/, "")}
           />
           {selected.map((x) => (
             <Bar
               key={x.i}
               dataKey={`s${x.i}`}
-              name={`${scopeLabel(x.side.scope)} · ${x.side.season}#${x.i}`}
+              name={`${scopeLabel(x.side.scope)} � ${x.side.season}#${x.i}`}
               radius={[4, 4, 0, 0]}
             >
               {data.map((_, di) => (
