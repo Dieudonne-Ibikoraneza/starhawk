@@ -220,14 +220,14 @@ function CellCard({ cell, onClick }: { cell: CellNode; onClick?: () => void }) {
         <span className="font-mono text-sm font-semibold text-primary">{cell.ndvi.toFixed(2)}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {cell.villages.slice(0, 4).map((v) => (
+        {cell.villages.slice(0, 3).map((v) => (
           <span key={v.id} className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
             {v.name} · {v.farmers}
           </span>
         ))}
-        {cell.villages.length > 4 && (
+        {cell.villages.length > 3 && (
           <span className="rounded-md bg-secondary/80 px-2 py-0.5 text-xs text-muted-foreground font-semibold">
-            +{cell.villages.length - 4} more
+            +{cell.villages.length - 3} more
           </span>
         )}
       </div>
