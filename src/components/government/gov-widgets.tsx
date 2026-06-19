@@ -7,16 +7,19 @@ export function Panel({
   subtitle,
   action,
   className,
+  onClick,
   children,
 }: {
   title?: string;
   subtitle?: string;
   action?: ReactNode;
   className?: string;
+  onClick?: React.MouseEventHandler<HTMLElement>;
   children: ReactNode;
 }) {
   return (
     <section
+      onClick={onClick}
       className={cn(
         "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm",
         className,
@@ -41,6 +44,7 @@ export function KpiCard({
   value,
   unit,
   delta,
+  deltaLabel = "vs last season",
   icon: Icon,
   accent = "primary",
 }: {
@@ -48,6 +52,7 @@ export function KpiCard({
   value: string;
   unit?: string;
   delta?: number;
+  deltaLabel?: string;
   icon: LucideIcon;
   accent?: "primary" | "info" | "warning" | "destructive";
 }) {
@@ -56,6 +61,13 @@ export function KpiCard({
     info: "text-blue-600 bg-blue-50",
     warning: "text-amber-600 bg-amber-50",
     destructive: "text-red-600 bg-red-50",
+  } as const;
+
+  const valueColorMap = {
+    primary: "text-emerald-600",
+    info: "text-blue-600",
+    warning: "text-amber-600",
+    destructive: "text-red-600",
   } as const;
 
   const glowColorMap = {
@@ -81,7 +93,7 @@ export function KpiCard({
         </span>
       </div>
       <div className="relative mt-3 flex items-end gap-1.5">
-        <span className="font-mono text-3xl font-bold tracking-tight text-gray-900">{value}</span>
+        <span className={cn("font-mono text-3xl font-bold tracking-tight", valueColorMap[accent])}>{value}</span>
         {unit && <span className="mb-1 text-sm text-gray-500">{unit}</span>}
       </div>
       {delta !== undefined && (
@@ -97,7 +109,7 @@ export function KpiCard({
             {trendUp ? <ArrowUpRight className="h-3 w-3" /> : trendDown ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
             {Math.abs(delta)}%
           </span>
-          <span className="text-gray-500">vs last period</span>
+          <span className="text-gray-500">{deltaLabel}</span>
         </div>
       )}
     </div>
