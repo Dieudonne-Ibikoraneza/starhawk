@@ -139,16 +139,47 @@ export interface InvoiceRow {
   period: string;
   farmsCovered: number;
   subsidyAmount: number;
-  status: "Paid" | "Pending" | "Overdue";
+  status: "Paid" | "Pending" | "Overdue" | "Rejected";
   issued: string;
+  dueDate?: string;
+  totalPremium?: number;
+  subsidyRate?: number;
+  paymentMethod?: string;
+  breakdown?: { category: string; farms: number; amount: number }[];
+  pdfUrl?: string;
 }
 
 export const invoices: InvoiceRow[] = [
-  { id: "INV-2026-06", insurer: "Radiant Yacu", period: "Jun 2026", farmsCovered: 4120, subsidyAmount: 184000000, status: "Pending", issued: "2026-06-01" },
-  { id: "INV-2026-05", insurer: "Prime Insurance", period: "May 2026", farmsCovered: 3380, subsidyAmount: 142500000, status: "Paid", issued: "2026-05-01" },
-  { id: "INV-2026-05B", insurer: "Sanlam", period: "May 2026", farmsCovered: 2210, subsidyAmount: 96800000, status: "Paid", issued: "2026-05-01" },
-  { id: "INV-2026-04", insurer: "Radiant Yacu", period: "Apr 2026", farmsCovered: 3990, subsidyAmount: 171200000, status: "Overdue", issued: "2026-04-01" },
-  { id: "INV-2026-04B", insurer: "Prime Insurance", period: "Apr 2026", farmsCovered: 3010, subsidyAmount: 128400000, status: "Paid", issued: "2026-04-01" },
+  { 
+    id: "INV-2026-06", insurer: "Radiant Yacu", period: "Jun 2026", farmsCovered: 4120, subsidyAmount: 184000000, status: "Pending", issued: "2026-06-01", 
+    dueDate: "2026-06-15", totalPremium: 460000000, subsidyRate: 0.4, paymentMethod: "Bank Transfer", 
+    breakdown: [{ category: "Maize", farms: 2120, amount: 94000000 }, { category: "Rice", farms: 2000, amount: 90000000 }],
+    pdfUrl: "/assets/invoice-mockup.png"
+  },
+  { 
+    id: "INV-2026-05", insurer: "Prime Insurance", period: "May 2026", farmsCovered: 3380, subsidyAmount: 142500000, status: "Paid", issued: "2026-05-01",
+    dueDate: "2026-05-15", totalPremium: 356250000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
+    breakdown: [{ category: "Beans", farms: 1800, amount: 72500000 }, { category: "Vegetables", farms: 1580, amount: 70000000 }],
+    pdfUrl: "/assets/invoice-mockup.png"
+  },
+  { 
+    id: "INV-2026-05B", insurer: "Sanlam", period: "May 2026", farmsCovered: 2210, subsidyAmount: 96800000, status: "Paid", issued: "2026-05-01",
+    dueDate: "2026-05-15", totalPremium: 242000000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
+    breakdown: [{ category: "Cassava", farms: 2210, amount: 96800000 }],
+    pdfUrl: "/assets/invoice-mockup.png"
+  },
+  { 
+    id: "INV-2026-04", insurer: "Radiant Yacu", period: "Apr 2026", farmsCovered: 3990, subsidyAmount: 171200000, status: "Overdue", issued: "2026-04-01",
+    dueDate: "2026-04-15", totalPremium: 428000000, subsidyRate: 0.4, paymentMethod: "Pending Resolution",
+    breakdown: [{ category: "Maize", farms: 3990, amount: 171200000 }],
+    pdfUrl: "/assets/invoice-mockup.png"
+  },
+  { 
+    id: "INV-2026-04B", insurer: "Prime Insurance", period: "Apr 2026", farmsCovered: 3010, subsidyAmount: 128400000, status: "Paid", issued: "2026-04-01",
+    dueDate: "2026-04-15", totalPremium: 321000000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
+    breakdown: [{ category: "Rice", farms: 3010, amount: 128400000 }],
+    pdfUrl: "/assets/invoice-mockup.png"
+  },
 ];
 
 export const subsidyByCrop = [

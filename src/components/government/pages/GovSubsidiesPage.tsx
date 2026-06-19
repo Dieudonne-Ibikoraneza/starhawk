@@ -11,23 +11,17 @@ import {
 import { Wallet, TrendingUp, PiggyBank, Receipt } from "lucide-react";
 import { KpiCard, Panel, StatusBadge } from "@/components/government/gov-widgets";
 import { invoices, subsidyByCrop, subsidyBudget, rwf, InvoiceRow } from "@/components/government/gov-data";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
 
-export function GovSubsidiesPage() {
+export function GovSubsidiesPage({ onNavigate }: { onNavigate?: (target: { level: "Invoice"; id?: string }) => void; }) {
+  console.log("GovSubsidiesPage rendered, onNavigate is:", !!onNavigate);
   const [invoiceData, setInvoiceData] = useState<InvoiceRow[]>(invoices);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
+  
 
   const utilizedPct = Math.round((subsidyBudget.utilized / subsidyBudget.allocated) * 100);
 
-  const handlePayInvoice = () => {
-    if (!selectedInvoice) return;
-    setInvoiceData(prev => 
-      prev.map(inv => inv.id === selectedInvoice.id ? { ...inv, status: "Paid" } : inv)
-    );
-    setSelectedInvoice(null);
-  };
-
+  
   return (
     <div className="flex flex-col space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -104,7 +98,7 @@ export function GovSubsidiesPage() {
                 {invoiceData.map((inv) => (
                   <tr 
                     key={inv.id} 
-                    onClick={() => setSelectedInvoice(inv)}
+                    onClick={() => onNavigate?.({ level: "Invoice", id: inv.id })}
                     className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40 cursor-pointer"
                   >
                     <td className="px-5 py-3 font-mono text-foreground">{inv.id}</td>
@@ -122,54 +116,7 @@ export function GovSubsidiesPage() {
         </Panel>
       </div>
 
-      <Dialog open={!!selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Invoice Details</DialogTitle>
-            <DialogDescription>
-              Review the subsidy invoice submitted by {selectedInvoice?.insurer}.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedInvoice && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="text-right text-sm font-medium text-muted-foreground">Invoice ID</span>
-                <span className="col-span-3 font-mono font-medium">{selectedInvoice.id}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="text-right text-sm font-medium text-muted-foreground">Period</span>
-                <span className="col-span-3">{selectedInvoice.period}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="text-right text-sm font-medium text-muted-foreground">Farms</span>
-                <span className="col-span-3 font-mono">{selectedInvoice.farmsCovered.toLocaleString()}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="text-right text-sm font-medium text-muted-foreground">Total Premium</span>
-                <span className="col-span-3 font-mono">{rwf(selectedInvoice.subsidyAmount / 0.4)}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4 border-t border-border pt-4">
-                <span className="text-right text-sm font-semibold text-foreground">Gov. Share</span>
-                <span className="col-span-3 font-mono text-lg font-bold text-emerald-600">{rwf(selectedInvoice.subsidyAmount)}</span>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedInvoice(null)}>
-              Cancel
-            </Button>
-            <Button 
-              disabled={selectedInvoice?.status === "Paid"} 
-              onClick={handlePayInvoice}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {selectedInvoice?.status === "Paid" ? "Already Paid" : "Pay Invoice"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      
     </div>
   );
 }

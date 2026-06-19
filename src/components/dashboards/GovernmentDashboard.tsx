@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { crops, seasons } from "@/components/government/gov-data";
+import { crops, seasons, invoices } from "@/components/government/gov-data";
 
 // Page components — one file per page
 import {
@@ -37,6 +37,7 @@ import {
   GovVillagePage,
 } from "@/components/government/pages";
 import { GovFarmerPage } from "@/components/government/pages/GovFarmerPage";
+import { GovInvoicePage } from "@/components/government/pages/GovInvoicePage";
 
 // ─── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -81,7 +82,7 @@ export const GovernmentDashboard = () => {
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("govSidebarCollapsed") === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [viewStack, setViewStack] = useState<{ id: string, level: "Sector" | "Cell" | "Village" | "Farmer" }[]>([]);
+  const [viewStack, setViewStack] = useState<{ id: string, level: "Sector" | "Cell" | "Village" | "Farmer" | "Invoice" }[]>([]);
 
   const governmentEmail = getEmail() || "";
   const governmentPhone = getPhoneNumber() || "";
@@ -316,7 +317,7 @@ export const GovernmentDashboard = () => {
           <main className="flex-1 min-h-0 bg-gray-50 flex flex-col">
             <CustomScrollbar id="gov-main-scroll-area" className="flex-1 overflow-auto">
               <div className="px-6 py-6">
-                {activePage === "leaderboard" && viewStack.length > 0 ? (
+                {(activePage === "leaderboard" || activePage === "invoicing") && viewStack.length > 0 ? (
                   (() => {
                     const currentView = viewStack[viewStack.length - 1];
                     const popView = () => setViewStack(prev => prev.slice(0, prev.length - 1));
@@ -368,12 +369,18 @@ export const GovernmentDashboard = () => {
                       }} />;
                     } else if (currentView.level === "Farmer") {
                       return <GovFarmerPage farmerId={currentView.id} onBack={popView} onNavigate={handleNavigate} />;
+                    } else if (currentView.level === "Invoice") {
+                      const inv = invoices.find(i => i.id === currentView.id);
+                      if (!inv) return <p className="text-muted-foreground p-6">Invoice not found</p>;
+                      return <GovInvoicePage invoice={inv} onBack={popView} />;
                     }
                   })()
                 ) : activePage === "leaderboard" ? (
                   <GovLeaderboardPage crop={crop} season={season} onSectorSelect={(id, level) => {
                     setViewStack([{ id, level }]);
                   }} onCropChange={setCrop} />
+                ) : activePage === "invoicing" ? (
+                  <GovSubsidiesPage onNavigate={(t) => setViewStack([t as any])} />
                 ) : (
                   renderPage(activePage)
                 )}
