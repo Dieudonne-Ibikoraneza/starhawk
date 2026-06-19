@@ -289,14 +289,18 @@ export function GovSeasonComparePage() {
                   <div
                     key={c.key}
                     className={cn(
-                      "flex flex-col md:flex-row items-stretch transition-colors",
-                      "bg-white border-x border-b border-gray-200 px-4 py-3 hover:bg-gray-50/50",
+                      "relative flex flex-col md:flex-row items-stretch transition-colors",
+                      "bg-white border-x border-b border-gray-200 px-4 py-4 md:py-3 hover:bg-gray-50/50",
                       isFirst && "rounded-t-2xl border-t",
                       isLast && "rounded-b-2xl",
                       "md:bg-transparent md:border-0 md:p-0 md:hover:bg-transparent md:gap-2"
                     )}
                   >
-                    <div className="order-2 md:order-1 flex items-center justify-center md:justify-start px-2 pt-3 pb-1 md:py-3 md:pr-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left md:w-[220px] md:shrink-0">
+                    <div className={cn(
+                      "absolute inset-0 pointer-events-none flex items-center justify-center",
+                      "md:relative md:inset-auto md:pointer-events-auto md:justify-start",
+                      "px-2 md:py-3 md:pr-4 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left md:w-[220px] md:shrink-0 md:order-1"
+                    )}>
                       {c.label.replace(/ \(.*\)/, "")}
                     </div>
                     <div className="order-1 md:order-2 flex flex-1 items-stretch gap-1.5 md:gap-2">
