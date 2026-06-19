@@ -462,6 +462,155 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
   };
 }
 
+export function getAllRegionsByLevel(level: "Sector" | "Cell" | "Village"): RegionRow[] {
+  if (level === "Sector") return regions;
+
+  const result: RegionRow[] = [];
+  for (const sector of regions) {
+    const detail = getSectorDetail(sector.id);
+    if (!detail) continue;
+
+    if (level === "Cell") {
+      for (const c of detail.cells) {
+        result.push({
+          id: c.id,
+          name: c.name,
+          level: "Cell",
+          cultivatedHa: c.cultivatedHa,
+          dominantCrop: sector.dominantCrop,
+          ndvi: c.ndvi,
+          change7d: +(sector.change7d + (hashSeed(c.id + "7d") - 0.5) * 0.05).toFixed(2),
+          change30d: +(sector.change30d + (hashSeed(c.id + "30d") - 0.5) * 0.05).toFixed(2),
+          insurancePenetration: c.insurancePenetration,
+          activeClaims: Math.floor(sector.activeClaims * (c.farmers / detail.stats.totalFarmers)),
+          riskLevel: c.ndvi < 0.6 ? "high" : c.ndvi < 0.7 ? "medium" : "low",
+        });
+      }
+    } else if (level === "Village") {
+      for (const c of detail.cells) {
+        for (const v of c.villages) {
+          const vNdvi = +(c.ndvi + (hashSeed(v.id + "ndvi") - 0.5) * 0.08).toFixed(2);
+          result.push({
+            id: v.id,
+            name: v.name,
+            level: "Village",
+            cultivatedHa: v.cultivatedHa,
+            dominantCrop: sector.dominantCrop,
+            ndvi: vNdvi,
+            change7d: +(sector.change7d + (hashSeed(v.id + "7d") - 0.5) * 0.08).toFixed(2),
+            change30d: +(sector.change30d + (hashSeed(v.id + "30d") - 0.5) * 0.08).toFixed(2),
+            insurancePenetration: c.insurancePenetration,
+            activeClaims: Math.floor(sector.activeClaims * (v.farmers / detail.stats.totalFarmers)),
+            riskLevel: vNdvi < 0.6 ? "high" : vNdvi < 0.7 ? "medium" : "low",
+          });
+        }
+      }
+    }
+  }
+  return result;
+}
+
+export interface CellDetail {
+  cell: RegionRow;
+  villages: VillageNode[];
+  farmers: Farmer[];
+  stats: {
+    totalFarmers: number;
+    insuredFarmers: number;
+    totalVillages: number;
+    cropMix: { crop: string; ha: number }[];
+  };
+  sectorId: string;
+  sectorName: string;
+}
+
+export function getCellDetail(cellId: string): CellDetail | null {
+  const sectorId = cellId.split("-")[0];
+  const sectorDetail = getSectorDetail(sectorId);
+  if (!sectorDetail) return null;
+
+  const cellNode = sectorDetail.cells.find(c => c.id === cellId);
+  if (!cellNode) return null;
+
+  const cellRow = getAllRegionsByLevel("Cell").find(c => c.id === cellId)!;
+  const farmers = sectorDetail.farmers.filter(f => f.cell === cellNode.name);
+
+  const cropMixMap = new Map<string, number>();
+  for (const f of farmers) {
+    const per = f.plotsHa / f.crops.length;
+    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
+  }
+  const cropMix = [...cropMixMap.entries()]
+    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
+    .sort((a, b) => b.ha - a.ha);
+
+  return {
+    cell: cellRow,
+    villages: cellNode.villages,
+    farmers,
+    stats: {
+      totalFarmers: cellNode.farmers,
+      insuredFarmers: farmers.filter(f => f.insured).length,
+      totalVillages: cellNode.villages.length,
+      cropMix,
+    },
+    sectorId,
+    sectorName: sectorDetail.sector.name
+  };
+}
+
+export interface VillageDetail {
+  village: RegionRow;
+  farmers: Farmer[];
+  stats: {
+    totalFarmers: number;
+    insuredFarmers: number;
+    cropMix: { crop: string; ha: number }[];
+  };
+  cellId: string;
+  cellName: string;
+  sectorId: string;
+  sectorName: string;
+}
+
+export function getVillageDetail(villageId: string): VillageDetail | null {
+  const parts = villageId.split("-");
+  const sectorId = parts[0];
+  const cellId = parts[0] + "-" + parts[1];
+  
+  const cellDetail = getCellDetail(cellId);
+  if (!cellDetail) return null;
+
+  const villageNode = cellDetail.villages.find(v => v.id === villageId);
+  if (!villageNode) return null;
+
+  const villageRow = getAllRegionsByLevel("Village").find(v => v.id === villageId)!;
+  const farmers = cellDetail.farmers.filter(f => f.village === villageNode.name);
+
+  const cropMixMap = new Map<string, number>();
+  for (const f of farmers) {
+    const per = f.plotsHa / f.crops.length;
+    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
+  }
+  const cropMix = [...cropMixMap.entries()]
+    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
+    .sort((a, b) => b.ha - a.ha);
+
+  return {
+    village: villageRow,
+    farmers,
+    stats: {
+      totalFarmers: villageNode.farmers,
+      insuredFarmers: farmers.filter(f => f.insured).length,
+      cropMix,
+    },
+    cellId,
+    cellName: cellDetail.cell.name,
+    sectorId,
+    sectorName: cellDetail.sectorName,
+  };
+}
+
 /** Flattened farmer index across all sectors — used for global name search. */
 export const allFarmers: Farmer[] = regions.flatMap((r) => getSectorDetail(r.id)?.farmers ?? []);
 

@@ -5,3 +5,5 @@ export { GovClaimsPage } from "./GovClaimsPage";
 export { GovSubsidiesPage } from "./GovSubsidiesPage";
 export { GovSeasonComparePage } from "./GovSeasonComparePage";
 export { GovSectorPage } from "./GovSectorPage";
+export { GovCellPage } from "./GovCellPage";
+export { GovVillagePage } from "./GovVillagePage";

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Panel, DeltaPill, StatusBadge } from "@/components/government/gov-widgets";
 import {
-  regions,
+  getAllRegionsByLevel,
   crops,
   seasons,
   allFarmers,
@@ -48,11 +48,14 @@ export function GovLeaderboardPage({
 }: {
   crop: string;
   season: string;
-  onSectorSelect?: (sectorId: string) => void;
+  onSectorSelect?: (id: string, level: "Sector" | "Cell" | "Village") => void;
 }) {
   const [view, setView] = useState<View>("attention");
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [query, setQuery] = useState("");
+
+  const [level, setLevel] = useState<"Sector" | "Cell" | "Village">("Sector");
+  const regions = useMemo(() => getAllRegionsByLevel(level), [level]);
 
   const rows = useMemo(() => {
     let list = [...regions];
@@ -80,7 +83,7 @@ export function GovLeaderboardPage({
       }
     }
     return list;
-  }, [view, crop, sortConfig]);
+  }, [view, crop, sortConfig, regions]);
 
   const needle = query.trim().toLowerCase();
   const searchResults = useMemo(() => {
@@ -98,7 +101,7 @@ export function GovLeaderboardPage({
       )
       .slice(0, 8);
     return { sectors, farmers };
-  }, [needle]);
+  }, [needle, regions]);
 
   const sectorName = (id: string) => regions.find((r) => r.id === id)?.name ?? id;
 
@@ -113,7 +116,7 @@ export function GovLeaderboardPage({
 
   const handleSectorClick = (sectorId: string) => {
     setQuery("");
-    onSectorSelect?.(sectorId);
+    onSectorSelect?.(sectorId, level);
   };
 
   const SortableHeader = ({
@@ -164,10 +167,33 @@ export function GovLeaderboardPage({
               <TrendingUp className="h-4 w-4" /> Top Performers
             </TabsTrigger>
             <TabsTrigger value="all" className="gap-1.5">
-              <List className="h-4 w-4" /> All Sectors
+              <List className="h-4 w-4" /> All {level}s
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={level} onValueChange={(val: any) => setLevel(val)}>
+            <SelectTrigger className="w-[120px] bg-white">
+              <SelectValue placeholder="Level" />
+            </SelectTrigger>
+            <SelectContent>
+              {["Sector", "Cell", "Village"].map((l) => (
+                <SelectItem key={l} value={l}>{l}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select defaultValue={crop}>
+            <SelectTrigger className="w-[140px] bg-white">
+              <SelectValue placeholder="All Crops" />
+            </SelectTrigger>
+            <SelectContent>
+              {crops.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Search */}

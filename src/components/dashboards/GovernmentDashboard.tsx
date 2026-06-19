@@ -33,6 +33,8 @@ import {
   GovSubsidiesPage,
   GovSeasonComparePage,
   GovSectorPage,
+  GovCellPage,
+  GovVillagePage,
 } from "@/components/government/pages";
 
 // ─── Navigation items ──────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ export const GovernmentDashboard = () => {
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("govSidebarCollapsed") === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
+  const [viewStack, setViewStack] = useState<{ id: string, level: "Sector" | "Cell" | "Village" }[]>([]);
 
   const governmentEmail = getEmail() || "";
   const governmentPhone = getPhoneNumber() || "";
@@ -92,7 +94,7 @@ export const GovernmentDashboard = () => {
 
   useEffect(() => { document.documentElement.classList.remove("dark"); }, []);
   useEffect(() => { localStorage.setItem("govSidebarCollapsed", String(collapsed)); }, [collapsed]);
-  useEffect(() => { setSelectedSectorId(null); }, [activePage]);
+  useEffect(() => { setViewStack([]); }, [activePage]);
 
   useEffect(() => {
     if (!profileLoading && !governmentProfile) {
@@ -300,10 +302,27 @@ export const GovernmentDashboard = () => {
           <main className="flex-1 overflow-auto bg-gray-50">
             <CustomScrollbar className="h-full">
               <div className="px-6 py-6">
-                {activePage === "leaderboard" && selectedSectorId ? (
-                  <GovSectorPage sectorId={selectedSectorId} onBack={() => setSelectedSectorId(null)} />
+                {activePage === "leaderboard" && viewStack.length > 0 ? (
+                  (() => {
+                    const currentView = viewStack[viewStack.length - 1];
+                    const popView = () => setViewStack(prev => prev.slice(0, prev.length - 1));
+                    
+                    if (currentView.level === "Sector") {
+                      return <GovSectorPage sectorId={currentView.id} onBack={popView} onCellSelect={(cellId) => {
+                        setViewStack(prev => [...prev, { id: cellId, level: "Cell" }]);
+                      }} />;
+                    } else if (currentView.level === "Cell") {
+                      return <GovCellPage cellId={currentView.id} onBack={popView} onVillageSelect={(villageId) => {
+                        setViewStack(prev => [...prev, { id: villageId, level: "Village" }]);
+                      }} />;
+                    } else if (currentView.level === "Village") {
+                      return <GovVillagePage villageId={currentView.id} onBack={popView} />;
+                    }
+                  })()
                 ) : activePage === "leaderboard" ? (
-                  <GovLeaderboardPage crop={crop} season={season} onSectorSelect={setSelectedSectorId} />
+                  <GovLeaderboardPage crop={crop} season={season} onSectorSelect={(id, level) => {
+                    setViewStack([{ id, level }]);
+                  }} />
                 ) : (
                   renderPage(activePage)
                 )}

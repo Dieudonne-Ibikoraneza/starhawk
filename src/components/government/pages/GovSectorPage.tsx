@@ -30,9 +30,11 @@ import { cn } from "@/lib/utils";
 export function GovSectorPage({
   sectorId,
   onBack,
+  onCellSelect,
 }: {
   sectorId: string;
   onBack: () => void;
+  onCellSelect?: (cellId: string) => void;
 }) {
   const detail = useMemo(() => getSectorDetail(sectorId), [sectorId]);
 
@@ -55,11 +57,11 @@ export function GovSectorPage({
     <div className="flex flex-col space-y-6">
       {/* Header Actions */}
       <div className="flex items-center justify-between">
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <button onClick={onBack} className="flex items-center gap-1 transition-colors hover:text-foreground">
+        <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
             <Home className="h-3.5 w-3.5" /> Leaderboard
-          </button>
-          <ChevronRight className="h-3.5 w-3.5" />
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
           <span className="font-medium text-foreground">{sector.name} Sector</span>
         </nav>
         <button
@@ -113,11 +115,11 @@ export function GovSectorPage({
       {/* Cells & villages */}
       <div>
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-foreground">
-          <MapPinned className="h-5 w-5 text-primary" /> Cells & Villages
+          <MapPinned className="h-5 w-5 text-primary" /> Cells
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {cells.map((cell) => (
-            <CellCard key={cell.name} cell={cell} />
+            <CellCard key={cell.name} cell={cell} onClick={() => onCellSelect?.(cell.id)} />
           ))}
         </div>
       </div>
@@ -174,9 +176,12 @@ function CropMix({ data }: { data: { crop: string; ha: number }[] }) {
   );
 }
 
-function CellCard({ cell }: { cell: CellNode }) {
+function CellCard({ cell, onClick }: { cell: CellNode; onClick?: () => void }) {
   return (
-    <Panel className="p-4">
+    <Panel 
+      className={cn("p-4", onClick && "cursor-pointer transition-colors hover:bg-secondary/40")}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div>
           <h3 className="font-semibold text-foreground">{cell.name} Cell</h3>
@@ -186,7 +191,7 @@ function CellCard({ cell }: { cell: CellNode }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {cell.villages.map((v) => (
-          <span key={v.name} className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+          <span key={v.id} className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
             {v.name} · {v.farmers}
           </span>
         ))}
