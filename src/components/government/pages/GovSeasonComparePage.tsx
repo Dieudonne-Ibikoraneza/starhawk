@@ -296,10 +296,10 @@ export function GovSeasonComparePage() {
                       "md:bg-transparent md:border-0 md:p-0 md:hover:bg-transparent md:gap-2"
                     )}
                   >
-                    <div className="order-2 md:order-1 flex items-center justify-center md:justify-start px-2 py-1 md:py-3 md:pr-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left md:w-[220px] md:shrink-0">
+                    <div className="flex items-center justify-center md:justify-start px-2 pb-2 md:py-3 md:pr-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 md:text-gray-500 text-center md:text-left md:w-[220px] md:shrink-0">
                       {c.label.replace(/ \(.*\)/, "")}
                     </div>
-                    <div className="order-1 md:order-2 flex flex-1 items-stretch gap-1.5 md:gap-2">
+                    <div className="flex flex-1 items-stretch gap-1.5 md:gap-2">
                     {sides.map((side, i) => {
                       const v = allValues[i];
                       const isBest = best !== null && v !== null && v !== undefined && v === best;
@@ -652,10 +652,11 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
             fontSize={10}
             tickLine={false}
             axisLine={false}
-            interval={0}
-            angle={-12}
+            interval="preserveStartEnd"
+            angle={-35}
+            textAnchor="end"
             dy={8}
-            height={48}
+            height={60}
           />
           <YAxis
             stroke="#9ca3af"
@@ -687,13 +688,13 @@ function ComparisonChart({ sides }: { sides: (Side | null)[] }) {
           />
           <Legend
             wrapperStyle={{ fontSize: 12 }}
-            formatter={(value) => String(value).replace(/#d+$/, "")}
+            formatter={(value) => String(value).replace(/#\d+$/, "")}
           />
           {selected.map((x) => (
             <Bar
               key={x.i}
               dataKey={`s${x.i}`}
-              name={`${scopeLabel(x.side.scope)} � ${x.side.season}#${x.i}`}
+              name={`${scopeLabel(x.side.scope)} — ${x.side.season}#${x.i}`}
               radius={[4, 4, 0, 0]}
             >
               {data.map((_, di) => (
