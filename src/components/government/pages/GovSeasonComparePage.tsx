@@ -322,8 +322,8 @@ export function GovSeasonComparePage() {
                               "flex flex-1 gap-1 md:gap-2",
                               "flex-col sm:flex-row",
                               i === 0 
-                                ? "items-start sm:items-center sm:justify-start md:justify-center md:items-center" 
-                                : "items-end sm:items-center sm:justify-end md:justify-center md:items-center",
+                                ? "items-start justify-center sm:items-center sm:justify-start md:justify-center md:items-center" 
+                                : "items-end justify-center sm:items-center sm:justify-end md:justify-center md:items-center",
                               "md:border md:border-gray-200 md:bg-white md:px-3 md:py-3 md:transition-colors md:hover:bg-gray-50/50",
                               isFirst && "md:rounded-t-2xl",
                               isLast && "md:rounded-b-2xl"
