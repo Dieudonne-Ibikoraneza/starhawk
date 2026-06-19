@@ -143,8 +143,8 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[750px] md:max-w-[850px]">
-      <CommandInput placeholder="Search farmers, farms, policies, claims, fields…" className="h-14 text-lg border-none focus:ring-0" />
-      <CommandList className="max-h-[550px] scrollbar-thin">
+      <CommandInput placeholder="Search farmers, farms, policies, claims, fields…" className="h-14 text-lg border-none focus:ring-0 pr-12" />
+      <CommandList className="max-h-[60vh] sm:max-h-[550px] overflow-y-auto scrollbar-thin">
         {loading ? (
           <div className="p-4 space-y-4">
              {[1, 2, 3].map(i => (

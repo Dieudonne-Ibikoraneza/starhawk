@@ -176,7 +176,7 @@ export function GovLeaderboardPage({
 
         <div className="flex flex-wrap items-center gap-3">
           <Select value={level} onValueChange={(val: any) => setLevel(val)}>
-            <SelectTrigger className="w-[120px] bg-white">
+            <SelectTrigger className="w-[120px] bg-white border-gray-200 focus:ring-0 focus:ring-offset-0">
               <SelectValue placeholder="Level" />
             </SelectTrigger>
             <SelectContent>
@@ -186,7 +186,7 @@ export function GovLeaderboardPage({
             </SelectContent>
           </Select>
           <Select value={crop} onValueChange={(val) => onCropChange?.(val)}>
-            <SelectTrigger className="w-[140px] bg-white">
+            <SelectTrigger className="w-[140px] bg-white border-gray-200 focus:ring-0 focus:ring-offset-0">
               <SelectValue placeholder="All Crops" />
             </SelectTrigger>
             <SelectContent>
