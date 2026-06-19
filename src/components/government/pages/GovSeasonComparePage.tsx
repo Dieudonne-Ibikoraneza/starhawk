@@ -166,7 +166,7 @@ export function GovSeasonComparePage() {
       <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
         <span>
-          <strong>Side A is the base reference</strong> � all percentage changes (? / ?) on Side B
+          <strong>Side A is the base reference</strong> — all percentage changes (↑ / ↓) on Side B
           and C are calculated relative to Side A. Drag the cards left or right to change which
           side acts as the baseline.
         </span>
