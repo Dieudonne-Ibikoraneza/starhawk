@@ -278,23 +278,35 @@ export type ConceptKey =
   | "yield"
   | "claims"
   | "subsidy"
-  | "cultivated";
+  | "cultivated"
+  | "farmers"
+  | "policiesIssued"
+  | "sumInsured"
+  | "areaLost"
+  | "compensationPaid";
 
 export interface ConceptDef {
   key: ConceptKey;
   label: string;
+  category: string;
   unit: string;
   higherIsBetter: boolean;
   format: (v: number) => string;
 }
 
 export const concepts: ConceptDef[] = [
-  { key: "ndvi",      label: "Crop Health (NDVI)",       unit: "index",   higherIsBetter: true,  format: (v) => v.toFixed(2) },
-  { key: "insurance", label: "Insurance Penetration",    unit: "%",       higherIsBetter: true,  format: (v) => `${Math.round(v)}%` },
-  { key: "yield",     label: "Avg Yield",                unit: "t/ha",    higherIsBetter: true,  format: (v) => `${v.toFixed(1)} t/ha` },
-  { key: "claims",    label: "Active Claims",            unit: "claims",  higherIsBetter: false, format: (v) => `${Math.round(v)}` },
-  { key: "subsidy",   label: "Subsidy Utilized",         unit: "M RWF",   higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
-  { key: "cultivated",label: "Cultivated Area",          unit: "ha",      higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()} ha` },
+  { key: "ndvi",      label: "Crop Health (NDVI)",       category: "Agricultural", unit: "index",   higherIsBetter: true,  format: (v) => v.toFixed(2) },
+  { key: "insurance", label: "Insurance Penetration",    category: "Financial",    unit: "%",       higherIsBetter: true,  format: (v) => `${Math.round(v)}%` },
+  { key: "yield",     label: "Avg Yield",                category: "Agricultural", unit: "t/ha",    higherIsBetter: true,  format: (v) => `${v.toFixed(1)} t/ha` },
+  { key: "claims",    label: "Active Claims",            category: "Financial",    unit: "claims",  higherIsBetter: false, format: (v) => `${Math.round(v)}` },
+  { key: "subsidy",   label: "Subsidy Utilized",         category: "Financial",    unit: "M RWF",   higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
+  { key: "cultivated",label: "Cultivated Area",          category: "General",      unit: "ha",      higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()} ha` },
+  { key: "farmers",   label: "Registered Farmers",       category: "General",      unit: "farmers", higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()}` },
+  { key: "policiesIssued",  label: "Active Policies",         category: "Financial",    unit: "policies", higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()}` },
+  { key: "sumInsured",      label: "Total Sum Insured",       category: "Financial",    unit: "M RWF",    higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
+  { key: "compensationPaid",label: "Compensation Paid",       category: "Financial",    unit: "M RWF",    higherIsBetter: false, format: (v) => `${Math.round(v)}M` },
+  { key: "areaLost",        label: "Disaster Area Lost",      category: "Agricultural", unit: "ha",       higherIsBetter: false, format: (v) => `${Math.round(v).toLocaleString()} ha` },
+
 ];
 
 export type ConceptValues = Record<ConceptKey, number>;
@@ -331,8 +343,14 @@ export function getConceptValues(scopeId: string, season: CompareSeason): Concep
   const claims = Math.max(0, Math.round((40 + seed * 90) * (1 - drift * 2) * (scale / 3)));
   const subsidy = Math.round((90 + seed * 160) * scale * (1 + drift));
   const cultivated = Math.round((1200 + seed * 1800) * scale);
+  const farmers = Math.round((500 + seed * 900) * scale);
+  const policiesIssued = Math.round((300 + seed * 800) * scale * (1 + drift));
+  const sumInsured = Math.round(policiesIssued * (1.2 + seed * 0.8));
+  const areaLost = Math.round((15 + seed * 60) * (1 - drift * 2) * scale);
+  const compensationPaid = Math.round(areaLost * (0.5 + seed * 0.3));
 
-  return { ndvi, insurance, yield: yieldVal, claims, subsidy, cultivated };
+
+  return { ndvi, insurance, yield: yieldVal, claims, subsidy, cultivated, farmers, policiesIssued, sumInsured, areaLost, compensationPaid };
 }
 
 export function scopeLabel(scopeId: string): string {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { AlertTriangle, Sprout, Banknote, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Sprout, Banknote, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Panel, KpiCard, StatusBadge } from "@/components/government/gov-widgets";
 import {
   claims,
@@ -24,6 +24,8 @@ type EpicenterMode = "area" | "claims";
 export function GovClaimsPage() {
   const [crop, setCrop] = useState("All Crops");
   const [insurer, setInsurer] = useState("All Insurers");
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [status, setStatus] = useState("All Statuses");
   const [cause, setCause] = useState("All Causes");
   const [mode, setMode] = useState<EpicenterMode>("area");
@@ -47,6 +49,43 @@ export function GovClaimsPage() {
 
   const dataKey = mode === "area" ? "area" : "count";
   const epicenterTotal = claimCauses.reduce((s, d) => s + (d[dataKey] as number), 0);
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      if (sortDir === "asc") setSortDir("desc");
+      else { setSortCol(null); setSortDir("asc"); }
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    if (!sortCol) return rows;
+    return [...rows].sort((a, b) => {
+      let valA = (a as any)[sortCol];
+      let valB = (b as any)[sortCol];
+      if (valA < valB) return sortDir === "asc" ? -1 : 1;
+      if (valA > valB) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [rows, sortCol, sortDir]);
+
+  const SortHeader = ({ col, label, align = "left" }: { col: string, label: string, align?: string }) => (
+    <th 
+      className={`px-4 py-3 font-medium cursor-pointer hover:bg-gray-50 transition-colors select-none ${align === "right" ? "text-right pr-5" : ""}`}
+      onClick={() => handleSort(col)}
+    >
+      <div className={`flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}>
+        {label}
+        {sortCol === col ? (
+          sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </th>
+  );
 
   return (
     <div className="flex flex-col space-y-6">
@@ -72,9 +111,9 @@ export function GovClaimsPage() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={claimCauses} dataKey={dataKey} nameKey="cause" innerRadius={48} outerRadius={80} paddingAngle={3}>
+                <Pie data={claimCauses} dataKey={dataKey} nameKey="cause" innerRadius={48} outerRadius={80} paddingAngle={3} style={{ outline: "none" }} activeShape={undefined}>
                   {claimCauses.map((d) => (
-                    <Cell key={d.cause} fill={d.fill} />
+                    <Cell key={d.cause} fill={d.fill} style={{ outline: "none" }} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -126,17 +165,17 @@ export function GovClaimsPage() {
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Claim ID</th>
-                  <th className="px-4 py-3 font-medium">Farmer</th>
-                  <th className="px-4 py-3 font-medium">Sector</th>
-                  <th className="px-4 py-3 font-medium">Cause</th>
-                  <th className="px-4 py-3 font-medium">Area Lost (ha)</th>
-                  <th className="px-4 py-3 font-medium">Insurer</th>
-                  <th className="px-4 py-3 font-medium pr-5">Status</th>
+                  <SortHeader col="id" label="Claim ID" />
+                  <SortHeader col="farmer" label="Farmer" />
+                  <SortHeader col="region" label="Sector" />
+                  <SortHeader col="cause" label="Cause" />
+                  <SortHeader col="areaLostHa" label="Area Lost (ha)" />
+                  <SortHeader col="insurer" label="Insurer" />
+                  <SortHeader col="status" label="Status" align="right" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((c) => (
+                {sortedRows.map((c) => (
                   <tr key={c.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40">
                     <td className="px-5 py-3 font-mono text-foreground">{c.id}</td>
                     <td className="px-4 py-3 font-medium text-foreground">{c.farmer}</td>
