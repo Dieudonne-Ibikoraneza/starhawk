@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Panel, DeltaPill, StatusBadge, KpiCard } from "@/components/government/gov-widgets";
 import {
-  getSectorDetail,
-  type CellNode,
+  getVillageDetail,
   type Farmer,
 } from "@/components/government/gov-data";
 import {
@@ -27,24 +26,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function GovSectorPage({
-  sectorId,
+export function GovVillagePage({
+  villageId,
   onBack,
-  onCellSelect,
   onNavigate,
 }: {
-  sectorId: string;
+  villageId: string;
   onBack: () => void;
-  onCellSelect?: (cellId: string) => void;
   onNavigate?: (target: { level: "Leaderboard" | "Sector" | "Cell" | "Village"; id?: string }) => void;
 }) {
-  const detail = useMemo(() => getSectorDetail(sectorId), [sectorId]);
+  const detail = useMemo(() => getVillageDetail(villageId), [villageId]);
 
   if (!detail) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-xl font-bold">Sector not found</h2>
-        <p className="mt-2 text-muted-foreground">This sector does not exist.</p>
+        <h2 className="text-xl font-bold">Village not found</h2>
+        <p className="mt-2 text-muted-foreground">This village does not exist.</p>
         <button onClick={onBack} className="mt-4 text-primary hover:underline">
           Back to leaderboard
         </button>
@@ -52,13 +49,13 @@ export function GovSectorPage({
     );
   }
 
-  const { sector, cells, farmers, stats } = detail;
+  const { village, farmers, stats } = detail;
   const insuredPct = Math.round((stats.insuredFarmers / stats.totalFarmers) * 100);
 
   // Deterministic deltas vs last season based on stats
-  const registeredDelta = 4 + (stats.totalFarmers % 7);
-  const insuredDelta = 2 + (insuredPct % 9);
-  const cultivatedDelta = -3 + (sector.cultivatedHa % 9);
+  const registeredDelta = 2 + (stats.totalFarmers % 9);
+  const insuredDelta = 1 + (insuredPct % 13);
+  const cultivatedDelta = -1 + (village.cultivatedHa % 6);
 
   return (
     <div className="flex flex-col space-y-6">
@@ -72,7 +69,21 @@ export function GovSectorPage({
             <Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Leaderboard</span>
           </button>
           <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          <span className="font-medium text-foreground truncate max-w-[100px] sm:max-w-none shrink-0">{sector.name}</span>
+          <button
+            onClick={() => onNavigate?.({ level: "Sector", id: detail.sectorId })}
+            className="hover:text-foreground transition-colors truncate max-w-[80px] sm:max-w-none shrink-0"
+          >
+            {detail.sectorName}
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <button
+            onClick={() => onNavigate?.({ level: "Cell", id: detail.cellId })}
+            className="hover:text-foreground transition-colors truncate max-w-[80px] sm:max-w-none shrink-0"
+          >
+            {detail.cellName}
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <span className="font-medium text-foreground truncate max-w-[100px] sm:max-w-none shrink-0">{village.name}</span>
         </nav>
         <button
           onClick={onBack}
@@ -83,37 +94,36 @@ export function GovSectorPage({
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{sector.name} Sector</h1>
-        <p className="text-muted-foreground">{sector.level} overview — cells, villages, farmers & crop mix</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{village.name} Village</h1>
+        <p className="text-muted-foreground">{village.level} overview — farmers & crop mix</p>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3">
         <KpiCard label="Registered Farmers" value={stats.totalFarmers.toLocaleString()} delta={registeredDelta} deltaLabel="vs last season" icon={Users} accent="primary" />
         <KpiCard label="Insured" value={`${insuredPct}%`} delta={insuredDelta} deltaLabel="vs last season" icon={ShieldCheck} accent="info" />
-        <KpiCard label="Cells / Villages" value={`${stats.totalCells} / ${stats.totalVillages}`} icon={Layers} accent="warning" />
-        <KpiCard label="Cultivated" value={sector.cultivatedHa.toLocaleString()} unit="ha" delta={cultivatedDelta} deltaLabel="vs last season" icon={Sprout} accent="primary" />
+        <KpiCard label="Cultivated" value={village.cultivatedHa.toLocaleString()} unit="ha" delta={cultivatedDelta} deltaLabel="vs last season" icon={Sprout} accent="primary" />
       </div>
 
       {/* Descriptive overview */}
       <div className="grid gap-4 xl:grid-cols-3">
-        <Panel title="Sector Snapshot" className="xl:col-span-1">
+        <Panel title="Village Snapshot" className="xl:col-span-1">
           <dl className="space-y-3 text-sm">
             <Row label="Avg NDVI">
-              <span className="font-mono font-semibold text-foreground">{sector.ndvi.toFixed(2)}</span>
+              <span className="font-mono font-semibold text-foreground">{village.ndvi.toFixed(2)}</span>
             </Row>
-            <Row label="7-day change"><DeltaPill value={sector.change7d} /></Row>
-            <Row label="30-day change"><DeltaPill value={sector.change30d} /></Row>
+            <Row label="7-day change"><DeltaPill value={village.change7d} /></Row>
+            <Row label="30-day change"><DeltaPill value={village.change30d} /></Row>
             <Row label="Insurance penetration">
-              <span className="font-mono text-foreground">{sector.insurancePenetration}%</span>
+              <span className="font-mono text-foreground">{village.insurancePenetration}%</span>
             </Row>
             <Row label="Active claims">
-              <span className="font-mono text-foreground">{sector.activeClaims}</span>
+              <span className="font-mono text-foreground">{village.activeClaims}</span>
             </Row>
             <Row label="Dominant crop">
-              <span className="text-foreground">{sector.dominantCrop}</span>
+              <span className="text-foreground">{village.dominantCrop}</span>
             </Row>
-            <Row label="Risk level"><StatusBadge status={sector.riskLevel} /></Row>
+            <Row label="Risk level"><StatusBadge status={village.riskLevel} /></Row>
           </dl>
         </Panel>
 
@@ -122,25 +132,8 @@ export function GovSectorPage({
         </Panel>
       </div>
 
-      {/* Cells & villages */}
-      <div>
-        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-foreground">
-          <MapPinned className="h-5 w-5 text-primary" /> Cells
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {cells.slice(0, 4).map((cell) => (
-            <CellCard key={cell.id} cell={cell} onClick={() => onCellSelect?.(cell.id)} />
-          ))}
-          {cells.length > 4 && (
-            <div className="flex items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-4 text-muted-foreground hover:bg-card/80 transition-colors cursor-pointer text-sm font-medium">
-              +{cells.length - 4} more
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Farmers */}
-      <FarmersTable farmers={farmers} cells={cells} sectorName={sector.name} />
+      <FarmersTable farmers={farmers} regionName={village.name} />
     </div>
   );
 }
@@ -209,44 +202,10 @@ function CropMix({ data }: { data: { crop: string; ha: number }[] }) {
   );
 }
 
-function CellCard({ cell, onClick }: { cell: CellNode; onClick?: () => void }) {
-  return (
-    <Panel 
-      className={cn("p-4", onClick && "cursor-pointer transition-colors hover:bg-secondary/40")}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-semibold text-foreground">{cell.name} Cell</h3>
-          <p className="text-xs text-muted-foreground">{cell.villages.length} villages · {cell.farmers} farmers</p>
-        </div>
-        <span className="font-mono text-sm font-semibold text-primary">{cell.ndvi.toFixed(2)}</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {cell.villages.slice(0, 4).map((v) => (
-          <span key={v.id} className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-            {v.name} · {v.farmers}
-          </span>
-        ))}
-        {cell.villages.length > 4 && (
-          <span className="rounded-md bg-secondary/80 px-2 py-0.5 text-xs text-muted-foreground font-semibold">
-            +{cell.villages.length - 4} more
-          </span>
-        )}
-      </div>
-      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{cell.cultivatedHa} ha cultivated</span>
-        <span>{cell.insurancePenetration}% insured</span>
-      </div>
-    </Panel>
-  );
-}
-
 const PAGE_SIZE = 20;
 
-function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells: CellNode[]; sectorName: string }) {
+function FarmersTable({ farmers, regionName }: { farmers: Farmer[]; regionName: string }) {
   const [q, setQ] = useState("");
-  const [cell, setCell] = useState("All Cells");
   const [ins, setIns] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Farmer | null>(null);
@@ -254,15 +213,14 @@ function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return farmers.filter((f) => {
-      if (cell !== "All Cells" && f.cell !== cell) return false;
       if (ins === "insured" && !f.insured) return false;
       if (ins === "uninsured" && f.insured) return false;
       if (needle && !f.name.toLowerCase().includes(needle) && !f.crops.join(" ").toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [farmers, q, cell, ins]);
+  }, [farmers, q, ins]);
 
-  useEffect(() => setPage(1), [q, cell, ins]);
+  useEffect(() => setPage(1), [q, ins]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -287,15 +245,6 @@ function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells
               className="w-44 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <Select value={cell} onValueChange={setCell}>
-            <SelectTrigger className="w-[140px] cursor-pointer"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All Cells">All Cells</SelectItem>
-              {[...new Set(cells.map((c) => c.name))].map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select value={ins} onValueChange={setIns}>
             <SelectTrigger className="w-[130px] cursor-pointer"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -387,7 +336,7 @@ function FarmersTable({ farmers, cells, sectorName }: { farmers: Farmer[]; cells
         )}
       </Panel>
 
-      <FarmerDialog farmer={selected} sectorName={sectorName} onClose={() => setSelected(null)} />
+      <FarmerDialog farmer={selected} sectorName={regionName} onClose={() => setSelected(null)} />
     </>
   );
 }
