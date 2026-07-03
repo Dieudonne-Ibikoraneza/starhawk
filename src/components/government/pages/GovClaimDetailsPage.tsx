@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Home, ChevronRight, Sprout, Gauge, Layers, Info, CloudRain, FileText, ClipboardCheck, User, Ruler, CalendarDays, MapPin, Images, Expand, Thermometer, Droplets, Wind, FileSearch, ArrowRight, Activity, Map, ArrowRightCircle, Download } from "lucide-react";
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ReferenceLine, Bar, Line, AreaChart, Area } from "recharts";
 import { Panel, StatusBadge, KpiCard } from "@/components/government/gov-widgets";
@@ -9,10 +10,10 @@ import { getClaimDetail, rwf } from "@/components/government/gov-data";
 
 export function GovClaimDetailsPage({ claimId, onBack }: { claimId: string, onBack: () => void }) {
   const tooltipStyle = {
-    backgroundColor: "var(--card)",
-    border: "1px solid var(--border)",
+    backgroundColor: "hsl(var(--card))",
+    border: "1px solid hsl(var(--border))",
     borderRadius: "var(--radius)",
-    color: "var(--foreground)",
+    color: "hsl(var(--foreground))",
   };
   const detail = useMemo(() => getClaimDetail(claimId), [claimId]);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -272,8 +273,9 @@ export function GovClaimDetailsPage({ claimId, onBack }: { claimId: string, onBa
         </TabsContent>
       </Tabs>
 
-      {lightbox !== null && (
-        <PhotoLightbox photos={photos} index={lightbox} onClose={() => setLightbox(null)} onIndex={setLightbox} />
+      {lightbox !== null && createPortal(
+        <PhotoLightbox photos={photos} index={lightbox} onClose={() => setLightbox(null)} onIndex={setLightbox} />,
+        document.body
       )}
     </div>
   );
