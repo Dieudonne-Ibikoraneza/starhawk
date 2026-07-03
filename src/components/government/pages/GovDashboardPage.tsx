@@ -26,7 +26,7 @@ const severityBorder: Record<string, string> = {
   info: "border-blue-500/30 bg-blue-500/5",
 };
 
-function HeatCell({ r }: { r: (typeof regions)[number] }) {
+function HeatCell({ r, onClick }: { r: (typeof regions)[number]; onClick?: () => void }) {
   const color =
     r.riskLevel === "high"
       ? "bg-red-100 border-red-200 hover:bg-red-200"
@@ -42,7 +42,7 @@ function HeatCell({ r }: { r: (typeof regions)[number] }) {
         : "text-green-900";
 
   return (
-    <div className={`group/cell relative flex aspect-[4/3] flex-col justify-between rounded-xl border p-3 text-left transition-colors ${color}`}>
+    <button onClick={onClick} className={`group/cell relative flex aspect-[4/3] flex-col justify-between rounded-xl border p-3 text-left transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] ${color}`}>
       <span className={`text-[11px] font-semibold ${textColor}`}>{r.name}</span>
       <div>
         <span className={`font-mono block text-lg font-bold ${textColor}`}>{r.ndvi.toFixed(2)}</span>
@@ -51,11 +51,11 @@ function HeatCell({ r }: { r: (typeof regions)[number] }) {
           <span className={`text-[10px] font-medium opacity-80 ${textColor}`}>Least: {r.leastCrop}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
-export function GovDashboardPage() {
+export function GovDashboardPage({ onSectorSelect }: { onSectorSelect?: (id: string, level: "Sector" | "Cell") => void }) {
   const [openAlert, setOpenAlert] = useState<AlertItem | null>(null);
   const detail = useMemo(() => (openAlert ? getAlertDetail(openAlert.id) : null), [openAlert]);
 
@@ -147,11 +147,11 @@ export function GovDashboardPage() {
           }
         >
           <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
-            <MapPin className="h-3.5 w-3.5" /> Gasabo District · {regions.length} sectors
+            <MapPin className="h-3.5 w-3.5" /> Gasabo District · {regions.length} sectors · <span className="text-indigo-500 font-medium ml-1">Click on a cell to drill in</span>
           </div>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
             {regions.map((r) => (
-              <HeatCell key={r.id} r={r} />
+              <HeatCell key={r.id} r={r} onClick={() => onSectorSelect?.(r.id, "Sector")} />
             ))}
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">

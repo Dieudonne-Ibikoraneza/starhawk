@@ -60,15 +60,15 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
   compare:     { title: "Season Comparison",    description: "Pick a region and season for each side — data appears the moment you choose" },
 };
 
-function renderPage(page: PageId) {
+function renderPage(page: PageId, onSectorSelect?: (id: string, level: "Sector" | "Cell") => void) {
   switch (page) {
-    case "dashboard":   return <GovDashboardPage />;
+    case "dashboard":   return <GovDashboardPage onSectorSelect={onSectorSelect} />;
     case "leaderboard": return <GovLeaderboardPage crop="All Crops" season="Season A 2026" />;
     case "policies":    return <GovPoliciesPage />;
     case "claims":      return <GovClaimsPage />;
     case "invoicing":   return <GovSubsidiesPage />;
     case "compare":     return <GovSeasonComparePage />;
-    default:            return <GovDashboardPage />;
+    default:            return <GovDashboardPage onSectorSelect={onSectorSelect} />;
   }
 }
 
@@ -316,7 +316,7 @@ export const GovernmentDashboard = () => {
           <main className="flex-1 min-h-0 bg-gray-50 flex flex-col">
             <CustomScrollbar id="gov-main-scroll-area" className="flex-1 overflow-auto">
               <div className="px-6 py-6">
-                {(activePage === "leaderboard" || activePage === "invoicing") && viewStack.length > 0 ? (
+                {(activePage === "dashboard" || activePage === "leaderboard" || activePage === "invoicing") && viewStack.length > 0 ? (
                   (() => {
                     const currentView = viewStack[viewStack.length - 1];
                     const popView = () => setViewStack(prev => prev.slice(0, prev.length - 1));
@@ -381,7 +381,7 @@ export const GovernmentDashboard = () => {
                 ) : activePage === "invoicing" ? (
                   <GovSubsidiesPage onNavigate={(t) => setViewStack([t as any])} />
                 ) : (
-                  renderPage(activePage)
+                  renderPage(activePage, (id, level) => setViewStack([{ id, level }]))
                 )}
               </div>
             </CustomScrollbar>
