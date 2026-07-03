@@ -69,7 +69,7 @@ export function GovCellPage({
       <div className="flex items-center justify-between">
         <GovBreadcrumb 
           items={[
-            { level: "Leaderboard", name: "Overview" },
+            { level: "Leaderboard", name: "Leaderboard" },
             { level: "Sector", id: detail.sectorId, name: detail.sectorName },
             { level: "Cell", name: cell.name }
           ]} 
