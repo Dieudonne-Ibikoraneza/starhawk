@@ -8,6 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClaimDetail, rwf } from "@/components/government/gov-data";
 
 export function GovClaimDetailsPage({ claimId, onBack }: { claimId: string, onBack: () => void }) {
+  const tooltipStyle = {
+    backgroundColor: "var(--card)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    color: "var(--foreground)",
+  };
   const detail = useMemo(() => getClaimDetail(claimId), [claimId]);
   const [lightbox, setLightbox] = useState<number | null>(null);
 

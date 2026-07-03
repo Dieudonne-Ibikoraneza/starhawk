@@ -75,6 +75,12 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --color-chart-1: oklch(0.74 0.16 158);
+    --color-chart-2: oklch(0.7 0.13 230);
+    --color-chart-3: oklch(0.8 0.15 75);
+    --color-chart-4: oklch(0.62 0.22 22);
+    --color-chart-5: oklch(0.66 0.17 300);
   }
 
   .dark {
@@ -113,6 +119,12 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --color-chart-1: oklch(0.74 0.16 158);
+    --color-chart-2: oklch(0.7 0.13 230);
+    --color-chart-3: oklch(0.8 0.15 75);
+    --color-chart-4: oklch(0.62 0.22 22);
+    --color-chart-5: oklch(0.66 0.17 300);
   }
 }
 
