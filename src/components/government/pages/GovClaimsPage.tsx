@@ -18,14 +18,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { GovClaimDetailsPage } from "./GovClaimDetailsPage";
 
 type EpicenterMode = "area" | "claims";
 
 export function GovClaimsPage() {
-  const [crop, setCrop] = useState("All Crops");
-  const [insurer, setInsurer] = useState("All Insurers");
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [crop, setCrop] = useState("All Crops");
+  const [insurer, setInsurer] = useState("All Insurers");
   const [status, setStatus] = useState("All Statuses");
   const [cause, setCause] = useState("All Causes");
   const [mode, setMode] = useState<EpicenterMode>("area");
@@ -86,6 +88,10 @@ export function GovClaimsPage() {
       </div>
     </th>
   );
+
+  if (selectedClaimId) {
+    return <GovClaimDetailsPage claimId={selectedClaimId} onBack={() => setSelectedClaimId(null)} />;
+  }
 
   return (
     <div className="flex flex-col space-y-6">
@@ -176,7 +182,11 @@ export function GovClaimsPage() {
               </thead>
               <tbody>
                 {sortedRows.map((c) => (
-                  <tr key={c.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40">
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelectedClaimId(c.id)}
+                    className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40 cursor-pointer"
+                  >
                     <td className="px-5 py-3 font-mono text-foreground">{c.id}</td>
                     <td className="px-4 py-3 font-medium text-foreground">{c.farmer}</td>
                     <td className="px-4 py-3 text-muted-foreground">{c.region}</td>

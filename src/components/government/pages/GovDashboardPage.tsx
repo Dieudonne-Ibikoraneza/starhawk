@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -10,12 +11,19 @@ import {
 } from "recharts";
 import { Users, Sprout, Activity, Wallet, AlertTriangle, MapPin } from "lucide-react";
 import { KpiCard, Panel } from "@/components/government/gov-widgets";
-import { regions, ndviTrend, alerts } from "@/components/government/gov-data";
+import { regions, ndviTrend, alerts, getAlertDetail, type AlertItem } from "@/components/government/gov-data";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const severityStyles: Record<string, string> = {
   critical: "bg-red-500",
   warning: "bg-orange-500",
   info: "bg-blue-500",
+};
+
+const severityBorder: Record<string, string> = {
+  critical: "border-red-500/30 bg-red-500/5",
+  warning: "border-orange-500/30 bg-orange-500/5",
+  info: "border-blue-500/30 bg-blue-500/5",
 };
 
 function HeatCell({ r }: { r: (typeof regions)[number] }) {
@@ -45,6 +53,9 @@ function HeatCell({ r }: { r: (typeof regions)[number] }) {
 }
 
 export function GovDashboardPage() {
+  const [openAlert, setOpenAlert] = useState<AlertItem | null>(null);
+  const detail = useMemo(() => (openAlert ? getAlertDetail(openAlert.id) : null), [openAlert]);
+
   return (
     <div className="space-y-4">
       {/* KPIs */}
@@ -94,15 +105,27 @@ export function GovDashboardPage() {
         {/* Alert Feed */}
         <Panel title="Alert Feed" subtitle="Critical events requiring attention">
           <div className="flex flex-col gap-3">
-            {alerts.map((a) => (
-              <div key={a.id} className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3 hover:bg-gray-50 transition-colors">
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${severityStyles[a.severity]}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium leading-snug text-gray-900">{a.title}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{a.region} · {a.time}</p>
-                </div>
-              </div>
-            ))}
+            {alerts.map((a) => {
+              const d = getAlertDetail(a.id);
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setOpenAlert(a)}
+                  className={`group flex gap-3 rounded-xl border bg-background/40 p-3 text-left transition-colors hover:border-primary/40 ${severityBorder[a.severity]}`}
+                >
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${severityStyles[a.severity]}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-snug text-foreground">{a.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{a.region} · {a.time}</p>
+                    {d && d.metrics.affectedFarms > 0 && (
+                      <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
+                        {d.metrics.affectedFarms} farms · {d.metrics.affectedAreaHa} ha · {d.metrics.insuredShare}% insured
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Panel>
       </div>
@@ -134,6 +157,57 @@ export function GovDashboardPage() {
           </div>
         </Panel>
       </div>
+
+      <Dialog open={openAlert !== null} onOpenChange={(o) => !o && setOpenAlert(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          {openAlert && detail && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                  <span className={`h-2.5 w-2.5 rounded-full ${severityStyles[openAlert.severity]}`} />
+                  <span className="uppercase tracking-wider">
+                    {openAlert.severity} · {openAlert.region} · {openAlert.time}
+                  </span>
+                </div>
+                <DialogTitle className="text-left">{openAlert.title}</DialogTitle>
+              </DialogHeader>
+              
+              <div className="mt-2 space-y-4 text-sm text-foreground">
+                <p className="leading-relaxed">{detail.meta.summary}</p>
+                
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Impact Assessment
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Affected</p>
+                      <p className="mt-0.5 font-mono text-base font-semibold">{detail.metrics.affectedFarms}</p>
+                      <p className="text-[10px] text-muted-foreground">Farms</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Area</p>
+                      <p className="mt-0.5 font-mono text-base font-semibold">{detail.metrics.affectedAreaHa}</p>
+                      <p className="text-[10px] text-muted-foreground">Hectares</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Insured</p>
+                      <p className="mt-0.5 font-mono text-base font-semibold">{detail.metrics.insuredShare}%</p>
+                      <p className="text-[10px] text-muted-foreground">Of affected</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Immediate Actions Recommended</h4>
+                  <p className="leading-relaxed text-muted-foreground">{detail.meta.recommendation}</p>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

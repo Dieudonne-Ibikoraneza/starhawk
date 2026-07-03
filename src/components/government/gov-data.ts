@@ -1,4 +1,4 @@
-// Starhawk — Government Command Center mock data.
+﻿// Starhawk — Government Command Center mock data.
 // All values are illustrative aggregates for a District Agriculture Officer
 // overseeing Gasabo District (Kigali City). Currency: RWF.
 
@@ -32,7 +32,6 @@ export const regions: RegionRow[] = [
 ];
 
 export const crops = ["All Crops", "Maize", "Beans", "Rice", "Cassava", "Vegetables"] as const;
-export const SUBSIDY_RATE = 0.4;
 export const seasons = ["Season A 2026", "Season B 2025", "Season A 2025"] as const;
 
 // NDVI trajectory — current season vs last year (12 weeks)
@@ -77,7 +76,7 @@ export interface ClaimRow {
 }
 
 export const claims: ClaimRow[] = [
-  { id: "CLM-2041", farmer: "J. Uwimana", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1850000, areaLostHa: 12.5, status: "Pending", filed: "2026-06-08", insurer: "Radiant Yacu" },
+  { id: "CLM-2041", farmer: "J. Uwimana", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1850000, areaLostHa: 12.4, status: "Pending", filed: "2026-06-08", insurer: "Radiant Yacu" },
   { id: "CLM-2042", farmer: "E. Mukamana", region: "Bumbogo", crop: "Rice", cause: "Flood", value: 2400000, areaLostHa: 18.1, status: "Approved", filed: "2026-06-07", insurer: "Prime Insurance" },
   { id: "CLM-2043", farmer: "P. Habimana", region: "Ndera", crop: "Cassava", cause: "Pest", value: 720000, areaLostHa: 5.2, status: "Paid", filed: "2026-06-05", insurer: "Sanlam" },
   { id: "CLM-2044", farmer: "C. Niyonsaba", region: "Kinyinya", crop: "Rice", cause: "Drought", value: 1320000, areaLostHa: 9.7, status: "Pending", filed: "2026-06-09", insurer: "Radiant Yacu" },
@@ -89,10 +88,10 @@ export const claims: ClaimRow[] = [
 
 // Disaster epicenters by cause — sized either by share of claims or share of damaged area.
 export const claimCauses = [
-  { cause: "Drought", count: 60, area: 1840, fill: "#f59e0b" }, // amber
-  { cause: "Flood", count: 30, area: 2210, fill: "#0ea5e9" },   // sky
-  { cause: "Pest", count: 7, area: 420, fill: "#10b981" },      // emerald
-  { cause: "Hail", count: 3, area: 180, fill: "#8b5cf6" },      // violet
+  { cause: "Drought", count: 60, area: 1840, fill: "var(--color-chart-3)" },
+  { cause: "Flood", count: 30, area: 2210, fill: "var(--color-chart-2)" },
+  { cause: "Pest", count: 7, area: 420, fill: "var(--color-chart-1)" },
+  { cause: "Hail", count: 3, area: 180, fill: "var(--color-chart-5)" },
 ];
 
 export const claimInsurers = ["All Insurers", "Radiant Yacu", "Prime Insurance", "Sanlam"] as const;
@@ -138,49 +137,28 @@ export interface InvoiceRow {
   insurer: string;
   period: string;
   farmsCovered: number;
-  subsidyAmount: number;
-  status: "Paid" | "Pending" | "Overdue" | "Rejected";
+  premiumTotal: number; // total premium billed by insurer
+  subsidyAmount: number; // government share = 40% of premiumTotal
+  status: "Paid" | "Pending" | "Overdue";
   issued: string;
-  dueDate?: string;
-  totalPremium?: number;
-  subsidyRate?: number;
-  paymentMethod?: string;
-  breakdown?: { category: string; farms: number; amount: number }[];
-  pdfUrl?: string;
 }
 
-export const invoices: InvoiceRow[] = [
-  { 
-    id: "INV-2026-06", insurer: "Radiant Yacu", period: "Jun 2026", farmsCovered: 4120, subsidyAmount: 184000000, status: "Pending", issued: "2026-06-01", 
-    dueDate: "2026-06-15", totalPremium: 460000000, subsidyRate: 0.4, paymentMethod: "Bank Transfer", 
-    breakdown: [{ category: "Maize", farms: 2120, amount: 94000000 }, { category: "Rice", farms: 2000, amount: 90000000 }],
-    pdfUrl: "/assets/invoice-mockup.png"
-  },
-  { 
-    id: "INV-2026-05", insurer: "Prime Insurance", period: "May 2026", farmsCovered: 3380, subsidyAmount: 142500000, status: "Paid", issued: "2026-05-01",
-    dueDate: "2026-05-15", totalPremium: 356250000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
-    breakdown: [{ category: "Beans", farms: 1800, amount: 72500000 }, { category: "Vegetables", farms: 1580, amount: 70000000 }],
-    pdfUrl: "/assets/invoice-mockup.png"
-  },
-  { 
-    id: "INV-2026-05B", insurer: "Sanlam", period: "May 2026", farmsCovered: 2210, subsidyAmount: 96800000, status: "Paid", issued: "2026-05-01",
-    dueDate: "2026-05-15", totalPremium: 242000000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
-    breakdown: [{ category: "Cassava", farms: 2210, amount: 96800000 }],
-    pdfUrl: "/assets/invoice-mockup.png"
-  },
-  { 
-    id: "INV-2026-04", insurer: "Radiant Yacu", period: "Apr 2026", farmsCovered: 3990, subsidyAmount: 171200000, status: "Overdue", issued: "2026-04-01",
-    dueDate: "2026-04-15", totalPremium: 428000000, subsidyRate: 0.4, paymentMethod: "Pending Resolution",
-    breakdown: [{ category: "Maize", farms: 3990, amount: 171200000 }],
-    pdfUrl: "/assets/invoice-mockup.png"
-  },
-  { 
-    id: "INV-2026-04B", insurer: "Prime Insurance", period: "Apr 2026", farmsCovered: 3010, subsidyAmount: 128400000, status: "Paid", issued: "2026-04-01",
-    dueDate: "2026-04-15", totalPremium: 321000000, subsidyRate: 0.4, paymentMethod: "Central Bank Transfer",
-    breakdown: [{ category: "Rice", farms: 3010, amount: 128400000 }],
-    pdfUrl: "/assets/invoice-mockup.png"
-  },
+// Government subsidises 40% of the total premium.
+export const SUBSIDY_RATE = 0.4;
+
+function withSubsidy(row: Omit<InvoiceRow, "subsidyAmount">): InvoiceRow {
+  return { ...row, subsidyAmount: Math.round(row.premiumTotal * SUBSIDY_RATE) };
+}
+
+const invoiceSeed: Omit<InvoiceRow, "subsidyAmount">[] = [
+  { id: "INV-2026-06", insurer: "Radiant Yacu", period: "Jun 2026", farmsCovered: 4120, premiumTotal: 460000000, status: "Pending", issued: "2026-06-01" },
+  { id: "INV-2026-05", insurer: "Prime Insurance", period: "May 2026", farmsCovered: 3380, premiumTotal: 356250000, status: "Paid", issued: "2026-05-01" },
+  { id: "INV-2026-05B", insurer: "Sanlam", period: "May 2026", farmsCovered: 2210, premiumTotal: 242000000, status: "Paid", issued: "2026-05-01" },
+  { id: "INV-2026-04", insurer: "Radiant Yacu", period: "Apr 2026", farmsCovered: 3990, premiumTotal: 428000000, status: "Overdue", issued: "2026-04-01" },
+  { id: "INV-2026-04B", insurer: "Prime Insurance", period: "Apr 2026", farmsCovered: 3010, premiumTotal: 321000000, status: "Paid", issued: "2026-04-01" },
 ];
+
+export const invoices: InvoiceRow[] = invoiceSeed.map(withSubsidy);
 
 export const subsidyByCrop = [
   { crop: "Maize", amount: 312 },
@@ -205,6 +183,9 @@ export function rwfShort(value: number): string {
 
 // ──────────────────────────────────────────────────────────────────────────
 // SEASON COMPARISON LAYER
+// Lets a District/National officer compare the same "concept" (metric) across
+// seasons, filtered down the administrative hierarchy:
+//   Province → District → (All sectors)
 // ──────────────────────────────────────────────────────────────────────────
 
 export interface RegionNode {
@@ -213,6 +194,7 @@ export interface RegionNode {
   districts?: { id: string; name: string }[];
 }
 
+// Rwanda administrative hierarchy (illustrative subset of districts).
 export const provinceTree: RegionNode[] = [
   {
     id: "kigali",
@@ -262,6 +244,7 @@ export const provinceTree: RegionNode[] = [
   },
 ];
 
+// The seasons available for comparison (most recent first).
 export const compareSeasons = [
   "Season A 2026",
   "Season B 2025",
@@ -272,49 +255,38 @@ export const compareSeasons = [
 
 export type CompareSeason = (typeof compareSeasons)[number];
 
+// The "concepts" (metrics) the officer can compare across seasons.
+export interface ConceptDef {
+  key: ConceptKey;
+  label: string;
+  unit: string;
+  /** true when a higher value is the desirable / healthy direction */
+  higherIsBetter: boolean;
+  /** how to format a single value for display */
+  format: (v: number) => string;
+}
+
 export type ConceptKey =
   | "ndvi"
   | "insurance"
   | "yield"
   | "claims"
   | "subsidy"
-  | "cultivated"
-  | "farmers"
-  | "policiesIssued"
-  | "sumInsured"
-  | "areaLost"
-  | "compensationPaid";
-
-export interface ConceptDef {
-  key: ConceptKey;
-  label: string;
-  category: string;
-  unit: string;
-  higherIsBetter: boolean;
-  format: (v: number) => string;
-}
+  | "cultivated";
 
 export const concepts: ConceptDef[] = [
-  { key: "ndvi",      label: "Crop Health (NDVI)",       category: "Agricultural", unit: "index",   higherIsBetter: true,  format: (v) => v.toFixed(2) },
-  { key: "insurance", label: "Insurance Penetration",    category: "Financial",    unit: "%",       higherIsBetter: true,  format: (v) => `${Math.round(v)}%` },
-  { key: "yield",     label: "Avg Yield",                category: "Agricultural", unit: "t/ha",    higherIsBetter: true,  format: (v) => `${v.toFixed(1)} t/ha` },
-  { key: "claims",    label: "Active Claims",            category: "Financial",    unit: "claims",  higherIsBetter: false, format: (v) => `${Math.round(v)}` },
-  { key: "subsidy",   label: "Subsidy Utilized",         category: "Financial",    unit: "M RWF",   higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
-  { key: "cultivated",label: "Cultivated Area",          category: "General",      unit: "ha",      higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()} ha` },
-  { key: "farmers",   label: "Registered Farmers",       category: "General",      unit: "farmers", higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()}` },
-  { key: "policiesIssued",  label: "Active Policies",         category: "Financial",    unit: "policies", higherIsBetter: true,  format: (v) => `${Math.round(v).toLocaleString()}` },
-  { key: "sumInsured",      label: "Total Sum Insured",       category: "Financial",    unit: "M RWF",    higherIsBetter: true,  format: (v) => `${Math.round(v)}M` },
-  { key: "compensationPaid",label: "Compensation Paid",       category: "Financial",    unit: "M RWF",    higherIsBetter: false, format: (v) => `${Math.round(v)}M` },
-  { key: "areaLost",        label: "Disaster Area Lost",      category: "Agricultural", unit: "ha",       higherIsBetter: false, format: (v) => `${Math.round(v).toLocaleString()} ha` },
-
+  { key: "ndvi", label: "Crop Health (NDVI)", unit: "index", higherIsBetter: true, format: (v) => v.toFixed(2) },
+  { key: "insurance", label: "Insurance Penetration", unit: "%", higherIsBetter: true, format: (v) => `${Math.round(v)}%` },
+  { key: "yield", label: "Avg Yield", unit: "t/ha", higherIsBetter: true, format: (v) => `${v.toFixed(1)} t/ha` },
+  { key: "claims", label: "Active Claims", unit: "claims", higherIsBetter: false, format: (v) => `${Math.round(v)}` },
+  { key: "subsidy", label: "Subsidy Utilized", unit: "M RWF", higherIsBetter: true, format: (v) => `${Math.round(v)}M` },
+  { key: "cultivated", label: "Cultivated Area", unit: "ha", higherIsBetter: true, format: (v) => `${Math.round(v).toLocaleString()} ha` },
 ];
 
 export type ConceptValues = Record<ConceptKey, number>;
 
-function pick<T>(arr: readonly T[] | T[], seed: string): T {
-  return arr[Math.floor(hashSeed(seed) * arr.length)];
-}
-
+// Deterministic pseudo-random generator so the same scope+season always
+// produces the same illustrative figures (stable across renders).
 function hashSeed(str: string): number {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -332,9 +304,14 @@ const seasonDrift: Record<CompareSeason, number> = {
   "Season A 2024": -0.15,
 };
 
+/**
+ * Returns illustrative aggregated metrics for a given administrative scope
+ * (province id or district id, "national" for the whole country) and season.
+ */
 export function getConceptValues(scopeId: string, season: CompareSeason): ConceptValues {
   const seed = hashSeed(scopeId);
   const drift = seasonDrift[season] ?? 0;
+  // scale base figures by an approximate scope size
   const scale = scopeId === "national" ? 12 : provinceTree.some((p) => p.id === scopeId) ? 3 : 1;
 
   const ndvi = +(0.58 + seed * 0.18 + drift).toFixed(2);
@@ -343,14 +320,8 @@ export function getConceptValues(scopeId: string, season: CompareSeason): Concep
   const claims = Math.max(0, Math.round((40 + seed * 90) * (1 - drift * 2) * (scale / 3)));
   const subsidy = Math.round((90 + seed * 160) * scale * (1 + drift));
   const cultivated = Math.round((1200 + seed * 1800) * scale);
-  const farmers = Math.round((500 + seed * 900) * scale);
-  const policiesIssued = Math.round((300 + seed * 800) * scale * (1 + drift));
-  const sumInsured = Math.round(policiesIssued * (1.2 + seed * 0.8));
-  const areaLost = Math.round((15 + seed * 60) * (1 - drift * 2) * scale);
-  const compensationPaid = Math.round(areaLost * (0.5 + seed * 0.3));
 
-
-  return { ndvi, insurance, yield: yieldVal, claims, subsidy, cultivated, farmers, policiesIssued, sumInsured, areaLost, compensationPaid };
+  return { ndvi, insurance, yield: yieldVal, claims, subsidy, cultivated };
 }
 
 export function scopeLabel(scopeId: string): string {
@@ -364,6 +335,7 @@ export function scopeLabel(scopeId: string): string {
   return scopeId;
 }
 
+/** Percentage change of value B relative to value A. */
 export function pctChange(a: number, b: number): number {
   if (a === 0) return b === 0 ? 0 : 100;
   return ((b - a) / Math.abs(a)) * 100;
@@ -371,7 +343,7 @@ export function pctChange(a: number, b: number): number {
 
 // ──────────────────────────────────────────────────────────────────────────
 // SECTOR DETAIL LAYER
-// Drill down from a sector (leaderboard row) into its cells, villages, and
+// Drill down from a sector (leaderboard row) into its cells, villages, and the
 // individual farmers registered there — with illustrative descriptive stats.
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -381,8 +353,6 @@ export interface Farmer {
   sectorId: string;
   cell: string;
   village: string;
-  villageId: string;
-  cellId: string;
   phone: string;
   registeredOn: string;
   crops: string[];
@@ -393,14 +363,12 @@ export interface Farmer {
 }
 
 export interface VillageNode {
-  id: string;
   name: string;
   farmers: number;
   cultivatedHa: number;
 }
 
 export interface CellNode {
-  id: string;
   name: string;
   villages: VillageNode[];
   farmers: number;
@@ -436,7 +404,7 @@ function seededInt(seed: string, min: number, max: number): number {
   return min + Math.floor(hashSeed(seed) * (max - min + 1));
 }
 
-function pickRandom<T>(arr: T[], seed: string): T {
+function pick<T>(arr: T[], seed: string): T {
   return arr[Math.floor(hashSeed(seed) * arr.length)];
 }
 
@@ -450,43 +418,35 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
   const farmers: Farmer[] = [];
 
   for (let c = 0; c < numCells; c++) {
-    const cellId = `${sectorId}-c${c}`;
     const cellName = CELL_NAMES[(seededInt(sectorId + "c" + c, 0, 1000) + c) % CELL_NAMES.length];
     const numVillages = seededInt(sectorId + cellName + "v", 2, 4);
     const villages: VillageNode[] = [];
 
     for (let v = 0; v < numVillages; v++) {
-      const villageId = `${cellId}-v${v}`;
       const villageName = VILLAGE_NAMES[(seededInt(sectorId + cellName + v, 0, 1000) + v) % VILLAGE_NAMES.length];
       const vFarmers = seededInt(sectorId + cellName + villageName + "f", 4, 9);
       const vHa = seededInt(sectorId + cellName + villageName + "ha", 40, 180);
-      villages.push({ id: villageId, name: villageName, farmers: vFarmers, cultivatedHa: vHa });
+      villages.push({ name: villageName, farmers: vFarmers, cultivatedHa: vHa });
 
       for (let f = 0; f < vFarmers; f++) {
         const fseed = sectorId + cellName + villageName + f;
-        const name = `${pickRandom(FIRST_NAMES, fseed + "fn")} ${pickRandom(SURNAMES, fseed + "sn")}`;
+        const name = `${pick(FIRST_NAMES, fseed + "fn")} ${pick(SURNAMES, fseed + "sn")}`;
         const numCrops = seededInt(fseed + "nc", 1, 3);
         const cropSet = new Set<string>();
-        for (let k = 0; k < numCrops; k++) cropSet.add(pickRandom(CROP_POOL, fseed + "crop" + k));
+        for (let k = 0; k < numCrops; k++) cropSet.add(pick(CROP_POOL, fseed + "crop" + k));
         const ndvi = +(0.5 + hashSeed(fseed + "ndvi") * 0.35).toFixed(2);
-
         const phone = `+250 7${seededInt(fseed + "ph0", 2, 9)}${seededInt(fseed + "ph1", 0, 9)} ${String(seededInt(fseed + "ph2", 100, 999))} ${String(seededInt(fseed + "ph3", 100, 999))}`;
-        const regYear = seededInt(fseed + "ry", 2021, 2025);
+        const regYear = seededInt(fseed + "ry", 2019, 2024);
         const regMonth = String(seededInt(fseed + "rm", 1, 12)).padStart(2, "0");
         const regDay = String(seededInt(fseed + "rd", 1, 28)).padStart(2, "0");
-
         farmers.push({
-          phone,
-          registeredOn: `${regYear}-${regMonth}-${regDay}`,
-          cellId,
-          villageId,
           id: `${sectorId}-F${farmers.length + 1}`,
           name,
           sectorId,
           cell: cellName,
-          cellId,
           village: villageName,
-          villageId,
+          phone,
+          registeredOn: `${regYear}-${regMonth}-${regDay}`,
           crops: [...cropSet],
           plotsHa: +(0.5 + hashSeed(fseed + "ha") * 4).toFixed(1),
           insured: hashSeed(fseed + "ins") < sector.insurancePenetration / 100,
@@ -499,7 +459,6 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
     const cellFarmers = villages.reduce((s, v) => s + v.farmers, 0);
     const cellHa = villages.reduce((s, v) => s + v.cultivatedHa, 0);
     cells.push({
-      id: cellId,
       name: cellName,
       villages,
       farmers: cellFarmers,
@@ -537,160 +496,10 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
   };
 }
 
-export function getAllRegionsByLevel(level: "Sector" | "Cell" | "Village"): RegionRow[] {
-  if (level === "Sector") return regions;
-
-  const result: RegionRow[] = [];
-  for (const sector of regions) {
-    const detail = getSectorDetail(sector.id);
-    if (!detail) continue;
-
-    if (level === "Cell") {
-      for (const c of detail.cells) {
-        result.push({
-          id: c.id,
-          name: c.name,
-          level: "Cell",
-          cultivatedHa: c.cultivatedHa,
-          dominantCrop: sector.dominantCrop,
-          ndvi: c.ndvi,
-          change7d: +(sector.change7d + (hashSeed(c.id + "7d") - 0.5) * 0.05).toFixed(2),
-          change30d: +(sector.change30d + (hashSeed(c.id + "30d") - 0.5) * 0.05).toFixed(2),
-          insurancePenetration: c.insurancePenetration,
-          activeClaims: Math.floor(sector.activeClaims * (c.farmers / detail.stats.totalFarmers)),
-          riskLevel: c.ndvi < 0.6 ? "high" : c.ndvi < 0.7 ? "medium" : "low",
-        });
-      }
-    } else if (level === "Village") {
-      for (const c of detail.cells) {
-        for (const v of c.villages) {
-          const vNdvi = +(c.ndvi + (hashSeed(v.id + "ndvi") - 0.5) * 0.08).toFixed(2);
-          result.push({
-            id: v.id,
-            name: v.name,
-            level: "Village",
-            cultivatedHa: v.cultivatedHa,
-            dominantCrop: sector.dominantCrop,
-            ndvi: vNdvi,
-            change7d: +(sector.change7d + (hashSeed(v.id + "7d") - 0.5) * 0.08).toFixed(2),
-            change30d: +(sector.change30d + (hashSeed(v.id + "30d") - 0.5) * 0.08).toFixed(2),
-            insurancePenetration: c.insurancePenetration,
-            activeClaims: Math.floor(sector.activeClaims * (v.farmers / detail.stats.totalFarmers)),
-            riskLevel: vNdvi < 0.6 ? "high" : vNdvi < 0.7 ? "medium" : "low",
-          });
-        }
-      }
-    }
-  }
-  return result;
-}
-
-export interface CellDetail {
-  cell: RegionRow;
-  villages: VillageNode[];
-  farmers: Farmer[];
-  stats: {
-    totalFarmers: number;
-    insuredFarmers: number;
-    totalVillages: number;
-    cropMix: { crop: string; ha: number }[];
-  };
-  sectorId: string;
-  sectorName: string;
-}
-
-export function getCellDetail(cellId: string): CellDetail | null {
-  const sectorId = cellId.split("-")[0];
-  const sectorDetail = getSectorDetail(sectorId);
-  if (!sectorDetail) return null;
-
-  const cellNode = sectorDetail.cells.find(c => c.id === cellId);
-  if (!cellNode) return null;
-
-  const cellRow = getAllRegionsByLevel("Cell").find(c => c.id === cellId)!;
-  const farmers = sectorDetail.farmers.filter(f => f.cell === cellNode.name);
-
-  const cropMixMap = new Map<string, number>();
-  for (const f of farmers) {
-    const per = f.plotsHa / f.crops.length;
-    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
-  }
-  const cropMix = [...cropMixMap.entries()]
-    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
-    .sort((a, b) => b.ha - a.ha);
-
-  return {
-    cell: cellRow,
-    villages: cellNode.villages,
-    farmers,
-    stats: {
-      totalFarmers: cellNode.farmers,
-      insuredFarmers: farmers.filter(f => f.insured).length,
-      totalVillages: cellNode.villages.length,
-      cropMix,
-    },
-    sectorId,
-    sectorName: sectorDetail.sector.name
-  };
-}
-
-export interface VillageDetail {
-  village: RegionRow;
-  farmers: Farmer[];
-  stats: {
-    totalFarmers: number;
-    insuredFarmers: number;
-    cropMix: { crop: string; ha: number }[];
-  };
-  cellId: string;
-  cellName: string;
-  sectorId: string;
-  sectorName: string;
-}
-
-export function getVillageDetail(villageId: string): VillageDetail | null {
-  const parts = villageId.split("-");
-  const sectorId = parts[0];
-  const cellId = parts[0] + "-" + parts[1];
-  
-  const cellDetail = getCellDetail(cellId);
-  if (!cellDetail) return null;
-
-  const villageNode = cellDetail.villages.find(v => v.id === villageId);
-  if (!villageNode) return null;
-
-  const villageRow = getAllRegionsByLevel("Village").find(v => v.id === villageId)!;
-  const farmers = cellDetail.farmers.filter(f => f.village === villageNode.name);
-
-  const cropMixMap = new Map<string, number>();
-  for (const f of farmers) {
-    const per = f.plotsHa / f.crops.length;
-    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
-  }
-  const cropMix = [...cropMixMap.entries()]
-    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
-    .sort((a, b) => b.ha - a.ha);
-
-  return {
-    village: villageRow,
-    farmers,
-    stats: {
-      totalFarmers: villageNode.farmers,
-      insuredFarmers: farmers.filter(f => f.insured).length,
-      cropMix,
-    },
-    cellId,
-    cellName: cellDetail.cell.name,
-    sectorId,
-    sectorName: cellDetail.sectorName,
-  };
-}
-
 /** Flattened farmer index across all sectors — used for global name search. */
 export const allFarmers: Farmer[] = regions.flatMap((r) => getSectorDetail(r.id)?.farmers ?? []);
 
-
-// --------------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────────
 // FARMER PROFILE LAYER
 // Deep, deterministic per-farmer detail: plantings (with planting dates,
 // season, area & insurance status) and the insurance policies covering them.
@@ -1011,3 +820,539 @@ export function getFarmerProfile(farmerId: string): FarmerProfile | null {
   };
 }
 
+
+// ──────────────────────────────────────────────────────────────────────────
+// SECTOR CROP EXTREMES
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface SectorCropExtremes {
+  dominant: { crop: string; ha: number; share: number };
+  least: { crop: string; ha: number; share: number };
+  totalHa: number;
+  cropCount: number;
+}
+
+export function getSectorCropExtremes(sectorId: string): SectorCropExtremes | null {
+  const detail = getSectorDetail(sectorId);
+  if (!detail || detail.stats.cropMix.length === 0) return null;
+  const mix = detail.stats.cropMix;
+  const total = mix.reduce((s, m) => s + m.ha, 0) || 1;
+  const dom = mix[0];
+  const lst = mix[mix.length - 1];
+  return {
+    dominant: { crop: dom.crop, ha: dom.ha, share: Math.round((dom.ha / total) * 100) },
+    least: { crop: lst.crop, ha: lst.ha, share: Math.round((lst.ha / total) * 100) },
+    totalHa: total,
+    cropCount: mix.length,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ALERT DETAIL LAYER
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface AlertAffectedFarm {
+  id: string;
+  name: string;
+  village: string;
+  cell: string;
+  crop: string;
+  areaHa: number;
+  ndvi: number;
+  insured: boolean;
+  riskLevel: "low" | "medium" | "high";
+}
+
+export interface AlertDetail {
+  alert: AlertItem;
+  summary: string;
+  sectorId: string | null;
+  metrics: {
+    affectedFarms: number;
+    affectedAreaHa: number;
+    insuredShare: number;
+    dominantCrop: string;
+    avgNdvi: number;
+  };
+  recommendation: string;
+  affectedFarms: AlertAffectedFarm[];
+}
+
+const alertSummaries: Record<string, { summary: string; recommendation: string }> = {
+  a1: {
+    summary:
+      "Satellite NDVI readings across Kinyinya Sector fell 14% over the last 30 days, crossing the drought-stress threshold on rice and maize plots. The decline is concentrated in low-lying cells with limited irrigation access.",
+    recommendation: "Dispatch agronomists, activate the drought contingency and pre-position irrigation pumps in the worst-hit cells.",
+  },
+  a2: {
+    summary:
+      "19 new flood claims were filed in Bumbogo Sector this week after heavy rainfall overwhelmed drainage along the river-adjacent cells. Rice plots on the valley floor account for most of the damaged area.",
+    recommendation: "Fast-track claim verification with insurers and coordinate with the district on emergency drainage clearing.",
+  },
+  a3: {
+    summary:
+      "Insurance penetration in Ndera Sector dropped below the 50% policy threshold, leaving a large share of cassava and rice farmers exposed ahead of the risky season window.",
+    recommendation: "Launch a cooperative enrollment drive and remind farmers of the 40% government premium subsidy before the cut-off.",
+  },
+  a4: {
+    summary:
+      "Field scouts flagged early signs of fall armyworm on maize plots in Jabana Sector. If untreated, pest pressure could spread to neighbouring cells within two weeks.",
+    recommendation: "Distribute approved pesticides and issue an SMS advisory to maize farmers on scouting and spraying.",
+  },
+  a5: {
+    summary:
+      "Season A subsidy disbursement completed across Gasabo District. Government covered 40% of premiums for all enrolled farmers, clearing the pending insurer invoices for the season.",
+    recommendation: "Reconcile disbursement records with insurers and publish the utilization report.",
+  },
+  a6: {
+    summary:
+      "A new agronomist team was deployed to Remera Sector to support recovery efforts and improve extension coverage for smallholder maize farmers.",
+    recommendation: "Schedule field visits to the priority cells and track advisory uptake over the next month.",
+  },
+};
+
+/** Builds a thorough, deterministic detail summary for a dashboard alert. */
+export function getAlertDetail(alertId: string): AlertDetail | null {
+  const alert = alerts.find((a) => a.id === alertId);
+  if (!alert) return null;
+
+  const sectorName = alert.region.replace(/ Sector| District/i, "").trim();
+  const sector = regions.find((r) => r.name === sectorName) ?? null;
+  const meta = alertSummaries[alertId] ?? {
+    summary: alert.title,
+    recommendation: "Review the situation and coordinate the appropriate district response.",
+  };
+
+  let affected: AlertAffectedFarm[] = [];
+  if (sector) {
+    const detail = getSectorDetail(sector.id);
+    if (detail) {
+      const pool = [...detail.farmers];
+      pool.sort((a, b) => (alert.severity === "info" ? 0 : a.ndvi - b.ndvi));
+      const count = alert.severity === "critical" ? 24 : alert.severity === "warning" ? 14 : 8;
+      affected = pool.slice(0, count).map((f) => ({
+        id: f.id,
+        name: f.name,
+        village: f.village,
+        cell: f.cell,
+        crop: f.crops[0] ?? "Maize",
+        areaHa: f.plotsHa,
+        ndvi: f.ndvi,
+        insured: f.insured,
+        riskLevel: f.riskLevel,
+      }));
+    }
+  }
+
+  const affectedAreaHa = +affected.reduce((s, f) => s + f.areaHa, 0).toFixed(1);
+  const insuredShare = affected.length === 0 ? 0 : Math.round((affected.filter((f) => f.insured).length / affected.length) * 100);
+  const avgNdvi = affected.length === 0 ? sector?.ndvi ?? 0.65 : +(affected.reduce((s, f) => s + f.ndvi, 0) / affected.length).toFixed(2);
+  const cropCounts = new Map<string, number>();
+  for (const f of affected) cropCounts.set(f.crop, (cropCounts.get(f.crop) ?? 0) + 1);
+  const dominantCrop = [...cropCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? sector?.dominantCrop ?? "Mixed";
+
+  return {
+    alert,
+    summary: meta.summary,
+    sectorId: sector?.id ?? null,
+    metrics: { affectedFarms: affected.length, affectedAreaHa, insuredShare, dominantCrop, avgNdvi },
+    recommendation: meta.recommendation,
+    affectedFarms: affected,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// CLAIM DETAIL LAYER
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+export interface NdviCell {
+  id: string;
+  polygon: LatLng[];
+  ndvi: number;
+  color: string;
+}
+
+export interface ClaimPhoto {
+  id: string;
+  url: string;
+  caption: string;
+}
+
+export interface WeatherDay {
+  date: string;
+  rainfallMm: number;
+  tempC: number;
+  humidity: number;
+}
+
+export interface ClaimReport {
+  id: string;
+  title: string;
+  type: "PDF";
+  sizeKb: number;
+  pages: number;
+  author: string;
+  date: string;
+}
+
+export interface ClaimDetail {
+  claim: ClaimRow;
+  field: {
+    name: string;
+    farmerId: string | null;
+    farmerName: string;
+    cropType: string;
+    sizeHa: number;
+    sowingDate: string;
+    center: LatLng;
+    boundary: LatLng[];
+    ndviCells: NdviCell[];
+    plotNdvi: number;
+  };
+  lossDescription: string;
+  photos: ClaimPhoto[];
+  weather: {
+    current: { tempC: number; humidity: number; windKph: number; rainfallMm: number; condition: string };
+    onClaimDate: WeatherDay;
+    historical: WeatherDay[];
+    forecast: WeatherDay[];
+    accumulated: {
+      rainfall30dMm: number;
+      rainfallSeasonMm: number;
+      normalSeasonMm: number;
+      dryDays30d: number;
+      maxDailyRainfallMm: number;
+      avgTempC: number;
+    };
+  };
+  reports: ClaimReport[];
+  assessment: {
+    assessor: string;
+    inspectedOn: string;
+    verdict: string;
+    lossPct: number;
+    notes: string[];
+    recommendation: string;
+  };
+}
+
+function ndviColor(v: number): string {
+  if (v < 0.3) return "#b91c1c";
+  if (v < 0.45) return "#ea580c";
+  if (v < 0.55) return "#eab308";
+  if (v < 0.68) return "#84cc16";
+  if (v < 0.8) return "#22c55e";
+  return "#15803d";
+}
+
+const CONDITIONS: Record<ClaimRow["cause"], string> = {
+  Drought: "Hot & dry",
+  Flood: "Heavy rain",
+  Pest: "Warm & humid",
+  Hail: "Storms",
+};
+
+const REPORT_AUTHORS = ["Agr. Mukamana", "Insp. Habimana", "Agr. Niyonsaba", "Loss Adj. Kamanzi"];
+
+/** Builds a rich, deterministic detail record for a single claim id. */
+export function getClaimDetail(claimId: string): ClaimDetail | null {
+  const claim = claims.find((c) => c.id === claimId);
+  if (!claim) return null;
+
+  const seed = hashSeed(claimId);
+  const center: LatLng = {
+    lat: -1.93 + (seed - 0.5) * 0.14,
+    lng: 30.1 + (hashSeed(claimId + "lng") - 0.5) * 0.14,
+  };
+
+  const r = 0.0016 + seed * 0.0014;
+  const boundary: LatLng[] = [
+    { lat: center.lat + r * (1 + hashSeed(claimId + "b0") * 0.3), lng: center.lng - r * (1 + hashSeed(claimId + "b1") * 0.3) },
+    { lat: center.lat + r * (1 + hashSeed(claimId + "b2") * 0.3), lng: center.lng + r * (1 + hashSeed(claimId + "b3") * 0.4) },
+    { lat: center.lat - r * (1 + hashSeed(claimId + "b4") * 0.4), lng: center.lng + r * (1 + hashSeed(claimId + "b5") * 0.3) },
+    { lat: center.lat - r * (1 + hashSeed(claimId + "b6") * 0.3), lng: center.lng - r * (1 + hashSeed(claimId + "b7") * 0.4) },
+  ];
+
+  const damage = claim.areaLostHa / (claim.areaLostHa + 6);
+  const gs = 4;
+  const latMin = Math.min(...boundary.map((p) => p.lat));
+  const latMax = Math.max(...boundary.map((p) => p.lat));
+  const lngMin = Math.min(...boundary.map((p) => p.lng));
+  const lngMax = Math.max(...boundary.map((p) => p.lng));
+  const dLat = (latMax - latMin) / gs;
+  const dLng = (lngMax - lngMin) / gs;
+  const ndviCells: NdviCell[] = [];
+  let ndviSum = 0;
+  for (let i = 0; i < gs; i++) {
+    for (let j = 0; j < gs; j++) {
+      const cseed = hashSeed(claimId + "-" + i + "-" + j);
+      const distFromCenter = Math.hypot(i - (gs - 1) / 2, j - (gs - 1) / 2) / gs;
+      const base = 0.28 + cseed * 0.55;
+      const hit = Math.max(0, damage * (1 - distFromCenter) * 1.6);
+      const ndvi = +Math.max(0.12, Math.min(0.9, base - hit)).toFixed(2);
+      ndviSum += ndvi;
+      const y0 = latMin + i * dLat;
+      const x0 = lngMin + j * dLng;
+      ndviCells.push({
+        id: i + "-" + j,
+        ndvi,
+        color: ndviColor(ndvi),
+        polygon: [
+          { lat: y0, lng: x0 },
+          { lat: y0 + dLat, lng: x0 },
+          { lat: y0 + dLat, lng: x0 + dLng },
+          { lat: y0, lng: x0 + dLng },
+        ],
+      });
+    }
+  }
+  const plotNdvi = +(ndviSum / ndviCells.length).toFixed(2);
+
+  const farmer = allFarmers.find((f) => f.name === claim.farmer) ?? null;
+  const sowingDate = addDays(claim.filed, -seededInt(claimId + "sow", 60, 110));
+  const fieldName = claim.region + " " + pick(["Valley", "Ridge", "Marsh", "Hillside", "Plateau"], claimId + "fn") + " Plot " + seededInt(claimId + "pn", 1, 40);
+
+  const lossDescriptions: Record<ClaimRow["cause"], string> = {
+    Drought: "Prolonged rainfall deficit left " + claim.crop.toLowerCase() + " plots severely moisture-stressed. Leaves show widespread wilting and premature senescence across roughly " + claim.areaLostHa.toFixed(1) + " ha, with NDVI collapsing in the field's interior.",
+    Flood: "Heavy rainfall caused standing water and waterlogging across the " + claim.crop.toLowerCase() + " field. Approximately " + claim.areaLostHa.toFixed(1) + " ha were submerged for several days, causing root rot and lodging of the crop.",
+    Pest: "A pest infestation spread through the " + claim.crop.toLowerCase() + " field, damaging foliage and cobs. Scouting confirmed heavy larval presence on " + claim.areaLostHa.toFixed(1) + " ha, with visible defoliation clusters.",
+    Hail: "A localized hailstorm shredded leaves and flattened " + claim.crop.toLowerCase() + " across " + claim.areaLostHa.toFixed(1) + " ha. Physical impact damage is concentrated on exposed, elevated sections of the plot.",
+  };
+
+  const photoTags: Record<ClaimRow["cause"], string[]> = {
+    Drought: ["Cracked, dry soil", "Wilting crop rows", "Stunted growth patch", "Field overview"],
+    Flood: ["Standing water", "Submerged rows", "Lodged crop", "Water damage close-up"],
+    Pest: ["Larval damage", "Defoliated leaves", "Damaged cobs", "Infestation cluster"],
+    Hail: ["Shredded leaves", "Flattened crop", "Impact damage", "Field overview"],
+  };
+  const photos: ClaimPhoto[] = photoTags[claim.cause].map((caption, i) => ({
+    id: claimId + "-ph" + i,
+    url: "https://picsum.photos/seed/" + claimId + "-" + i + "/1200/800",
+    caption,
+  }));
+
+  const isWet = claim.cause === "Flood" || claim.cause === "Hail";
+  const historical: WeatherDay[] = Array.from({ length: 14 }, (_, i) => {
+    const date = addDays(claim.filed, i - 13);
+    const wseed = hashSeed(claimId + "h" + i);
+    const spike = isWet && i > 9 ? 20 + wseed * 45 : wseed * (isWet ? 14 : 5);
+    const rainfallMm = +(claim.cause === "Drought" ? wseed * 2.2 : spike).toFixed(1);
+    const tempC = +((claim.cause === "Drought" ? 28 : 22) + (wseed - 0.5) * 6).toFixed(1);
+    const humidity = Math.round((claim.cause === "Drought" ? 40 : 70) + (wseed - 0.5) * 20);
+    return { date, rainfallMm, tempC, humidity };
+  });
+  const onClaimDate = historical[historical.length - 1];
+  const forecast: WeatherDay[] = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(claim.filed, i + 1);
+    const wseed = hashSeed(claimId + "fc" + i);
+    const rainfallMm = +(claim.cause === "Drought" ? wseed * 3 : wseed * 18).toFixed(1);
+    const tempC = +((claim.cause === "Drought" ? 27 : 23) + (wseed - 0.5) * 5).toFixed(1);
+    const humidity = Math.round((claim.cause === "Drought" ? 45 : 72) + (wseed - 0.5) * 18);
+    return { date, rainfallMm, tempC, humidity };
+  });
+
+  const rainfall30d = +historical.reduce((s, d) => s + d.rainfallMm, 0).toFixed(0);
+  const dryDays = historical.filter((d) => d.rainfallMm < 1).length;
+  const maxDaily = +Math.max(...historical.map((d) => d.rainfallMm)).toFixed(1);
+  const avgTemp = +(historical.reduce((s, d) => s + d.tempC, 0) / historical.length).toFixed(1);
+  const normalSeason = 480;
+  const rainfallSeason = claim.cause === "Drought" ? Math.round(normalSeason * (0.45 + seed * 0.2)) : Math.round(normalSeason * (1.1 + seed * 0.5));
+
+  const reports: ClaimReport[] = [
+    { id: claimId + "-R1", title: "Initial Field Damage Assessment", type: "PDF", sizeKb: 480 + seededInt(claimId + "r1", 40, 260), pages: seededInt(claimId + "r1p", 3, 6), author: pick(REPORT_AUTHORS, claimId + "a1"), date: addDays(claim.filed, 2) },
+    { id: claimId + "-R2", title: "Satellite NDVI Loss Report", type: "PDF", sizeKb: 620 + seededInt(claimId + "r2", 40, 220), pages: seededInt(claimId + "r2p", 4, 8), author: "Starhawk Remote Sensing", date: addDays(claim.filed, 3) },
+    { id: claimId + "-R3", title: "Insurer Adjuster Verification", type: "PDF", sizeKb: 300 + seededInt(claimId + "r3", 40, 200), pages: seededInt(claimId + "r3p", 2, 5), author: claim.insurer + " Adjuster", date: addDays(claim.filed, 6) },
+  ];
+  if (claim.status === "Paid" || claim.status === "Approved") {
+    reports.push({ id: claimId + "-R4", title: "Compensation Approval Memo", type: "PDF", sizeKb: 210 + seededInt(claimId + "r4", 20, 120), pages: 2, author: "District Agriculture Office", date: addDays(claim.filed, 9) });
+  }
+
+  const lossPct = Math.min(95, Math.round(damage * 100 + seededInt(claimId + "lp", 5, 20)));
+  const verdictMap: Record<ClaimRow["status"], string> = {
+    Pending: "Under assessment — awaiting adjuster verification.",
+    Approved: "Loss verified at " + lossPct + "%. Compensation approved, payout scheduled.",
+    Paid: "Loss verified at " + lossPct + "%. Compensation paid to the farmer.",
+    Rejected: "Claim rejected — damage attributed to non-covered causes.",
+  };
+
+  return {
+    claim,
+    field: { name: fieldName, farmerId: farmer?.id ?? null, farmerName: claim.farmer, cropType: claim.crop, sizeHa: +(claim.areaLostHa + 2 + seed * 4).toFixed(1), sowingDate, center, boundary, ndviCells, plotNdvi },
+    lossDescription: lossDescriptions[claim.cause],
+    photos,
+    weather: {
+      current: { tempC: onClaimDate.tempC, humidity: onClaimDate.humidity, windKph: +(6 + seed * 22).toFixed(0), rainfallMm: onClaimDate.rainfallMm, condition: CONDITIONS[claim.cause] },
+      onClaimDate,
+      historical,
+      forecast,
+      accumulated: { rainfall30dMm: rainfall30d, rainfallSeasonMm: rainfallSeason, normalSeasonMm: normalSeason, dryDays30d: dryDays, maxDailyRainfallMm: maxDaily, avgTempC: avgTemp },
+    },
+    reports,
+    assessment: {
+      assessor: pick(REPORT_AUTHORS, claimId + "assessor"),
+      inspectedOn: addDays(claim.filed, 2),
+      verdict: verdictMap[claim.status],
+      lossPct,
+      notes: [
+        "Field inspected on " + addDays(claim.filed, 2) + "; " + claim.cause.toLowerCase() + " damage confirmed on-site and corroborated by satellite NDVI imagery.",
+        "Estimated " + lossPct + "% yield loss on the affected " + claim.areaLostHa.toFixed(1) + " ha of " + claim.crop.toLowerCase() + ".",
+        "Photographic evidence and weather records for the incident period are attached to this claim.",
+        claim.status === "Rejected" ? "Portion of the reported damage could not be attributed to a covered peril." : "Damage is consistent with the covered peril under the active policy.",
+      ],
+      recommendation: claim.status === "Rejected" ? "Advise the farmer on the rejection basis and the appeal process." : "Proceed with compensation per the sum insured and verified loss percentage.",
+    },
+  };
+}
+export function getAllRegionsByLevel(level: "Sector" | "Cell" | "Village"): RegionRow[] {
+  if (level === "Sector") return regions;
+
+  const result: RegionRow[] = [];
+  for (const sector of regions) {
+    const detail = getSectorDetail(sector.id);
+    if (!detail) continue;
+
+    if (level === "Cell") {
+      for (const c of detail.cells) {
+        result.push({
+          id: c.id,
+          name: c.name,
+          level: "Cell",
+          cultivatedHa: c.cultivatedHa,
+          dominantCrop: sector.dominantCrop,
+          ndvi: c.ndvi,
+          change7d: +(sector.change7d + (hashSeed(c.id + "7d") - 0.5) * 0.05).toFixed(2),
+          change30d: +(sector.change30d + (hashSeed(c.id + "30d") - 0.5) * 0.05).toFixed(2),
+          insurancePenetration: c.insurancePenetration,
+          activeClaims: Math.floor(sector.activeClaims * (c.farmers / detail.stats.totalFarmers)),
+          riskLevel: c.ndvi < 0.6 ? "high" : c.ndvi < 0.7 ? "medium" : "low",
+        });
+      }
+    } else if (level === "Village") {
+      for (const c of detail.cells) {
+        for (const v of c.villages) {
+          const vNdvi = +(c.ndvi + (hashSeed(v.id + "ndvi") - 0.5) * 0.08).toFixed(2);
+          result.push({
+            id: v.id,
+            name: v.name,
+            level: "Village",
+            cultivatedHa: v.cultivatedHa,
+            dominantCrop: sector.dominantCrop,
+            ndvi: vNdvi,
+            change7d: +(sector.change7d + (hashSeed(v.id + "7d") - 0.5) * 0.08).toFixed(2),
+            change30d: +(sector.change30d + (hashSeed(v.id + "30d") - 0.5) * 0.08).toFixed(2),
+            insurancePenetration: c.insurancePenetration,
+            activeClaims: Math.floor(sector.activeClaims * (v.farmers / detail.stats.totalFarmers)),
+            riskLevel: vNdvi < 0.6 ? "high" : vNdvi < 0.7 ? "medium" : "low",
+          });
+        }
+      }
+    }
+  }
+  return result;
+}
+
+export interface CellDetail {
+  cell: RegionRow;
+  villages: VillageNode[];
+  farmers: Farmer[];
+  stats: {
+    totalFarmers: number;
+    insuredFarmers: number;
+    totalVillages: number;
+    cropMix: { crop: string; ha: number }[];
+  };
+  sectorId: string;
+  sectorName: string;
+}
+
+export function getCellDetail(cellId: string): CellDetail | null {
+  const sectorId = cellId.split("-")[0];
+  const sectorDetail = getSectorDetail(sectorId);
+  if (!sectorDetail) return null;
+
+  const cellNode = sectorDetail.cells.find(c => c.id === cellId);
+  if (!cellNode) return null;
+
+  const cellRow = getAllRegionsByLevel("Cell").find(c => c.id === cellId)!;
+  const farmers = sectorDetail.farmers.filter(f => f.cell === cellNode.name);
+
+  const cropMixMap = new Map<string, number>();
+  for (const f of farmers) {
+    const per = f.plotsHa / f.crops.length;
+    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
+  }
+  const cropMix = [...cropMixMap.entries()]
+    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
+    .sort((a, b) => b.ha - a.ha);
+
+  return {
+    cell: cellRow,
+    villages: cellNode.villages,
+    farmers,
+    stats: {
+      totalFarmers: cellNode.farmers,
+      insuredFarmers: farmers.filter(f => f.insured).length,
+      totalVillages: cellNode.villages.length,
+      cropMix,
+    },
+    sectorId,
+    sectorName: sectorDetail.sector.name
+  };
+}
+
+export interface VillageDetail {
+  village: RegionRow;
+  farmers: Farmer[];
+  stats: {
+    totalFarmers: number;
+    insuredFarmers: number;
+    cropMix: { crop: string; ha: number }[];
+  };
+  cellId: string;
+  cellName: string;
+  sectorId: string;
+  sectorName: string;
+}
+
+export function getVillageDetail(villageId: string): VillageDetail | null {
+  const parts = villageId.split("-");
+  const sectorId = parts[0];
+  const cellId = parts[0] + "-" + parts[1];
+  
+  const cellDetail = getCellDetail(cellId);
+  if (!cellDetail) return null;
+
+  const villageNode = cellDetail.villages.find(v => v.id === villageId);
+  if (!villageNode) return null;
+
+  const villageRow = getAllRegionsByLevel("Village").find(v => v.id === villageId)!;
+  const farmers = cellDetail.farmers.filter(f => f.village === villageNode.name);
+
+  const cropMixMap = new Map<string, number>();
+  for (const f of farmers) {
+    const per = f.plotsHa / f.crops.length;
+    for (const crop of f.crops) cropMixMap.set(crop, (cropMixMap.get(crop) ?? 0) + per);
+  }
+  const cropMix = [...cropMixMap.entries()]
+    .map(([crop, ha]) => ({ crop, ha: Math.round(ha) }))
+    .sort((a, b) => b.ha - a.ha);
+
+  return {
+    village: villageRow,
+    farmers,
+    stats: {
+      totalFarmers: villageNode.farmers,
+      insuredFarmers: farmers.filter(f => f.insured).length,
+      cropMix,
+    },
+    cellId,
+    cellName: cellDetail.cell.name,
+    sectorId,
+    sectorName: cellDetail.sectorName,
+  };
+}
