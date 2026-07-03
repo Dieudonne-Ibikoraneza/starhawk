@@ -98,26 +98,18 @@ export const GovernmentDashboard = () => {
   useEffect(() => { localStorage.setItem("govSidebarCollapsed", String(collapsed)); }, [collapsed]);
   
   useEffect(() => { 
-    const incomingStack = location.state?.viewStack;
-    if (incomingStack) {
-      setViewStack(incomingStack);
-      navigate(location.pathname, { replace: true, state: {} });
+    if (location.state?.viewStack) {
+      setViewStack(location.state.viewStack);
     } else {
-      setViewStack([]); 
+      setViewStack([]);
     }
-  }, [activePage, location.state?.viewStack, location.pathname, navigate]);
+  }, [location.key]);
 
   useEffect(() => {
     const handleScroll = () => {
-      const scrollContainer = document.getElementById("gov-main-scroll-area");
-      if (scrollContainer) {
-        scrollContainer.scrollTop = 0;
-        const scrollableChildren = scrollContainer.querySelectorAll("*");
-        scrollableChildren.forEach((child) => {
-          if (child.scrollTop > 0) {
-            child.scrollTop = 0;
-          }
-        });
+      const scrollArea = document.querySelector("#gov-main-scroll-area > div");
+      if (scrollArea) {
+        scrollArea.dispatchEvent(new Event("scroll"));
       }
       window.scrollTo({ top: 0 });
       document.documentElement.scrollTop = 0;
@@ -163,6 +155,7 @@ export const GovernmentDashboard = () => {
   })();
 
   const handleNavigate = (page: PageId) => {
+    setViewStack([]);
     navigate(`/government/${page}`);
     setMobileOpen(false);
   };
