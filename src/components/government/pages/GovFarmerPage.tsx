@@ -87,7 +87,7 @@ export function GovFarmerPage({
       <div className="mb-6">
         <GovBreadcrumb 
           items={[
-            { level: "Leaderboard", name: "Leaderboard" },
+            { level: "Leaderboard", name: "Overview" },
             { level: "Sector", id: farmer.sectorId, name: sectorName },
             { level: "Cell", id: `${farmer.sectorId}-${farmer.cell}`, name: identity.cell },
             { level: "Village", id: `${farmer.sectorId}-${farmer.cell}-${farmer.village}`, name: identity.village },

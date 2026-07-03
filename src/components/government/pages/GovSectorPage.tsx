@@ -69,7 +69,7 @@ export function GovSectorPage({
       <div className="flex items-center justify-between">
         <GovBreadcrumb 
           items={[
-            { level: "Leaderboard", name: "Leaderboard" },
+            { level: "Leaderboard", name: "Overview" },
             { level: "Sector", name: sector.name }
           ]} 
           onNavigate={onNavigate} 
