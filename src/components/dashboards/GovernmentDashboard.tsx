@@ -96,7 +96,16 @@ export const GovernmentDashboard = () => {
 
   useEffect(() => { document.documentElement.classList.remove("dark"); }, []);
   useEffect(() => { localStorage.setItem("govSidebarCollapsed", String(collapsed)); }, [collapsed]);
-  useEffect(() => { setViewStack([]); }, [activePage]);
+  
+  useEffect(() => { 
+    const incomingStack = location.state?.viewStack;
+    if (incomingStack) {
+      setViewStack(incomingStack);
+      navigate(location.pathname, { replace: true, state: {} });
+    } else {
+      setViewStack([]); 
+    }
+  }, [activePage, location.state?.viewStack, location.pathname, navigate]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -383,7 +392,13 @@ export const GovernmentDashboard = () => {
                 ) : activePage === "invoicing" ? (
                   <GovSubsidiesPage onNavigate={(t) => setViewStack([t as any])} />
                 ) : (
-                  renderPage(activePage, (id, level) => setViewStack([{ id, level }]))
+                  renderPage(activePage, (id, level) => {
+                    if (activePage === "dashboard") {
+                      navigate("/government/leaderboard", { state: { viewStack: [{ id, level }] } });
+                    } else {
+                      setViewStack([{ id, level }]);
+                    }
+                  })
                 )}
               </div>
             </CustomScrollbar>
