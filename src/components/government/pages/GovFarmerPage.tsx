@@ -89,8 +89,8 @@ export function GovFarmerPage({
           items={[
             { level: "Leaderboard", name: "Leaderboard" },
             { level: "Sector", id: farmer.sectorId, name: sectorName },
-            { level: "Cell", id: farmer.cellId, name: identity.cell },
-            { level: "Village", id: farmer.villageId, name: identity.village },
+            { level: "Cell", id: `${farmer.sectorId}-${farmer.cell}`, name: identity.cell },
+            { level: "Village", id: `${farmer.sectorId}-${farmer.cell}-${farmer.village}`, name: identity.village },
             { level: "Farmer", id: farmer.id, name: farmer.name }
           ]} 
           onNavigate={onNavigate} 
