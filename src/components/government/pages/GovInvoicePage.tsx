@@ -1,7 +1,9 @@
 import { ArrowLeft, CheckCircle2, Download, FileText, Printer, ShieldCheck, XCircle, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/government/gov-widgets";
-import { rwf, type InvoiceRow } from "@/components/government/gov-data";
+import { rwf, type InvoiceRow, SUBSIDY_RATE } from "@/components/government/gov-data";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export function GovInvoicePage({
   invoice,
@@ -10,6 +12,37 @@ export function GovInvoicePage({
   invoice: InvoiceRow;
   onBack: () => void;
 }) {
+  const { toast } = useToast();
+  const [localStatus, setLocalStatus] = useState(invoice.status);
+
+  // Generate fallback data
+  const dueDate = new Date(invoice.issued);
+  dueDate.setDate(dueDate.getDate() + 30);
+  const formattedDueDate = dueDate.toISOString().split("T")[0];
+
+  const breakdown = [
+    { category: "Maize", farms: Math.round(invoice.farmsCovered * 0.4), amount: invoice.subsidyAmount * 0.4 },
+    { category: "Beans", farms: Math.round(invoice.farmsCovered * 0.3), amount: invoice.subsidyAmount * 0.3 },
+    { category: "Rice", farms: Math.round(invoice.farmsCovered * 0.2), amount: invoice.subsidyAmount * 0.2 },
+    { category: "Irish Potatoes", farms: Math.round(invoice.farmsCovered * 0.1), amount: invoice.subsidyAmount * 0.1 },
+  ];
+
+  const handleProcessPayment = () => {
+    setLocalStatus("Paid");
+    toast({
+      title: "Payment Processed",
+      description: `Payment of ${rwf(invoice.subsidyAmount)} has been processed via Bank Transfer.`,
+    });
+  };
+
+  const handleReject = () => {
+    toast({
+      title: "Invoice Rejected",
+      description: `Invoice ${invoice.id} from ${invoice.insurer} has been flagged for review.`,
+      variant: "destructive",
+    });
+  };
+
   return (
     <div className="flex flex-col space-y-6">
       {/* Header */}
@@ -21,7 +54,7 @@ export function GovInvoicePage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate">Invoice {invoice.id}</h1>
-              <StatusBadge status={invoice.status} />
+              <StatusBadge status={localStatus} />
             </div>
             <p className="text-sm md:text-base text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
               <ShieldCheck className="h-4 w-4 shrink-0" />
@@ -30,12 +63,12 @@ export function GovInvoicePage({
           </div>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto pl-14 md:pl-0">
-          <Button variant="outline" className="gap-2 flex-1 md:flex-none">
+          <Button variant="outline" className="gap-2 flex-1 md:flex-none" onClick={handleReject}>
             <XCircle className="h-4 w-4" /> Reject
           </Button>
-          <Button className="gap-2 flex-1 md:flex-none" disabled={invoice.status === "Paid"}>
+          <Button className="gap-2 flex-1 md:flex-none" disabled={localStatus === "Paid"} onClick={handleProcessPayment}>
             <CheckCircle2 className="h-4 w-4" /> 
-            <span className="truncate">{invoice.status === "Paid" ? "Already Paid" : "Process Payment"}</span>
+            <span className="truncate">{localStatus === "Paid" ? "Already Paid" : "Process Payment"}</span>
           </Button>
         </div>
       </div>
@@ -49,15 +82,15 @@ export function GovInvoicePage({
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-gray-500">Total Insured Premium</span>
-                <span className="font-mono font-medium">{rwf(invoice.totalPremium || 0)}</span>
+                <span className="font-mono font-medium">{rwf(invoice.premiumTotal)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-gray-500">Government Subsidy Rate</span>
-                <span className="font-mono font-medium text-blue-600">{(invoice.subsidyRate || 0) * 100}%</span>
+                <span className="font-mono font-medium text-blue-600">{SUBSIDY_RATE * 100}%</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-gray-500">Due Date</span>
-                <span className="font-medium text-red-600">{invoice.dueDate || "N/A"}</span>
+                <span className="font-medium text-red-600">{formattedDueDate}</span>
               </div>
               <div className="flex justify-between items-center py-3 bg-emerald-50 -mx-6 px-6 border-y border-emerald-100">
                 <span className="font-semibold text-emerald-800">Total Subsidy Payment</span>
@@ -65,7 +98,7 @@ export function GovInvoicePage({
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-gray-500 text-sm">Payment Method</span>
-                <span className="text-sm font-medium">{invoice.paymentMethod || "Bank Transfer"}</span>
+                <span className="text-sm font-medium">Bank Transfer</span>
               </div>
             </div>
           </div>
@@ -84,18 +117,13 @@ export function GovInvoicePage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {(invoice.breakdown || []).map((item, idx) => (
+                  {breakdown.map((item, idx) => (
                     <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900">{item.category}</td>
                       <td className="px-4 py-3 text-right font-mono text-gray-600">{item.farms.toLocaleString()}</td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">{rwf(item.amount)}</td>
                     </tr>
                   ))}
-                  {(!invoice.breakdown || invoice.breakdown.length === 0) && (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500 italic">No breakdown data available.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
