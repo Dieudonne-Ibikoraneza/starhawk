@@ -46,7 +46,10 @@ function HeatCell({ r }: { r: (typeof regions)[number] }) {
       <span className={`text-[11px] font-semibold ${textColor}`}>{r.name}</span>
       <div>
         <span className={`font-mono block text-lg font-bold ${textColor}`}>{r.ndvi.toFixed(2)}</span>
-        <span className={`text-[10px] font-medium opacity-80 ${textColor}`}>{r.dominantCrop}</span>
+        <div className="mt-1 flex flex-col gap-0.5">
+          <span className={`text-[10px] font-medium opacity-80 ${textColor}`}>Most: {r.dominantCrop}</span>
+          <span className={`text-[10px] font-medium opacity-80 ${textColor}`}>Least: {r.leastCrop}</span>
+        </div>
       </div>
     </div>
   );
