@@ -364,12 +364,14 @@ export interface Farmer {
 }
 
 export interface VillageNode {
+  id: string;
   name: string;
   farmers: number;
   cultivatedHa: number;
 }
 
 export interface CellNode {
+  id: string;
   name: string;
   villages: VillageNode[];
   farmers: number;
@@ -427,7 +429,7 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
       const villageName = VILLAGE_NAMES[(seededInt(sectorId + cellName + v, 0, 1000) + v) % VILLAGE_NAMES.length];
       const vFarmers = seededInt(sectorId + cellName + villageName + "f", 4, 9);
       const vHa = seededInt(sectorId + cellName + villageName + "ha", 40, 180);
-      villages.push({ name: villageName, farmers: vFarmers, cultivatedHa: vHa });
+      villages.push({ id: `${sectorId}-${cellName}-${villageName}`, name: villageName, farmers: vFarmers, cultivatedHa: vHa });
 
       for (let f = 0; f < vFarmers; f++) {
         const fseed = sectorId + cellName + villageName + f;
@@ -460,6 +462,7 @@ export function getSectorDetail(sectorId: string): SectorDetail | null {
     const cellFarmers = villages.reduce((s, v) => s + v.farmers, 0);
     const cellHa = villages.reduce((s, v) => s + v.cultivatedHa, 0);
     cells.push({
+      id: `${sectorId}-${cellName}`,
       name: cellName,
       villages,
       farmers: cellFarmers,
