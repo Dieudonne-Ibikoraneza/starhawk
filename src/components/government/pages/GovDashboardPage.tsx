@@ -173,7 +173,7 @@ export function GovDashboardPage() {
               </DialogHeader>
               
               <div className="mt-2 space-y-4 text-sm text-foreground">
-                <p className="leading-relaxed">{detail.meta.summary}</p>
+                <p className="leading-relaxed">{detail.summary}</p>
                 
                 <div className="rounded-xl border border-border bg-card p-4">
                   <h4 className="font-semibold mb-3 flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
@@ -201,7 +201,7 @@ export function GovDashboardPage() {
 
                 <div className="space-y-2">
                   <h4 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Immediate Actions Recommended</h4>
-                  <p className="leading-relaxed text-muted-foreground">{detail.meta.recommendation}</p>
+                  <p className="leading-relaxed text-muted-foreground">{detail.recommendation}</p>
                 </div>
               </div>
             </>

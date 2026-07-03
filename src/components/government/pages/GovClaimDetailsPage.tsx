@@ -1,3 +1,6 @@
+import { useMemo, useState } from "react";
+import { ArrowLeft, Home, ChevronRight, Sprout, Gauge, Layers, Info, CloudRain, FileText, ClipboardCheck, User, Ruler, CalendarDays, MapPin, Images, Expand, Thermometer, Droplets, Wind, FileSearch, ArrowRight, Activity, Map, ArrowRightCircle } from "lucide-react";
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ReferenceLine, Bar, Line, AreaChart, Area } from "recharts";
 import { Panel, StatusBadge, KpiCard } from "@/components/government/gov-widgets";
 import { FieldMap, NdviLegend } from "./FieldMap";
 import { PhotoLightbox } from "./PhotoLightbox";
