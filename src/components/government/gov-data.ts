@@ -261,6 +261,7 @@ export interface ConceptDef {
   key: ConceptKey;
   label: string;
   unit: string;
+  category: "General" | "Agricultural" | "Financial";
   /** true when a higher value is the desirable / healthy direction */
   higherIsBetter: boolean;
   /** how to format a single value for display */
@@ -276,12 +277,12 @@ export type ConceptKey =
   | "cultivated";
 
 export const concepts: ConceptDef[] = [
-  { key: "ndvi", label: "Crop Health (NDVI)", unit: "index", higherIsBetter: true, format: (v) => v.toFixed(2) },
-  { key: "insurance", label: "Insurance Penetration", unit: "%", higherIsBetter: true, format: (v) => `${Math.round(v)}%` },
-  { key: "yield", label: "Avg Yield", unit: "t/ha", higherIsBetter: true, format: (v) => `${v.toFixed(1)} t/ha` },
-  { key: "claims", label: "Active Claims", unit: "claims", higherIsBetter: false, format: (v) => `${Math.round(v)}` },
-  { key: "subsidy", label: "Subsidy Utilized", unit: "M RWF", higherIsBetter: true, format: (v) => `${Math.round(v)}M` },
-  { key: "cultivated", label: "Cultivated Area", unit: "ha", higherIsBetter: true, format: (v) => `${Math.round(v).toLocaleString()} ha` },
+  { key: "cultivated", label: "Cultivated Area", unit: "ha", category: "General", higherIsBetter: true, format: (v) => `${Math.round(v).toLocaleString()} ha` },
+  { key: "ndvi", label: "Crop Health (NDVI)", unit: "index", category: "Agricultural", higherIsBetter: true, format: (v) => v.toFixed(2) },
+  { key: "yield", label: "Avg Yield", unit: "t/ha", category: "Agricultural", higherIsBetter: true, format: (v) => `${v.toFixed(1)} t/ha` },
+  { key: "insurance", label: "Insurance Penetration", unit: "%", category: "Financial", higherIsBetter: true, format: (v) => `${Math.round(v)}%` },
+  { key: "claims", label: "Active Claims", unit: "claims", category: "Financial", higherIsBetter: false, format: (v) => `${Math.round(v)}` },
+  { key: "subsidy", label: "Subsidy Utilized", unit: "M RWF", category: "Financial", higherIsBetter: true, format: (v) => `${Math.round(v)}M` },
 ];
 
 export type ConceptValues = Record<ConceptKey, number>;
