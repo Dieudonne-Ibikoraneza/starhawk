@@ -12,7 +12,9 @@
     "server": "node server/server.js",
     "server:dev": "nodemon server/server.js",
     "dev:full": "concurrently \"npm run server:dev\" \"npm run dev\"",
-    "seed": "node server/seed.js"
+    "seed": "node server/seed.js",
+    "test:government": "node tests/run-government-tests.mjs",
+    "test:government:browser": "node tests/run-government-browser-tests.mjs"
   },
   "dependencies": {
     "18": "^0.0.0",
@@ -104,6 +106,7 @@
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.2.1",
+    "esbuild": "^0.25.5",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
