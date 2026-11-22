@@ -1,5 +1,10 @@
 import { cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, Minus, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Minus,
+  type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Panel({
@@ -21,15 +26,19 @@ export function Panel({
     <section
       onClick={onClick}
       className={cn(
-        "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm",
+        "min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm",
         className,
       )}
     >
       {(title || action) && (
-        <header className="mb-4 flex items-start justify-between gap-3">
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            {title && <h3 className="text-base font-semibold text-gray-900">{title}</h3>}
-            {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
+            {title && (
+              <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            )}
+            {subtitle && (
+              <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
+            )}
           </div>
           {action && <div className="shrink-0">{action}</div>}
         </header>
@@ -72,8 +81,8 @@ export function KpiCard({
 
   const glowColorMap = {
     primary: "rgba(16, 185, 129, 0.12)", // emerald
-    info: "rgba(37, 99, 235, 0.12)",     // blue
-    warning: "rgba(217, 119, 6, 0.12)",  // amber
+    info: "rgba(37, 99, 235, 0.12)", // blue
+    warning: "rgba(217, 119, 6, 0.12)", // amber
     destructive: "rgba(220, 38, 38, 0.12)", // red
   } as const;
 
@@ -82,18 +91,34 @@ export function KpiCard({
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-gray-300">
-      <div 
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" 
-        style={{ background: `radial-gradient(circle at 30% 0%, ${glowColorMap[accent]}, transparent 60%)` }} 
+      <div
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        style={{
+          background: `radial-gradient(circle at 30% 0%, ${glowColorMap[accent]}, transparent 60%)`,
+        }}
       />
       <div className="relative flex items-start justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
-        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full", accentMap[accent])}>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+          {label}
+        </span>
+        <span
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+            accentMap[accent],
+          )}
+        >
           <Icon className="h-4 w-4" />
         </span>
       </div>
       <div className="relative mt-3 flex items-end gap-1.5">
-        <span className={cn("text-3xl font-bold tracking-tight tabular-nums", valueColorMap[accent])}>{value}</span>
+        <span
+          className={cn(
+            "text-3xl font-bold tracking-tight tabular-nums",
+            valueColorMap[accent],
+          )}
+        >
+          {value}
+        </span>
         {unit && <span className="mb-1 text-sm text-gray-500">{unit}</span>}
       </div>
       {delta !== undefined && (
@@ -106,7 +131,13 @@ export function KpiCard({
               !trendUp && !trendDown && "bg-gray-100 text-gray-600",
             )}
           >
-            {trendUp ? <ArrowUpRight className="h-3 w-3" /> : trendDown ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+            {trendUp ? (
+              <ArrowUpRight className="h-3 w-3" />
+            ) : trendDown ? (
+              <ArrowDownRight className="h-3 w-3" />
+            ) : (
+              <Minus className="h-3 w-3" />
+            )}
             {Math.abs(delta)}%
           </span>
           <span className="text-gray-500">{deltaLabel}</span>
@@ -116,7 +147,16 @@ export function KpiCard({
   );
 }
 
-export function DeltaPill({ value }: { value: number }) {
+export function DeltaPill({ value }: { value?: number | null }) {
+  if (value == null || !Number.isFinite(value))
+    return (
+      <span
+        className="text-xs text-gray-400"
+        title="Insufficient dated readings"
+      >
+        —
+      </span>
+    );
   const up = value > 0;
   const down = value < 0;
   return (
@@ -128,7 +168,13 @@ export function DeltaPill({ value }: { value: number }) {
         !up && !down && "bg-gray-100 text-gray-600",
       )}
     >
-      {up ? <ArrowUpRight className="h-3 w-3" /> : down ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+      {up ? (
+        <ArrowUpRight className="h-3 w-3" />
+      ) : down ? (
+        <ArrowDownRight className="h-3 w-3" />
+      ) : (
+        <Minus className="h-3 w-3" />
+      )}
       {value > 0 ? "+" : ""}
       {value.toFixed(2)}
     </span>
@@ -152,10 +198,20 @@ const statusStyles: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const cls = riskStyles[status] ?? statusStyles[status] ?? "bg-gray-100 text-gray-600 border-gray-200";
+  const cls =
+    riskStyles[status.toLowerCase()] ??
+    statusStyles[
+      status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+    ] ??
+    "bg-gray-100 text-gray-600 border-gray-200";
   const label = status.charAt(0).toUpperCase() + status.slice(1);
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize", cls)}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
+        cls,
+      )}
+    >
       {label}
     </span>
   );

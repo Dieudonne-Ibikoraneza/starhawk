@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Phone, Lock, LogIn, AlertCircle, CheckCircle2, Satellite, Wheat, Building2, MapPin, BarChart3, Settings } from "lucide-react";
 import CustomScrollbar from "@/components/ui/CustomScrollbar";
 import { useToast } from "@/hooks/use-toast";
-import { farmerLogin, assessorLogin, insurerLogin, adminLogin } from "@/services/authAPI";
-import { API_BASE_URL } from "@/config/api";
+import { farmerLogin, assessorLogin, insurerLogin, adminLogin, governmentLogin } from "@/services/authAPI";
 import { useAuth } from "@/contexts/AuthContext";
 
 // ─────────────────────────────────────────────────────────────────
@@ -112,6 +111,7 @@ export default function RoleSelection() {
         () => assessorLogin(formattedPhone, formData.password),
         () => insurerLogin(formattedPhone, formData.password),
         () => adminLogin(formattedPhone, formData.password),
+        () => governmentLogin(formattedPhone, formData.password),
       ];
 
       let loginResponse = null;
@@ -124,24 +124,6 @@ export default function RoleSelection() {
         } catch (err: any) {
           lastError = err;
         }
-      }
-
-      if (!loginResponse) {
-        try {
-          const res = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phoneNumber: formattedPhone, password: formData.password }),
-          });
-          const data = await res.json();
-          if (res.ok && data.data?.role === "GOVERNMENT") {
-            loginResponse = data.data;
-            localStorage.setItem("token", loginResponse.token);
-            localStorage.setItem("role", loginResponse.role);
-            localStorage.setItem("userId", loginResponse.userId || "");
-            localStorage.setItem("phoneNumber", formattedPhone);
-          }
-        } catch (_) {}
       }
 
       const isConnectivityError = (err: any) => {

@@ -367,6 +367,59 @@ class AuthApiService {
     }
   }
 
+  // Government Login
+  async governmentLogin(
+    phoneNumber: string,
+    password: string,
+  ): Promise<LoginResponse> {
+    try {
+      const requestBody = { phoneNumber, password };
+
+      const response = await this.request<any>("/login", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+      });
+
+      // Handle both response structures: { data: {...} } or direct {...}
+      const data = response.data || response;
+
+      if (!data || !data.token) {
+        throw new Error("Invalid response from server");
+      }
+
+      if (data.role !== "GOVERNMENT") {
+        throw new Error("Access denied. Only government officials can log in here.");
+      }
+
+      // Save token & user info in localStorage
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("userId", data.userId || data._id || "");
+      localStorage.setItem("phoneNumber", data.phoneNumber || "");
+      localStorage.setItem("email", data.email || "");
+
+      const userObj = {
+        id: data.userId || data._id || "",
+        email: data.email || "",
+        role: data.role,
+        name: data.name || "User",
+        profile: null,
+        signatureUrl: data.signatureUrl
+      };
+      localStorage.setItem("user", JSON.stringify(userObj));
+
+      return data;
+    } catch (error: any) {
+      // Re-throw with a more user-friendly message if possible
+      if (error.message) {
+        throw error;
+      }
+      throw new Error(
+        "Login failed. Please check your credentials and try again.",
+      );
+    }
+  }
+
   // Insurer Login
   async insurerLogin(
     phoneNumber: string,
@@ -506,6 +559,9 @@ export const farmerLogin = (phoneNumber: string, password: string) =>
 
 export const insurerLogin = (phoneNumber: string, password: string) =>
   authApiService.insurerLogin(phoneNumber, password);
+
+export const governmentLogin = (phoneNumber: string, password: string) =>
+  authApiService.governmentLogin(phoneNumber, password);
 
 export const logout = () => authApiService.logout();
 
