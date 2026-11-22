@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Polygon, Tooltip as LTooltip, LayersControl } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Polygon,
+  Tooltip as LTooltip,
+  LayersControl,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import type { LatLng, NdviCell } from "@/components/government/gov-data";
+import type { LatLng, NdviCell } from "./governmentTypes";
 
 /**
  * Client-only satellite field map. Renders the field boundary plus a
@@ -63,8 +69,15 @@ export function FieldMap({
             ndviCells.map((c) => (
               <Polygon
                 key={c.id}
-                positions={c.polygon.map((p) => [p.lat, p.lng] as [number, number])}
-                pathOptions={{ color: c.color, weight: 0.5, fillColor: c.color, fillOpacity: 0.55 }}
+                positions={c.polygon.map(
+                  (p) => [p.lat, p.lng] as [number, number],
+                )}
+                pathOptions={{
+                  color: c.color,
+                  weight: 0.5,
+                  fillColor: c.color,
+                  fillOpacity: 0.55,
+                }}
               >
                 <LTooltip sticky>NDVI {c.ndvi.toFixed(2)}</LTooltip>
               </Polygon>
@@ -72,22 +85,28 @@ export function FieldMap({
 
           <Polygon
             positions={boundaryPos}
-            pathOptions={{ color: "#38bdf8", weight: 3, fill: false, dashArray: "6 4" }}
+            pathOptions={{
+              color: "#38bdf8",
+              weight: 3,
+              fill: false,
+              dashArray: "6 4",
+            }}
           >
             <LTooltip sticky>Field boundary</LTooltip>
           </Polygon>
         </MapContainer>
 
-        <button
-          onClick={() => setShowNdvi((v) => !v)}
-          className="absolute left-3 top-3 z-[1000] cursor-pointer rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:border-primary/50"
-        >
-          {showNdvi ? "Hide NDVI" : "Show NDVI"}
-        </button>
+        {ndviCells.length > 0 && (
+          <button
+            onClick={() => setShowNdvi((v) => !v)}
+            className="absolute left-3 top-3 z-[1000] cursor-pointer rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:border-primary/50"
+          >
+            {showNdvi ? "Hide NDVI" : "Show NDVI"}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 export default FieldMap;
-

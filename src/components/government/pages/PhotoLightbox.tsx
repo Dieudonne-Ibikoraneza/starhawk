@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import type { ClaimPhoto } from "@/lib/gov-data";
+import {
+  X,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
+import type { ClaimPhoto } from "./governmentTypes";
 
 /**
  * Full-screen photo lightbox with zoom (buttons + scroll), pan (drag),
@@ -20,7 +28,12 @@ export function PhotoLightbox({
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
 
   const reset = useCallback(() => {
     setScale(1);
@@ -74,13 +87,19 @@ export function PhotoLightbox({
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <IconBtn label="Zoom out" onClick={() => setScale((s) => Math.max(1, s - 0.5))}>
+          <IconBtn
+            label="Zoom out"
+            onClick={() => setScale((s) => Math.max(1, s - 0.5))}
+          >
             <ZoomOut className="h-4 w-4" />
           </IconBtn>
           <span className="w-12 text-center text-xs tabular-nums text-white/70">
             {Math.round(scale * 100)}%
           </span>
-          <IconBtn label="Zoom in" onClick={() => setScale((s) => Math.min(6, s + 0.5))}>
+          <IconBtn
+            label="Zoom in"
+            onClick={() => setScale((s) => Math.min(6, s + 0.5))}
+          >
             <ZoomIn className="h-4 w-4" />
           </IconBtn>
           <IconBtn label="Reset" onClick={reset}>
@@ -100,10 +119,17 @@ export function PhotoLightbox({
         className="relative flex flex-1 items-center justify-center overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onWheel={(e) => {
-          setScale((s) => Math.min(6, Math.max(1, s - Math.sign(e.deltaY) * 0.3)));
+          setScale((s) =>
+            Math.min(6, Math.max(1, s - Math.sign(e.deltaY) * 0.3)),
+          );
         }}
         onMouseDown={(e) => {
-          dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+          dragRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            ox: offset.x,
+            oy: offset.y,
+          };
         }}
         onMouseMove={(e) => {
           if (!dragRef.current || scale === 1) return;
@@ -121,7 +147,9 @@ export function PhotoLightbox({
           alt={photo.caption}
           draggable={false}
           className="max-h-full max-w-full select-none object-contain transition-transform duration-150"
-          style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          }}
         />
 
         <NavBtn side="left" onClick={() => go(-1)}>
@@ -145,10 +173,16 @@ export function PhotoLightbox({
               reset();
             }}
             className={`h-14 w-20 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
-              i === index ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
+              i === index
+                ? "border-primary"
+                : "border-transparent opacity-60 hover:opacity-100"
             }`}
           >
-            <img src={p.url} alt={p.caption} className="h-full w-full object-cover" />
+            <img
+              src={p.url}
+              alt={p.caption}
+              className="h-full w-full object-cover"
+            />
           </button>
         ))}
       </div>

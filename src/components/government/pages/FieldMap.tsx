@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
-import type { LatLng, NdviCell } from "@/components/government/gov-data";
+import type { LatLng, NdviCell } from "./governmentTypes";
 
 interface FieldMapProps {
   center: LatLng;
@@ -52,7 +52,10 @@ export function NdviLegend() {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
       {steps.map((s) => (
         <span key={s.l} className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.c }} />
+          <span
+            className="h-2.5 w-2.5 rounded-sm"
+            style={{ background: s.c }}
+          />
           {s.l}
         </span>
       ))}
