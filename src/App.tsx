@@ -18,7 +18,6 @@ import PolicyDetailsPage from "./components/insurer/PolicyDetailsPage";
 import { PolicyRequestForm } from "./components/requests/PolicyRequestForm";
 import { RiskAssessmentModule } from "./components/assessment/RiskAssessmentModule";
 import { UnderwritingDashboard } from "./components/underwriting/UnderwritingDashboard";
-import { GovernmentAnalyticsDashboard } from "./components/government/GovernmentAnalyticsDashboard";
 import { GovernmentDashboard } from "./components/dashboards/GovernmentDashboard";
 import { NotificationManager } from "./components/notifications/NotificationManager";
 import { PaymentIntegration } from "./components/payments/PaymentIntegration";
@@ -124,7 +123,7 @@ const App = () => {
               <Route path="/policy-request" element={<PolicyRequestForm farmerId="farmer_001" onSubmit={() => {}} onCancel={() => {}} />} />
               <Route path="/risk-assessment" element={<RiskAssessmentModule policyRequestId="req_001" farmerId="farmer_001" assessorId="assessor_001" onSubmit={() => {}} onCancel={() => {}} />} />
               <Route path="/underwriting" element={<UnderwritingDashboard underwriterId="underwriter_001" />} />
-              <Route path="/government-analytics" element={<GovernmentAnalyticsDashboard />} />
+              <Route path="/government-analytics" element={<Navigate to="/government/dashboard" replace />} />
               <Route path="/notifications" element={<NotificationManager userType="farmer" userId="farmer_001" />} />
               <Route path="/payments" element={<PaymentIntegration farmerId="farmer_001" amount={120000} currency="RWF" onPaymentSuccess={() => {}} onPaymentFailure={() => {}} />} />
               <Route path="/file-claim" element={<ClaimFilingSystem farmerId="farmer_001" onClaimSubmit={() => {}} onCancel={() => {}} />} />

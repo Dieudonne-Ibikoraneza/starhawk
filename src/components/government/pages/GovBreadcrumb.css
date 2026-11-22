@@ -1,0 +1,33 @@
+.gov-breadcrumb {
+  container-type: inline-size;
+}
+.gov-breadcrumb .gov-breadcrumb-collapsed {
+  display: none;
+}
+.gov-breadcrumb .gov-breadcrumb-expanded,
+.gov-breadcrumb .gov-breadcrumb-home {
+  max-width: 10rem;
+  flex-shrink: 1;
+}
+@container (max-width: 760px) {
+  .gov-breadcrumb .gov-breadcrumb-expanded {
+    display: none;
+  }
+  .gov-breadcrumb .gov-breadcrumb-collapsed {
+    display: inline-flex;
+  }
+}
+@container (max-width: 420px) {
+  .gov-breadcrumb .gov-breadcrumb-home-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .gov-breadcrumb .gov-breadcrumb-home {
+    flex-shrink: 0;
+  }
+}

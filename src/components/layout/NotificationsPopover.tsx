@@ -51,7 +51,7 @@ export function NotificationsPopover() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-2xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 shadow-sm">
+        <Button aria-label="Notifications" variant="ghost" size="icon" className="relative h-11 w-11 rounded-2xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 shadow-sm">
           <Bell className="h-5 w-5 text-slate-500" />
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-white animate-in zoom-in duration-300">
@@ -63,7 +63,7 @@ export function NotificationsPopover() {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-[360px] p-0 sm:w-[400px] bg-card/90 backdrop-blur-xl border-border/60 shadow-lg"
+        className="w-[360px] max-w-[calc(100vw-1rem)] p-0 sm:w-[400px] bg-card/90 backdrop-blur-xl border-border/60 shadow-lg"
       >
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div>
